@@ -1,9 +1,5 @@
 # Generic artifact: no passwords, owner SSH keys or machine identities.
 # The operator provisions the owner account over QEMU guest agent on first install.
-[customizations]
-hostname = "zeusos"
-
 [[customizations.filesystem]]
 mountpoint = "/"
 minsize = "56 GiB"
-
