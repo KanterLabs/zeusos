@@ -84,6 +84,12 @@ struct TerminalInfo {
 }
 
 #[derive(Debug)]
+struct DesktopTool {
+    path: PathBuf,
+    helper: bool,
+}
+
+#[derive(Debug)]
 struct BootcProbe {
     available: bool,
     status: String,
@@ -268,26 +274,34 @@ fn desktop_safe(dry_run: bool) -> Result<(), CliError> {
             "desktop safe needs a usable terminal (expected ptyxis, gnome-terminal, or kgx); no desktop changes were made",
         )
     })?;
-    let extensions =
-        resolve_program("ZEUS_GNOME_EXTENSIONS_BIN", "gnome-extensions").ok_or_else(|| {
-            CliError::operation(
-                "desktop safe needs gnome-extensions; the Zeus dock was left unchanged",
-            )
-        })?;
+    let desktop_tool = resolve_desktop_tool().ok_or_else(|| {
+        CliError::operation(
+            "desktop safe needs the Zeus desktop helper or gnome-extensions; the dock was left unchanged",
+        )
+    })?;
 
     if dry_run {
         println!("Desktop safe (dry run)");
-        println!("Would run: gnome-extensions disable {}", DOCK_EXTENSION);
+        if desktop_tool.helper {
+            println!("Would run: zeus-desktop-safe disable");
+        } else {
+            println!("Would run: gnome-extensions disable {}", DOCK_EXTENSION);
+        }
         println!("Would return the shell to stock GNOME behavior by disabling the dock extension");
         println!("Terminal remains available through {}", terminal.name);
         println!("Credentials and personal data would remain untouched");
         return Ok(());
     }
 
-    let result = run_capture(&extensions, &["disable", DOCK_EXTENSION], COMMAND_TIMEOUT)?;
+    let arguments: &[&str] = if desktop_tool.helper {
+        &["disable"]
+    } else {
+        &["disable", DOCK_EXTENSION]
+    };
+    let result = run_capture(&desktop_tool.path, arguments, COMMAND_TIMEOUT)?;
     if !result.status.success() {
         return Err(CliError::operation(format!(
-            "gnome-extensions could not disable the Zeus dock (exit {}); no stock reset was attempted",
+            "the desktop fallback could not disable the Zeus dock (exit {}); no stock reset was attempted",
             exit_code_text(result.status)
         )));
     }
@@ -300,21 +314,29 @@ fn desktop_safe(dry_run: bool) -> Result<(), CliError> {
 }
 
 fn desktop_restore(dry_run: bool) -> Result<(), CliError> {
-    let extensions =
-        resolve_program("ZEUS_GNOME_EXTENSIONS_BIN", "gnome-extensions").ok_or_else(|| {
-            CliError::operation(
-                "desktop restore needs gnome-extensions; the Zeus dock was left unchanged",
-            )
-        })?;
+    let desktop_tool = resolve_desktop_tool().ok_or_else(|| {
+        CliError::operation(
+            "desktop restore needs the Zeus desktop helper or gnome-extensions; the dock was left unchanged",
+        )
+    })?;
 
     if dry_run {
         println!("Desktop restore (dry run)");
-        println!("Would run: gnome-extensions enable {}", DOCK_EXTENSION);
+        if desktop_tool.helper {
+            println!("Would run: zeus-desktop-safe enable");
+        } else {
+            println!("Would run: gnome-extensions enable {}", DOCK_EXTENSION);
+        }
         println!("Credentials and personal data would remain untouched");
         return Ok(());
     }
 
-    let result = run_capture(&extensions, &["enable", DOCK_EXTENSION], COMMAND_TIMEOUT)?;
+    let arguments: &[&str] = if desktop_tool.helper {
+        &["enable"]
+    } else {
+        &["enable", DOCK_EXTENSION]
+    };
+    let result = run_capture(&desktop_tool.path, arguments, COMMAND_TIMEOUT)?;
     if !result.status.success() {
         return Err(CliError::operation(format!(
             "gnome-extensions could not enable the Zeus dock (exit {})",
@@ -324,6 +346,30 @@ fn desktop_restore(dry_run: bool) -> Result<(), CliError> {
     println!("Zeus desktop restored: dock enabled.");
     println!("Credentials and personal data were left untouched.");
     Ok(())
+}
+
+fn resolve_desktop_tool() -> Option<DesktopTool> {
+    if let Some(path) = env::var_os("ZEUS_DESKTOP_HELPER") {
+        let path = PathBuf::from(path);
+        if is_executable(&path) {
+            return Some(DesktopTool { path, helper: true });
+        }
+    }
+
+    let installed_helper = Path::new("/usr/libexec/zeus-desktop-safe");
+    if is_executable(installed_helper) {
+        return Some(DesktopTool {
+            path: installed_helper.to_path_buf(),
+            helper: true,
+        });
+    }
+    if let Some(path) = find_executable("zeus-desktop-safe") {
+        return Some(DesktopTool { path, helper: true });
+    }
+    resolve_program("ZEUS_GNOME_EXTENSIONS_BIN", "gnome-extensions").map(|path| DesktopTool {
+        path,
+        helper: false,
+    })
 }
 
 fn command_update(arguments: &[String]) -> Result<(), CliError> {

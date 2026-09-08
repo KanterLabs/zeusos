@@ -8,6 +8,7 @@ will arrive through the shared ``zeus`` command surface in a later preview.
 
 import os
 import shutil
+import sys
 
 import gi
 
@@ -136,7 +137,7 @@ def make_label(text, css_class, *, wrap=False):
     label.add_css_class(css_class)
     if wrap:
         label.set_wrap(True)
-        label.set_wrap_mode(2)  # PANGO_WRAP_WORD_CHAR, without another import.
+        label.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
     return label
 
 
@@ -314,7 +315,7 @@ class WelcomeApplication(Adw.Application):
 
 
 def main():
-    return WelcomeApplication().run(None)
+    return WelcomeApplication().run(sys.argv)
 
 
 if __name__ == "__main__":
