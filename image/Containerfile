@@ -6,6 +6,7 @@ RUN dnf install -y --setopt=install_weak_deps=False $(cat /tmp/zeus-packages.txt
 
 FROM ${BASE_IMAGE} AS cli-builder
 RUN dnf install -y --setopt=install_weak_deps=False cargo rust gcc && dnf clean all
+ENV CARGO_HOME=/tmp/cargo
 WORKDIR /src/zeus
 COPY zeus/Cargo.toml zeus/Cargo.lock ./
 COPY zeus/src ./src
@@ -37,4 +38,3 @@ RUN chmod 0755 /usr/libexec/zeus-welcome && \
     printf '%s\n' "${SOURCE_COMMIT}" > /usr/share/zeus/source-commit && \
     sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="Zeus OS 0.1 Preview"/' /usr/lib/os-release && \
     bootc container lint
-
