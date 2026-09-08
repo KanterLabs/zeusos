@@ -27,6 +27,7 @@ libadwaita
 dconf
 polkit
 qemu-guest-agent
+cloud-init
 spice-vdagent
 openssh-clients
 openssh-server
