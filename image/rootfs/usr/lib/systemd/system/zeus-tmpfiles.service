@@ -1,0 +1,13 @@
+[Unit]
+Description=Prepare Zeus desktop runtime directories
+After=systemd-tmpfiles-setup.service
+Before=gdm.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemd-tmpfiles --create
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Welcome to Zeus OS
+Comment=Start with the essentials on the Zeus OS preview
+Exec=/usr/libexec/zeus-welcome
+Icon=org.zeus.Welcome
+Terminal=false
+Categories=GTK;GNOME;Utility;
+StartupNotify=true

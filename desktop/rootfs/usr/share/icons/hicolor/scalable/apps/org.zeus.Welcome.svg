@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title description">
+  <title id="title">Zeus OS</title>
+  <desc id="description">A geometric indigo Z mark on a rounded midnight-blue tile.</desc>
+  <defs>
+    <linearGradient id="tile" x1="30" y1="20" x2="224" y2="236" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#152C68"/>
+      <stop offset="0.52" stop-color="#0B173B"/>
+      <stop offset="1" stop-color="#261B59"/>
+    </linearGradient>
+    <linearGradient id="z" x1="48" y1="54" x2="206" y2="205" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#B8DBFF"/>
+      <stop offset="0.46" stop-color="#6F9BFF"/>
+      <stop offset="1" stop-color="#C18DFF"/>
+    </linearGradient>
+    <radialGradient id="sheen" cx="50%" cy="0%" r="100%">
+      <stop offset="0" stop-color="#A9C8FF" stop-opacity="0.26"/>
+      <stop offset="0.68" stop-color="#526DC2" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#526DC2" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="10" y="10" width="236" height="236" rx="58" fill="url(#tile)"/>
+  <rect x="10" y="10" width="236" height="236" rx="58" fill="url(#sheen)"/>
+  <rect x="11.5" y="11.5" width="233" height="233" rx="56.5" fill="none" stroke="#A3C4FF" stroke-opacity="0.24" stroke-width="3"/>
+  <circle cx="128" cy="128" r="87" fill="none" stroke="#8DACFF" stroke-opacity="0.14" stroke-width="2"/>
+  <path d="M53 72H204L142 128L204 184H53L115 128Z" fill="url(#z)" stroke="#D8E7FF" stroke-opacity="0.72" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M79 94H163L138 116H79Z" fill="#F4F8FF" fill-opacity="0.70"/>
+  <path d="M118 140H178L163 162H93Z" fill="#E8DDFF" fill-opacity="0.54"/>
+  <circle cx="58" cy="57" r="3" fill="#B7D2FF" fill-opacity="0.75"/>
+  <circle cx="201" cy="202" r="3" fill="#BD9CFF" fill-opacity="0.62"/>
+</svg>

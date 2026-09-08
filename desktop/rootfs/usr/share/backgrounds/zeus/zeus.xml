@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE background SYSTEM "gnome-wp-list.dtd">
+<background>
+  <starttime>
+    <year>2026</year>
+    <month>1</month>
+    <day>1</day>
+    <hour>0</hour>
+    <minute>0</minute>
+    <second>0</second>
+  </starttime>
+  <static>
+    <duration>86400.0</duration>
+    <file>/usr/share/backgrounds/zeus/zeus-wallpaper-dark.svg</file>
+  </static>
+</background>

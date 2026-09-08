@@ -1,0 +1,94 @@
+#!/bin/sh
+# Disable or restore the optional Zeus dock without touching other shell
+# extensions or the native GNOME lock/authentication path.
+set -eu
+
+DOCK_UUID='dash-to-dock@micxgx.gmail.com'
+
+usage() {
+    printf '%s\n' \
+        'Usage: zeus-desktop-safe {disable|enable|status}' \
+        '' \
+        'disable  Add the Zeus dock to GNOME Shell disabled-extensions.' \
+        'enable   Remove only the Zeus dock from disabled-extensions.' \
+        'status   Show the current dock state and favorite applications.'
+}
+
+require_gsettings() {
+    if ! command -v gsettings >/dev/null 2>&1; then
+        printf '%s\n' 'gsettings is required for the desktop fallback.' >&2
+        exit 1
+    fi
+}
+
+current_disabled() {
+    # gsettings prints an array as @as [] or ['one', 'two']; extension UUIDs
+    # contain neither commas nor quotes, so this small parser is sufficient.
+    gsettings get org.gnome.shell disabled-extensions 2>/dev/null \
+        | sed 's/^@as //' \
+        | tr -d "[]'" \
+        | tr ',' '\n' \
+        | sed 's/^ *//; s/ *$//' \
+        | sed '/^$/d'
+}
+
+as_variant() {
+    output='['
+    first=true
+    while IFS= read -r item; do
+        [ -n "$item" ] || continue
+        if [ "$first" = true ]; then
+            first=false
+        else
+            output="$output, "
+        fi
+        output="$output'$item'"
+    done
+    output="$output]"
+    printf '%s\n' "$output"
+}
+
+disable_dock() {
+    items=$(current_disabled)
+    if printf '%s\n' "$items" | grep -Fqx "$DOCK_UUID"; then
+        printf '%s\n' 'Zeus dock is already disabled.'
+        return 0
+    fi
+    next=$(printf '%s\n' "$items" "$DOCK_UUID" | as_variant)
+    gsettings set org.gnome.shell disabled-extensions "$next"
+    printf '%s\n' 'Zeus dock disabled; native GNOME shell and authentication remain available.'
+}
+
+enable_dock() {
+    items=$(current_disabled)
+    next=$(printf '%s\n' "$items" | grep -Fvx "$DOCK_UUID" || true)
+    gsettings set org.gnome.shell disabled-extensions "$(printf '%s\n' "$next" | as_variant)"
+    printf '%s\n' 'Zeus dock enabled when the GNOME Shell extension is installed.'
+}
+
+show_status() {
+    if printf '%s\n' "$(current_disabled)" | grep -Fqx "$DOCK_UUID"; then
+        printf '%s\n' 'dock: disabled'
+    else
+        printf '%s\n' 'dock: enabled (or awaiting extension load)'
+    fi
+    printf 'favorites: '
+    gsettings get org.gnome.shell favorite-apps
+}
+
+require_gsettings
+case "${1:-}" in
+    disable|fallback)
+        disable_dock
+        ;;
+    enable|restore)
+        enable_dock
+        ;;
+    status)
+        show_status
+        ;;
+    *)
+        usage >&2
+        exit 2
+        ;;
+esac

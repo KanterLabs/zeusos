@@ -1,0 +1,14 @@
+out/
+target/
+__pycache__/
+*.pyc
+*.qcow2
+*.raw
+*.iso
+*.oci
+*.ociarchive
+*.pem
+*.key
+*.credentials*
+*.private.*
+

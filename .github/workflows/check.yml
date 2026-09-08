@@ -1,0 +1,34 @@
+name: Preview source checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  image-policy:
+    runs-on: homelab
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - name: Validate image inputs, assets and login policy
+        run: python3 -m unittest discover -s tests -p test_image_contract.py -v
+      - name: Check build script syntax
+        run: bash -n scripts/build.sh scripts/build-disk.sh
+      - name: Check welcome application syntax
+        run: python3 -m py_compile zeus/assets/welcome.py
+  cli:
+    runs-on: homelab-heavy
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path zeus/Cargo.toml --check
+      - name: Test and build CLI
+        run: |
+          cargo test --manifest-path zeus/Cargo.toml --locked --offline
+          cargo build --manifest-path zeus/Cargo.toml --release --locked --offline
+          python3 -m unittest discover -s tests -p test_cli.py -v

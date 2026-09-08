@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="3840" height="2160" viewBox="0 0 3840 2160" role="img" aria-labelledby="title description">
+  <title id="title">Zeus OS morning horizon</title>
+  <desc id="description">A pale blue and indigo horizon with a geometric Zeus mark and a quiet technical grid.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0.92" y2="1">
+      <stop offset="0" stop-color="#F7FAFF"/>
+      <stop offset="0.48" stop-color="#EAF1FF"/>
+      <stop offset="1" stop-color="#D5E0F8"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="50%" cy="39%" r="58%">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.92"/>
+      <stop offset="0.38" stop-color="#C4D5FB" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#A3B6E5" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ridge" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7892D4" stop-opacity="0"/>
+      <stop offset="0.25" stop-color="#6E86CC" stop-opacity="0.30"/>
+      <stop offset="0.5" stop-color="#415EB2" stop-opacity="0.54"/>
+      <stop offset="0.75" stop-color="#6E86CC" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#7892D4" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="-220" y1="-180" x2="210" y2="190">
+      <stop offset="0" stop-color="#4669C5"/>
+      <stop offset="0.48" stop-color="#344FA7"/>
+      <stop offset="1" stop-color="#7350B6"/>
+    </linearGradient>
+    <pattern id="grid" width="112" height="112" patternUnits="userSpaceOnUse">
+      <path d="M112 0H0V112" fill="none" stroke="#536FB8" stroke-opacity="0.12" stroke-width="2"/>
+    </pattern>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#D8E5FF" stop-opacity="0"/>
+      <stop offset="1" stop-color="#B9C9EC" stop-opacity="0.46"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="3840" height="2160" fill="url(#sky)"/>
+  <rect width="3840" height="2160" fill="url(#halo)"/>
+
+  <g fill="none" stroke-linecap="round">
+    <path d="M-160 1540C520 1300 1010 1460 1530 1310S2610 1030 4000 1320" stroke="#849BDC" stroke-opacity="0.30" stroke-width="4"/>
+    <path d="M-160 1594C580 1368 1070 1510 1580 1370S2700 1104 4000 1386" stroke="#6E86CC" stroke-opacity="0.24" stroke-width="2"/>
+    <path d="M-160 1650C620 1430 1090 1570 1660 1414S2760 1188 4000 1440" stroke="url(#ridge)" stroke-width="3"/>
+    <path d="M-160 1704C640 1495 1110 1630 1710 1478S2830 1262 3980 1498" stroke="#7E94CF" stroke-opacity="0.18" stroke-width="2"/>
+  </g>
+
+  <rect x="0" y="1060" width="3840" height="1100" fill="url(#grid)" opacity="0.46"/>
+  <rect x="0" y="1340" width="3840" height="820" fill="url(#fade)"/>
+
+  <g fill="none" stroke-linecap="round">
+    <path d="M90 630L880 220" stroke="#5E78BC" stroke-opacity="0.12" stroke-width="3"/>
+    <path d="M2960 2140L3760 1700" stroke="#5E78BC" stroke-opacity="0.16" stroke-width="3"/>
+    <path d="M330 1030C810 680 1170 646 1530 806" stroke="#637EC2" stroke-opacity="0.12" stroke-width="2"/>
+    <path d="M2310 630C2710 436 3030 458 3470 750" stroke="#526DB4" stroke-opacity="0.11" stroke-width="2"/>
+    <circle cx="660" cy="520" r="4" fill="#4B63A4" fill-opacity="0.40" stroke="none"/>
+    <circle cx="3124" cy="414" r="3" fill="#4B63A4" fill-opacity="0.34" stroke="none"/>
+    <circle cx="3420" cy="1040" r="5" fill="#536FC2" fill-opacity="0.26" stroke="none"/>
+    <circle cx="520" cy="1320" r="3" fill="#536FC2" fill-opacity="0.30" stroke="none"/>
+  </g>
+
+  <g transform="translate(1920 1030)" fill="none" stroke-linejoin="round">
+    <circle r="274" stroke="#4D6BB9" stroke-opacity="0.16" stroke-width="2"/>
+    <circle r="214" stroke="#536FC2" stroke-opacity="0.18" stroke-width="2" stroke-dasharray="2 22"/>
+    <path d="M-188-128H190L34 0L190 128H-188L-34 0Z" fill="url(#mark)" fill-opacity="0.64" stroke="#304B9C" stroke-opacity="0.52" stroke-width="5"/>
+    <path d="M-122-74H92L28-22H-122Z" fill="#F2F6FF" fill-opacity="0.74" stroke="none"/>
+    <path d="M-28 22H122L92 74H-92Z" fill="#E8E1FF" fill-opacity="0.66" stroke="none"/>
+  </g>
+
+  <g fill="#536FC2" fill-opacity="0.32">
+    <circle cx="1452" cy="938" r="3"/>
+    <circle cx="2386" cy="1124" r="3"/>
+    <circle cx="2602" cy="946" r="2"/>
+    <circle cx="1224" cy="1132" r="2"/>
+  </g>
+  <path d="M260 1882H3580" stroke="#526DB4" stroke-opacity="0.24" stroke-width="2"/>
+  <path d="M1270 1882H2570" stroke="#304B9C" stroke-opacity="0.26" stroke-width="3"/>
+</svg>

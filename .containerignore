@@ -1,0 +1,8 @@
+.git
+out
+**/target
+**/__pycache__
+*.qcow2
+*.raw
+*.iso
+

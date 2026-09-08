@@ -1,0 +1,40 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE} AS desktop-base
+COPY image/packages.txt /tmp/zeus-packages.txt
+RUN dnf install -y --setopt=install_weak_deps=False $(cat /tmp/zeus-packages.txt) && \
+    dnf clean all && rm -f /tmp/zeus-packages.txt
+
+FROM ${BASE_IMAGE} AS cli-builder
+RUN dnf install -y --setopt=install_weak_deps=False cargo rust gcc && dnf clean all
+WORKDIR /src/zeus
+COPY zeus/Cargo.toml zeus/Cargo.lock ./
+COPY zeus/src ./src
+RUN cargo test --locked --offline && cargo build --release --locked --offline
+
+FROM desktop-base
+ARG VERSION=0.1.0-preview.1
+ARG SOURCE_COMMIT=unknown
+LABEL org.opencontainers.image.title="Zeus OS" \
+      org.opencontainers.image.description="A focused, beautiful laptop desktop. First preview." \
+      org.opencontainers.image.source="https://github.com/KanterLabs/zeusos" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${SOURCE_COMMIT}"
+COPY desktop/rootfs/ /
+COPY image/rootfs/ /
+COPY --from=cli-builder /src/zeus/target/release/zeus /usr/bin/zeus
+COPY zeus/assets/welcome.py /usr/libexec/zeus-welcome
+COPY zeus/assets/org.zeus.Welcome.desktop /usr/share/applications/org.zeus.Welcome.desktop
+COPY image/inputs.json /usr/share/zeus/inputs.json
+RUN chmod 0755 /usr/libexec/zeus-welcome && \
+    dconf update && \
+    systemctl set-default graphical.target && \
+    systemctl enable gdm.service NetworkManager.service firewalld.service sshd.service && \
+    systemctl mask bootc-fetch-apply-updates.timer && \
+    systemctl enable zeus-tmpfiles.service && \
+    mkdir -p /usr/share/zeus && \
+    rpm -qa --qf '%{NAME}-%{EPOCHNUM}:%{VERSION}-%{RELEASE}.%{ARCH}\n' | sort > /usr/share/zeus/packages.lock && \
+    printf '%s\n' "${VERSION}" > /usr/share/zeus/version && \
+    printf '%s\n' "${SOURCE_COMMIT}" > /usr/share/zeus/source-commit && \
+    sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="Zeus OS 0.1 Preview"/' /usr/lib/os-release && \
+    bootc container lint
+

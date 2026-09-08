@@ -1,0 +1,12 @@
+[package]
+name = "zeus"
+version = "0.1.0-preview.1"
+edition = "2021"
+description = "The small local command surface for the Zeus OS preview"
+license = "MIT"
+repository = "https://github.com/KanterLabs/zeusos"
+
+[[bin]]
+name = "zeus"
+path = "src/main.rs"
+
