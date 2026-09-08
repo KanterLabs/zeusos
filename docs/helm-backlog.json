@@ -1,0 +1,418 @@
+{
+  "project": "ZOS",
+  "project_id": "99275838ed530f2ea607b45fab3d0b2d",
+  "items": {
+    "I01": {
+      "id": "513ca0bd0cf82d9f270ea12af4964946",
+      "key": "ZOS-2",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-2",
+      "title": "[I01] Establish the repository and release contract",
+      "phase": "M0 — Prove the architecture",
+      "kind": "Implementation"
+    },
+    "I02": {
+      "id": "7931a202404f45218e2a51b549b72d9a",
+      "key": "ZOS-3",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-3",
+      "title": "[I02] Select and verify the exact artifact set",
+      "phase": "M0 — Prove the architecture",
+      "kind": "Implementation"
+    },
+    "I03": {
+      "id": "16b8ec369432c0ab2383d692bf8cc2f6",
+      "key": "ZOS-4",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-4",
+      "title": "[I03] Prepare an isolated builder and disposable test resources",
+      "phase": "M0 — Prove the architecture",
+      "kind": "Implementation"
+    },
+    "I04": {
+      "id": "e9eab30e912f282fd4b9f02a286f1c41",
+      "key": "ZOS-5",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-5",
+      "title": "[I04] Prove desktop installation and deployment rollback",
+      "phase": "M0 — Prove the architecture",
+      "kind": "Implementation"
+    },
+    "I05": {
+      "id": "f43b4a308c2e1821b98d69a9debdfc68",
+      "key": "ZOS-6",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-6",
+      "title": "[I05] Prove persistent remote T3 and Codex execution",
+      "phase": "M0 — Prove the architecture",
+      "kind": "Implementation"
+    },
+    "I06": {
+      "id": "061dc0cee4f7cff7c3e418d83569d70e",
+      "key": "ZOS-7",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-7",
+      "title": "[I06] Assemble the complete image and core application suite",
+      "phase": "M1 — Build the usable preview image",
+      "kind": "Implementation"
+    },
+    "I07": {
+      "id": "67cfd116f33108f2b12a2d9ec9878fb0",
+      "key": "ZOS-8",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-8",
+      "title": "[I07] Productize the safe installer and QCOW2 artifacts",
+      "phase": "M1 — Build the usable preview image",
+      "kind": "Implementation"
+    },
+    "I08": {
+      "id": "b0bf21839fe22ea94e1bc0e70d197a33",
+      "key": "ZOS-9",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-9",
+      "title": "[I08] Build the shared Rust command engine",
+      "phase": "M1 — Build the usable preview image",
+      "kind": "Implementation"
+    },
+    "I09": {
+      "id": "b0f15f0b585e4588a34f653b4555ba5d",
+      "key": "ZOS-10",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-10",
+      "title": "[I09] Establish device security and manual release trust",
+      "phase": "M1 — Build the usable preview image",
+      "kind": "Implementation"
+    },
+    "I10": {
+      "id": "ce3022f06de8438a9939e137ee56fcb7",
+      "key": "ZOS-11",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-11",
+      "title": "[I10] Implement private connectivity and remote launchers",
+      "phase": "M1 — Build the usable preview image",
+      "kind": "Implementation"
+    },
+    "I11": {
+      "id": "8c946dfc783a0b9feb28430ae12bd96e",
+      "key": "ZOS-12",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-12",
+      "title": "[I11] Package safe dev-VM service provisioning",
+      "phase": "M1 — Build the usable preview image",
+      "kind": "Implementation"
+    },
+    "I12": {
+      "id": "6bbbd29d89792482ab0a37b81544b323",
+      "key": "ZOS-13",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-13",
+      "title": "[I12] Deliver manual update, rollback, and recovery access",
+      "phase": "M1 — Build the usable preview image",
+      "kind": "Implementation"
+    },
+    "I13": {
+      "id": "a757ee29d4b906e2fc3da64ae77e37f5",
+      "key": "ZOS-14",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-14",
+      "title": "[I13] Define the portable-profile schema and precedence",
+      "phase": "M2 — Make a replacement laptop recoverable",
+      "kind": "Implementation"
+    },
+    "I14": {
+      "id": "1c70bdf6e49f4262cfd5069980ff668b",
+      "key": "ZOS-15",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-15",
+      "title": "[I14] Implement independent enrollment and lost-device revocation",
+      "phase": "M2 — Make a replacement laptop recoverable",
+      "kind": "Implementation"
+    },
+    "I15": {
+      "id": "31ac9096bb1a287045aa6fb25ed9bbe1",
+      "key": "ZOS-16",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-16",
+      "title": "[I15] Implement checkpointed, idempotent restore",
+      "phase": "M2 — Make a replacement laptop recoverable",
+      "kind": "Implementation"
+    },
+    "I16": {
+      "id": "ef04de8f7d3b59beccd6d6e1625f15e3",
+      "key": "ZOS-17",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-17",
+      "title": "[I16] Implement actionable readiness diagnostics",
+      "phase": "M2 — Make a replacement laptop recoverable",
+      "kind": "Implementation"
+    },
+    "I17": {
+      "id": "962c4216acede93e8839b8b5cb65d299",
+      "key": "ZOS-18",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-18",
+      "title": "[I17] Connect the first-run Setup Workstation journey",
+      "phase": "M2 — Make a replacement laptop recoverable",
+      "kind": "Implementation"
+    },
+    "I18": {
+      "id": "06ee834737ff360ce8ea92b8c4c426e4",
+      "key": "ZOS-19",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-19",
+      "title": "[I18] Implement deliberate preference export and local exceptions",
+      "phase": "M2 — Make a replacement laptop recoverable",
+      "kind": "Implementation"
+    },
+    "I19": {
+      "id": "7006525da4322490cc8d26c8ed733f4a",
+      "key": "ZOS-20",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-20",
+      "title": "[I19] Package the complete replacement-laptop runbook",
+      "phase": "M2 — Make a replacement laptop recoverable",
+      "kind": "Implementation"
+    },
+    "I20": {
+      "id": "b00e591c53c7cbd394fa70ca7d655d87",
+      "key": "ZOS-21",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-21",
+      "title": "[I20] Implement the baseline dock, shell defaults, and safe desktop",
+      "phase": "M1 — Build the usable preview image",
+      "kind": "Implementation"
+    },
+    "I21": {
+      "id": "bf89a0963fa7643a14f2b1617a9a69f0",
+      "key": "ZOS-22",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-22",
+      "title": "[I21] Implement baseline native lock/login privacy and accessibility",
+      "phase": "M1 — Build the usable preview image",
+      "kind": "Implementation"
+    },
+    "I22": {
+      "id": "5ac0cf6bc7d1185f1aeb230bd837cc24",
+      "key": "ZOS-23",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-23",
+      "title": "[I22] Implement conservative power and resume behavior",
+      "phase": "M3 — Add advanced polish and measured power policy",
+      "kind": "Implementation"
+    },
+    "I23": {
+      "id": "11cde8693d0cd7e31e0be28fbb873cd0",
+      "key": "ZOS-24",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-24",
+      "title": "[I23] Automate locked builds, signing, and release records",
+      "phase": "M4 — Maintain and qualify release channels",
+      "kind": "Implementation"
+    },
+    "I24": {
+      "id": "24d93788b02fff5c231307d5ba4c49c5",
+      "key": "ZOS-25",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-25",
+      "title": "[I24] Implement channels and client update scheduling",
+      "phase": "M4 — Maintain and qualify release channels",
+      "kind": "Implementation"
+    },
+    "I25": {
+      "id": "868eefac27a365d5bee764516febfae9",
+      "key": "ZOS-26",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-26",
+      "title": "[I25] Implement consistent, independent dev-VM backups",
+      "phase": "M4 — Maintain and qualify release channels",
+      "kind": "Implementation"
+    },
+    "I26": {
+      "id": "37ba85a1296a07bee9f00fe465ccc771",
+      "key": "ZOS-27",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-27",
+      "title": "[I26] Automate compatibility and data-preserving upgrade policy",
+      "phase": "M4 — Maintain and qualify release channels",
+      "kind": "Implementation"
+    },
+    "I27": {
+      "id": "233126f697dbfd9097edc3b865cc0804",
+      "key": "ZOS-28",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-28",
+      "title": "[I27] Implement signer rotation and security servicing",
+      "phase": "M4 — Maintain and qualify release channels",
+      "kind": "Implementation"
+    },
+    "I28": {
+      "id": "c8a23b67f162eba0e6b6e1a579b8964c",
+      "key": "ZOS-29",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-29",
+      "title": "[I28] Schedule isolated backup-restore verification",
+      "phase": "M4 — Maintain and qualify release channels",
+      "kind": "Implementation"
+    },
+    "I29": {
+      "id": "36ba7389dd64451e20d3de308c929f22",
+      "key": "ZOS-30",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-30",
+      "title": "[I29] Expose dated backup health and finish operating runbooks",
+      "phase": "M4 — Maintain and qualify release channels",
+      "kind": "Implementation"
+    },
+    "Q01": {
+      "id": "7a63dde84d868fea1540cec1f5728c0e",
+      "key": "ZOS-31",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-31",
+      "title": "[Q01] Establish the test contract and evidence ledger",
+      "phase": "M0, harness",
+      "kind": "Testing"
+    },
+    "Q02": {
+      "id": "7d1e0296cd42b57037012d3c40194919",
+      "key": "ZOS-32",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-32",
+      "title": "[Q02] Build CI routing and isolation policy",
+      "phase": "M0–M4, harness",
+      "kind": "Testing"
+    },
+    "Q03": {
+      "id": "440cc2e812ffb0ecfd18e3acbf372a85",
+      "key": "ZOS-33",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-33",
+      "title": "[Q03] Implement local unit, static, and content checks",
+      "phase": "M0–M3, harness",
+      "kind": "Testing"
+    },
+    "Q04": {
+      "id": "2063085fde993958f2d1d1757d5ac045",
+      "key": "ZOS-34",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-34",
+      "title": "[Q04] Wire artifact provenance and payload assertions",
+      "phase": "M0–M4, harness",
+      "kind": "Testing"
+    },
+    "Q05": {
+      "id": "cf3b349ba2c9be8c16efc2f1de01724a",
+      "key": "ZOS-35",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-35",
+      "title": "[Q05] Provision disposable VM and resource profiles",
+      "phase": "M0, harness",
+      "kind": "Testing"
+    },
+    "Q06": {
+      "id": "e054279cd9ff2a2691f406d577904085",
+      "key": "ZOS-36",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-36",
+      "title": "[Q06] Wire the offline-installer and suite test adapter",
+      "phase": "M0–M1, harness",
+      "kind": "Testing"
+    },
+    "Q07": {
+      "id": "4c0b46c176441879b7a1c55cb39ded1a",
+      "key": "ZOS-37",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-37",
+      "title": "[Q07] Implement the two-disk safety oracle",
+      "phase": "M1, acceptance harness",
+      "kind": "Testing"
+    },
+    "Q08": {
+      "id": "b59ac1a0c12aba65cfb429b61f57fbc4",
+      "key": "ZOS-38",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-38",
+      "title": "[Q08] Build the remote-workspace continuity fixture",
+      "phase": "M0 prototype, M1 complete, harness",
+      "kind": "Testing"
+    },
+    "Q09": {
+      "id": "f5e785f76b6d144744b0fbc0312e3db4",
+      "key": "ZOS-39",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-39",
+      "title": "[Q09] Add transport and session fault controls",
+      "phase": "M1, harness",
+      "kind": "Testing"
+    },
+    "Q10": {
+      "id": "5657579d7a3b0ad08f5bcbe9cb162555",
+      "key": "ZOS-40",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-40",
+      "title": "[Q10] Seed populated profile/application and retained-release fixtures",
+      "phase": "M1–M4, harness",
+      "kind": "Testing"
+    },
+    "Q11": {
+      "id": "a0094b6f1b9bec981e17c187d68a05d2",
+      "key": "ZOS-41",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-41",
+      "title": "[Q11] Make independent enrollment and credential-recovery fixtures",
+      "phase": "M2, harness",
+      "kind": "Testing"
+    },
+    "Q12": {
+      "id": "4fb0d8c2bbbde9e8139c139b7fc97963",
+      "key": "ZOS-42",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-42",
+      "title": "[Q12] Seed backup and isolated-restore test adapters",
+      "phase": "M2–M4, harness",
+      "kind": "Testing"
+    },
+    "Q13": {
+      "id": "a9ff64540d455b53df938570d7a1cce6",
+      "key": "ZOS-43",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-43",
+      "title": "[Q13] Construct update, rollback, signature, and boot-trust fixtures",
+      "phase": "M0–M4, harness",
+      "kind": "Testing"
+    },
+    "Q14": {
+      "id": "c398b9dfd7299aee8a75eca56f7f9efd",
+      "key": "ZOS-44",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-44",
+      "title": "[Q14] Add interrupted-operation and resource-exhaustion injection",
+      "phase": "M1–M3, harness",
+      "kind": "Testing"
+    },
+    "Q15": {
+      "id": "9f013074158d49e226d9e44be46a16ee",
+      "key": "ZOS-45",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-45",
+      "title": "[Q15] Run T01 offline install and required-suite acceptance",
+      "phase": "M1, execution",
+      "kind": "Testing"
+    },
+    "Q16": {
+      "id": "50e9ddba3f6e41e6679e26c52a5fd574",
+      "key": "ZOS-46",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-46",
+      "title": "[Q16] Run T03 wiped-client recovery drill and 30-minute clock",
+      "phase": "M2, execution",
+      "kind": "Testing"
+    },
+    "Q17": {
+      "id": "293f76ee2e10fc9c7a2cbf1fadab4394",
+      "key": "ZOS-47",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-47",
+      "title": "[Q17] Run T04 continuity and T05 transport acceptance",
+      "phase": "M1 smoke, M2 recovery, M3 hardware, execution",
+      "kind": "Testing"
+    },
+    "Q18": {
+      "id": "e59e233f7a5f63a62d4f38e11548a455",
+      "key": "ZOS-48",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-48",
+      "title": "[Q18] Run T06 update and T07 rollback smoke/full acceptance",
+      "phase": "M1 smoke, M2–M4 full, execution",
+      "kind": "Testing"
+    },
+    "Q19": {
+      "id": "c5442b22c194a6cff89fe358c568e885",
+      "key": "ZOS-49",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-49",
+      "title": "[Q19] Run T08 trust and T09 failure-safety acceptance",
+      "phase": "M1 smoke, M2–M4 full, execution",
+      "kind": "Testing"
+    },
+    "Q20": {
+      "id": "3fe1300b9fc221ff2b7b49bf953e098b",
+      "key": "ZOS-50",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-50",
+      "title": "[Q20] Run T10 desktop/accessibility and T11 physical power acceptance",
+      "phase": "M1 baseline smoke, M3 complete execution",
+      "kind": "Testing"
+    },
+    "Q21": {
+      "id": "552dac2234b173d67c8fbda0adf1c858",
+      "key": "ZOS-51",
+      "url": "https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-51",
+      "title": "[Q21] Run T12 backup restore acceptance",
+      "phase": "M2–M4, execution",
+      "kind": "Testing"
+    }
+  },
+  "board_url": "https://tc.shanekanterman.dev/p/zeusos",
+  "backlog_column_id": "116085cd78f6b3e63ede2eeeb1c21a16",
+  "verification": {
+    "cards": 50,
+    "implementation_cards": 29,
+    "testing_cards": 21,
+    "unchecked_criteria": 186,
+    "implementation_dependency_edges": 76,
+    "all_backlog": true,
+    "all_unclaimed": true,
+    "descriptions_match_source": true
+  }
+}
