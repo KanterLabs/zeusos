@@ -1,0 +1,30 @@
+{
+  "label": "stock-gnome-presentation",
+  "settle_seconds": 60,
+  "interval_seconds": 4,
+  "samples": [
+    {
+      "cpu_percent": 0.25,
+      "memory_used_mib": 882.1
+    },
+    {
+      "cpu_percent": 0.063,
+      "memory_used_mib": 882.1
+    },
+    {
+      "cpu_percent": 0.187,
+      "memory_used_mib": 882.1
+    },
+    {
+      "cpu_percent": 0.125,
+      "memory_used_mib": 882.1
+    },
+    {
+      "cpu_percent": 0.187,
+      "memory_used_mib": 882.1
+    }
+  ],
+  "median_cpu_percent": 0.187,
+  "median_memory_used_mib": 882.1,
+  "memory_definition": "MemTotal minus MemAvailable; includes non-reclaimable guest memory"
+}

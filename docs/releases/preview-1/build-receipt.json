@@ -1,0 +1,56 @@
+{
+  "version": "0.1.0-preview.1",
+  "source_commit": "38bb7fc53002a76dbfa4a5c891c3d1b1bbdb4f20",
+  "image_config_digest": "sha256:4227bad47963efa9779fe7b7fa51e1bbf08f360511a1480bd4eeccaea292b81b",
+  "booted_manifest_digest": "sha256:3fa00c6a1d5eaa5529deb6c6138ffedfedb354d999da9735d268e70e808cd06b",
+  "artifacts": {
+    "disk.qcow2": {
+      "sha256": "1a310143f573d04bd5bfd06e5fb0c4e719dfbf69f6ac6d1b20fc3c0c7dcb9c15",
+      "bytes": 2080047104
+    },
+    "zeusos-preview-1-release.oci": {
+      "sha256": "251aaa56d227e5d0c9cd7acfc9869095cbe7daef783c2213a00707175f02dccb",
+      "bytes": 1808258560
+    }
+  },
+  "validation": {
+    "unit_contract_tests": 15,
+    "installed_desktop_settings": 68,
+    "native_gdm_login": true,
+    "wayland_session": true,
+    "secure_boot_enabled": true,
+    "selinux": "Enforcing",
+    "failed_system_units": 0,
+    "qcow2_check": "passed",
+    "detached_checksum_signature": "verified",
+    "backup_zstd_integrity": "passed",
+    "backup_vma_verify": "passed",
+    "isolated_backup_restore": "not run",
+    "state_preserved_through_update_rollback_rollforward": true,
+    "preserved_files": 3,
+    "preserved_owner_preference": true,
+    "dock_fallback_restore": "passed",
+    "lock_unlock": "passed",
+    "native_login_after_final_update": "passed"
+  },
+  "vm": {
+    "vcpus": 4,
+    "memory_mib": 8192,
+    "disk_gib": 64,
+    "display": "VirtIO 1280x800",
+    "renderer": "kms_swrast software rendering"
+  },
+  "unqualified": [
+    "physical laptop hardware and battery",
+    "compositor frame-time/redraw tracing",
+    "fractional display scaling and full accessibility matrix",
+    "automatic signed registry update channel",
+    "interactive encrypted installer",
+    "remote personal-profile recovery and full T3 integration"
+  ],
+  "measurements": {
+    "zeus": "idle-zeus.json",
+    "baseline": "idle-baseline.json",
+    "cold_boot": "cold-boot.json"
+  }
+}

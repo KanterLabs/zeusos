@@ -1,0 +1,6 @@
+{
+  "cold_boot_to_gdm_service_seconds": 20.09,
+  "cold_boot_to_visible_greeter_seconds": 21.83,
+  "method": "Host monotonic clock around qm start, SSH gdm readiness, then 1s console polling for greeter background and owner avatar; final screenshot visually verified",
+  "resolution": "1280x800"
+}
