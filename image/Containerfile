@@ -28,6 +28,7 @@ COPY zeus/assets/org.zeus.Welcome.desktop /usr/share/applications/org.zeus.Welco
 COPY image/inputs.json /usr/share/zeus/inputs.json
 RUN chmod 0755 /usr/libexec/zeus-welcome && \
     dconf update && \
+    gtk-update-icon-cache --force --ignore-theme-index /usr/share/icons/hicolor && \
     systemctl set-default graphical.target && \
     systemctl enable gdm.service NetworkManager.service firewalld.service sshd.service && \
     systemctl enable cloud-init-local.service cloud-init-network.service cloud-init-main.service cloud-config.service cloud-final.service && \
