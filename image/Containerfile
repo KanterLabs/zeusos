@@ -30,6 +30,7 @@ RUN chmod 0755 /usr/libexec/zeus-welcome && \
     dconf update && \
     systemctl set-default graphical.target && \
     systemctl enable gdm.service NetworkManager.service firewalld.service sshd.service && \
+    systemctl enable cloud-init-local.service cloud-init-network.service cloud-init-main.service cloud-config.service cloud-final.service && \
     systemctl mask bootc-fetch-apply-updates.timer && \
     systemctl enable zeus-tmpfiles.service && \
     mkdir -p /usr/share/zeus && \
