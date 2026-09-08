@@ -27,7 +27,7 @@ this layer.
 
 `org.gnome.shell.favorite-apps` is the complete five-item dock list:
 
-`org.gnome.Nautilus.desktop`, `org.gnome.Ptyxis.desktop`, `firefox.desktop`,
+`org.gnome.Nautilus.desktop`, `org.gnome.Ptyxis.desktop`, `org.mozilla.firefox.desktop`,
 `org.gnome.Settings.desktop`, and `org.zeus.Welcome.desktop`.
 
 The dash-to-dock settings use its published GSettings schema: bottom floating

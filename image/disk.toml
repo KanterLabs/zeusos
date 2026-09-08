@@ -1,5 +1,5 @@
 # Generic artifact: no passwords, owner SSH keys or machine identities.
-# The operator provisions the owner account over QEMU guest agent on first install.
+# The operator provisions the owner account with a private NoCloud seed on first install.
 [[customizations.filesystem]]
 mountpoint = "/"
 minsize = "56 GiB"

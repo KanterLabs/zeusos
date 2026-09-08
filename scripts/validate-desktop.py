@@ -20,6 +20,9 @@ for section in config.sections():
         definition = schema.get_key(key)
         value = GLib.Variant.parse(definition.get_value_type(), raw, None, None)
         assert definition.range_check(value), f'Invalid value {schema_id}:{key}'
+        if schema_id == 'org.gnome.shell' and key == 'favorite-apps':
+            for desktop_id in value.unpack():
+                assert Gio.DesktopAppInfo.new(desktop_id), f'Missing favorite launcher: {desktop_id}'
         count += 1
 print(f'Validated {count} desktop settings against installed GNOME schemas.')
 

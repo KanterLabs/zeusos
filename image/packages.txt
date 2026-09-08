@@ -21,6 +21,7 @@ NetworkManager-bluetooth
 adwaita-icon-theme
 google-noto-sans-fonts
 google-noto-sans-mono-fonts
+glibc-langpack-en
 python3-gobject
 gtk4
 libadwaita

@@ -14,7 +14,7 @@ import gi
 
 gi.require_version("Adw", "1")
 gi.require_version("Gtk", "4.0")
-from gi.repository import Adw, Gio, GLib, Gtk
+from gi.repository import Adw, Gio, GLib, Gtk, Pango
 
 
 VERSION = "0.1.0-preview.1"
@@ -131,13 +131,19 @@ CSS = """
 """
 
 
-def make_label(text, css_class, *, wrap=False):
+def make_label(text, css_class, *, wrap=False, max_width_chars=None):
     label = Gtk.Label(label=text)
     label.set_xalign(0)
     label.add_css_class(css_class)
     if wrap:
         label.set_wrap(True)
-        label.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        label.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
+        label.set_hexpand(True)
+        if max_width_chars is not None:
+            # A wrapped label otherwise advertises its one-line natural width
+            # to a Grid/ScrolledWindow and can force the whole window wider
+            # than the display before GTK gets a chance to wrap it.
+            label.set_max_width_chars(max_width_chars)
     return label
 
 
@@ -156,13 +162,19 @@ class WelcomeWindow(Adw.ApplicationWindow):
 
         toolbar = Adw.ToolbarView()
         header = Adw.HeaderBar()
+        header.set_show_start_title_buttons(True)
+        header.set_show_end_title_buttons(True)
         header.set_title_widget(make_label("Zeus OS", "section-title"))
         toolbar.add_top_bar(header)
 
         toast_overlay = Adw.ToastOverlay()
         scroller = Gtk.ScrolledWindow()
         scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        scroller.set_child(self._build_content())
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(820)
+        clamp.set_tightening_threshold(600)
+        clamp.set_child(self._build_content())
+        scroller.set_child(clamp)
         toast_overlay.set_child(scroller)
         self._toast_overlay = toast_overlay
         toolbar.set_content(toast_overlay)
@@ -180,6 +192,7 @@ class WelcomeWindow(Adw.ApplicationWindow):
                 "A calm, capable desktop for focused work — with the essentials close and the rest out of your way.",
                 "hero-copy",
                 wrap=True,
+                max_width_chars=72,
             )
         )
         hero.append(make_label(f"Preview {VERSION}", "version-pill"))
@@ -241,6 +254,7 @@ class WelcomeWindow(Adw.ApplicationWindow):
                 "This first preview focuses on a polished local desktop. Future updates will make it simple to return to your trusted remote workspace and bring your personal setup to a new laptop.",
                 "journey-copy",
                 wrap=True,
+                max_width_chars=100,
             )
         )
         content.append(journey)
@@ -249,12 +263,15 @@ class WelcomeWindow(Adw.ApplicationWindow):
                 "You can always open the standard GNOME applications from the top bar.",
                 "footer-copy",
                 wrap=True,
+                max_width_chars=80,
             )
         )
         return content
 
     def _make_card(self, icon_name, title, copy, action_text, callback):
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        card.set_hexpand(True)
+        card.set_vexpand(True)
         card.add_css_class("welcome-card")
         icon = Gtk.Image.new_from_icon_name(icon_name)
         icon.set_pixel_size(26)
@@ -262,7 +279,7 @@ class WelcomeWindow(Adw.ApplicationWindow):
         icon.set_halign(Gtk.Align.START)
         card.append(icon)
         card.append(make_label(title, "card-title"))
-        card.append(make_label(copy, "card-copy", wrap=True))
+        card.append(make_label(copy, "card-copy", wrap=True, max_width_chars=32))
         button = Gtk.Button(label=action_text)
         button.set_halign(Gtk.Align.START)
         button.add_css_class("card-button")
@@ -308,6 +325,8 @@ class WelcomeApplication(Adw.Application):
         super().__init__(application_id=APPLICATION_ID)
 
     def do_activate(self):
+        # The welcome artwork uses a light palette; keep native controls legible.
+        self.get_style_manager().set_color_scheme(Adw.ColorScheme.FORCE_LIGHT)
         window = self.props.active_window
         if window is None:
             window = WelcomeWindow(self)

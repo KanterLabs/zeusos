@@ -5,9 +5,8 @@ Before=gdm.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/systemd-tmpfiles --create
+ExecStart=/usr/bin/systemd-tmpfiles --create /usr/lib/tmpfiles.d/zeus-desktop.conf
 RemainAfterExit=yes
 
 [Install]
 WantedBy=multi-user.target
-

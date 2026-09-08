@@ -5,6 +5,7 @@ cd "$(dirname "$0")/.."
 builder=$(python3 -c 'import json; print(json.load(open("image/inputs.json"))["builder"])')
 version=$(python3 -c 'import json; print(json.load(open("image/inputs.json"))["version"])')
 mkdir -p out/disk
+podman image exists "$builder" || podman pull --platform linux/amd64 "$builder"
 podman run --rm --privileged --security-opt label=disable \
   -v "$PWD/image/disk.toml:/config.toml:ro" \
   -v "$PWD/out/disk:/output" \
