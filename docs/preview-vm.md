@@ -16,7 +16,7 @@ preview candidates.
 | Proxmox UI | [https://10.0.0.20:8006](https://10.0.0.20:8006) |
 | Review guest | VM **115**, `zeusos-preview` |
 | Guest address | `10.0.0.95` on the private LAN; DHCP may change it |
-| Guest account | `shane`; native GDM login |
+| Guest account | `shane`; native GDM login; requested default password `root` |
 | Compute | 4 vCPUs, 8 GiB fixed RAM, no ballooning |
 | Storage | 64 GiB VirtIO system disk |
 | Firmware | UEFI/OVMF with enrolled Secure Boot keys |
@@ -36,8 +36,8 @@ address is current.
   Use a named disposable guest for clean installs, partitioning, corruption,
   full-disk, interrupted-update, and restore tests.
 - The generic image contains no owner password, private key, machine identity,
-  or personal profile. The one-time seed generates a password locally and
-  sends only its hash to the guest. The clear password stays in the local file
+  or personal profile. The one-time seed uses the owner-requested default password `root` and
+  sends only its hash to the guest. The local login record stays in the file
   `/home/shane/.local/state/zeusos/preview-1-credentials.json`, mode `0600`;
   do not copy or print it in the repository, terminal transcript, screenshots,
   or chat.

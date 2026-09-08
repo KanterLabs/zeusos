@@ -2,15 +2,13 @@
 """Provision the empty review VM through a private NoCloud seed.
 
 Only for the initial installation. Never use this to update an existing user.
-The generic image contains no credentials. Passwords are generated locally;
+The generic image contains no credentials. The owner-requested preview password default is applied locally;
 only a password hash and public SSH key enter the hypervisor seed.
 """
 import argparse
 import json
 import os
 from pathlib import Path
-import secrets
-import string
 import subprocess
 
 parser = argparse.ArgumentParser()
@@ -29,7 +27,8 @@ status = subprocess.check_output(['ssh', '-o', 'BatchMode=yes', args.host, f'qm 
 if status.strip() != 'status: stopped':
     parser.error('Initial provisioning requires the review VM to be stopped')
 args.credentials.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-password = ''.join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(24))
+# Owner-requested default for the isolated Zeus preview account.
+password = 'root'
 fd = os.open(args.credentials, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
 with os.fdopen(fd, 'w') as stream:
     json.dump({'vmid': args.vmid, 'username': 'shane', 'password': password}, stream, indent=2)
@@ -51,4 +50,4 @@ subprocess.run(['ssh', '-o', 'BatchMode=yes', args.host,
                input=seed, text=True, check=True)
 subprocess.run(['ssh', '-o', 'BatchMode=yes', args.host,
                 f'qm set {args.vmid} --ide2 local-lvm:cloudinit --cicustom user=sata-ssd:snippets/zeusos-preview-user.yaml --ipconfig0 ip=dhcp'], check=True)
-print('Private first-boot seed attached. Password stored only in the requested local credentials file.')
+print('Private first-boot seed attached. Login details stored in the requested local credentials file.')
