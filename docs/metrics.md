@@ -434,6 +434,68 @@ Evidence: [installed-image check](features/airpods/installed-image-check.json),
 [source CI](https://github.com/KanterLabs/zeusos/actions/runs/34390942069),
 and [AirPods implementation/testing contract](features/airpods.md).
 
+### 2026-09-09 — New York desktop, lock and login
+
+- Recorded at (UTC): `2026-09-09T21:09:32.401394+00:00`.
+- Version/build: `0.1.0-preview.2` / `git-31f0851a9d07`; baseline `git-fd2125f63159`.
+- Environment: persistent Proxmox VM115, 4 vCPU, 8 GiB RAM, 64 GiB disk,
+  VirtIO GPU, 1280×800 at 100%, UEFI Secure Boot and enforcing SELinux.
+- Protocol: three cold starts per image; 20 s settling then 120 s closed-desktop
+  idle with 5 s samples. Temp Never; builder stopped; backup work complete.
+  Shared host otherwise unisolated. Thresholds were [declared before sampling](iterations/git-31f0851a9d07/measurement-plan.json).
+
+| Measurement | Before samples | Candidate samples | Before / candidate median | Unit |
+| --- | --- | --- | --- | --- |
+| OS startup | 7.041, 7.168, 6.925 | 6.834, 7.265, 6.797 | 7.041 / 6.834 | s |
+| Host start to active GDM | 17.699, 18.660, 18.513 | 17.609, 18.646, 17.599 | 18.513 / 17.609 | s |
+| Closed idle CPU | qualifying repeat | fresh candidate login | 0.150 / 0.150 | % |
+| Closed idle memory | qualifying repeat | fresh candidate login | 1,057.5 / 904.7 | MiB |
+| Temp cleanup activations | 0 | 0 | 0 / 0 | count |
+| Runtime packages | 1,011 | 1,011 | unchanged | count |
+| Full OCI size | 1,829,006,336 | 1,834,208,768 | +5,202,432 (4.96 MiB) | bytes |
+
+Cold-start UTC windows (host measurement bounds):
+
+| Trial | Before | Candidate |
+| --- | --- | --- |
+| 1 | `2026-09-09T20:14:47.993143034Z` → `2026-09-09T20:15:05.877454016Z` | `2026-09-09T20:58:08.973386375Z` → `2026-09-09T20:58:26.749552759Z` |
+| 2 | `2026-09-09T20:15:11.479524005Z` → `2026-09-09T20:15:30.306703191Z` | `2026-09-09T20:58:32.266006924Z` → `2026-09-09T20:58:51.100078005Z` |
+| 3 | `2026-09-09T20:15:36.609650413Z` → `2026-09-09T20:15:55.315955574Z` | `2026-09-09T20:59:41.310649492Z` → `2026-09-09T20:59:59.075997711Z` |
+
+Qualifying baseline idle ran from `2026-09-09T20:31:40.825480479Z`
+to `2026-09-09T20:33:40.836128575Z`; candidate idle ran from
+`2026-09-09T21:02:32.783349962Z` to
+`2026-09-09T21:04:32.793998188Z`. Baseline repeat had
+121.5 context switches/s and 7 processes started; candidate had 124.0/s and 3.
+
+The first baseline idle (20:20:09.548967338Z–20:22:09.559557090Z) measured
+0.150% CPU and 939.8 MiB. Three failed read-only guest probes overlapped it;
+retain it as observational evidence and use the repeat for the declared comparison.
+The repeat followed extra lock/unlock activity; candidate idle followed a fresh
+login. The before/after values do not establish a lasting speedup or memory
+reduction. Every cold-start sample is retained. No declared review threshold
+was exceeded; no new runtime package, service or recurring timer was added.
+
+Native installation ran from `2026-09-09T20:46:42.094667+00:00` to
+`2026-09-09T20:47:57.686851+00:00` (**75.592 s**), including Polkit
+entry, metadata/archive fetch, staging and up to 5 s observation overhead.
+The explicit update reboot is separate from cold-start comparison. During public
+feed propagation the client briefly reported a verification failure; the later
+correct signed pair verified before installation. The exact failed pair was not
+retained. No physical battery, energy, radio or
+suspend-drain claim follows from these VM results.
+
+The [receipt and screenshots](iterations/git-31f0851a9d07/README.md) record native
+100%/200%, high contrast, fallback and password tests, the verified populated
+backup, seven preserved file hashes, restored Temp On boot and owner preferences.
+Raw evidence: [boot/idle comparison](iterations/git-31f0851a9d07/performance-comparison.json),
+[initial baseline](iterations/git-31f0851a9d07/baseline-idle-closed.json),
+[baseline repeat](iterations/git-31f0851a9d07/baseline-idle-closed-repeat.json),
+[candidate idle](iterations/git-31f0851a9d07/candidate-idle-closed.json),
+[image cost](iterations/git-31f0851a9d07/image-cost.json),
+[install](iterations/git-31f0851a9d07/native-install-timing.json) and
+[update reboot](iterations/git-31f0851a9d07/update-reboot-observation.json).
+
 ## Entry template
 
 Insert this compact block immediately above the Entry template section for every

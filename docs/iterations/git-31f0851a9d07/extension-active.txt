@@ -1,0 +1,7 @@
+zeus-lock-background@kanterlabs
+  Name: Zeus Lock Background
+  Description: Keeps the native GNOME lock wallpaper recognizable while preserving the native lock dialog.
+  Path: /usr/share/gnome-shell/extensions/zeus-lock-background@kanterlabs
+  Version: 1
+  Enabled: Yes
+  State: ACTIVE

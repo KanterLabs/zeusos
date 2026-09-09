@@ -1,0 +1,44 @@
+[
+  {
+    "name": "build-info-git-31f0851a9d07.json",
+    "bytes": 165,
+    "sha256": "77f020d1756ac56c1caeb3d9d21815364e14150f7028475a74916791782bf6fe",
+    "upload_state": "uploaded",
+    "url": "https://github.com/KanterLabs/zeusos/releases/download/v0.1.0-preview.2/build-info-git-31f0851a9d07.json"
+  },
+  {
+    "name": "SHA256SUMS-git-31f0851a9d07",
+    "bytes": 110,
+    "sha256": "93111b1fa577d531646e15b97afc2cd9dfe81bf973588dfad6f54cf162c41317",
+    "upload_state": "uploaded",
+    "url": "https://github.com/KanterLabs/zeusos/releases/download/v0.1.0-preview.2/SHA256SUMS-git-31f0851a9d07"
+  },
+  {
+    "name": "SHA256SUMS-git-31f0851a9d07.sig",
+    "bytes": 310,
+    "sha256": "462590e3f79d39f8757f7a0b13d04511a5fea76a1c235758875a532a3c11262d",
+    "upload_state": "uploaded",
+    "url": "https://github.com/KanterLabs/zeusos/releases/download/v0.1.0-preview.2/SHA256SUMS-git-31f0851a9d07.sig"
+  },
+  {
+    "name": "update-git-31f0851a9d07.json",
+    "bytes": 952,
+    "sha256": "99644b8119f77ee9726923cb7d345191409e9e54d57a8580e4b8710fec147f6b",
+    "upload_state": "uploaded",
+    "url": "https://github.com/KanterLabs/zeusos/releases/download/v0.1.0-preview.2/update-git-31f0851a9d07.json"
+  },
+  {
+    "name": "update-git-31f0851a9d07.json.sig",
+    "bytes": 306,
+    "sha256": "ab6cc418991b52d5e414c141d15343827d8abea6273652217c698b67ac02be27",
+    "upload_state": "uploaded",
+    "url": "https://github.com/KanterLabs/zeusos/releases/download/v0.1.0-preview.2/update-git-31f0851a9d07.json.sig"
+  },
+  {
+    "name": "zeusos-0.1.0-preview.2-git-31f0851a9d07.oci",
+    "bytes": 1834208768,
+    "sha256": "0e3fa07066ee6ebae885e96d284ce0e6756312e35e4153f4ec1034c76a30443b",
+    "upload_state": "uploaded",
+    "url": "https://github.com/KanterLabs/zeusos/releases/download/v0.1.0-preview.2/zeusos-0.1.0-preview.2-git-31f0851a9d07.oci"
+  }
+]

@@ -45,7 +45,7 @@ checks when the address is current.
 - Keep the review guest's owner files and settings across candidates. A
   Proxmox snapshot is a convenience point and is not a backup. Verify the
   backup gate below before any update or state migration.
-- Native Updates is qualified on VM 115 for signed build `git-fd2125f63159`
+- Native Updates is qualified on VM 115 for signed build `git-31f0851a9d07`
   after a native Updates installation and explicit reboot. The post-reboot
   status reported `The selected update is installed.` There is no unattended
   update or automatic reboot.
@@ -106,7 +106,7 @@ contents. Record its output as redacted evidence if it is retained.
 The current local desktop actions are also reversible and narrow:
 
 ```sh
-zeus desktop safe       # disable Zeus shell/dock and managed GTK imports
+zeus desktop safe       # disable Zeus shell/dock/lock effects and managed GTK imports
 zeus desktop restore    # restore the Zeus presentation
 zeus update status --json  # local updater state; read-only and no reboot
 zeus update check --json   # fetch signed metadata only; no image download
@@ -189,7 +189,7 @@ not authenticate a new artifact. The separate feed publication and
 Complete the source, image, signature, and release-asset gates before updating
 the feed; record native installation and explicit-restart qualification before
 handing the preview to users. The current final record is in the [signed
-Settings iteration receipt](iterations/git-fd2125f63159/README.md).
+city iteration receipt](iterations/git-31f0851a9d07/README.md).
 
 ## Bootstrap and manual update path
 
@@ -320,35 +320,39 @@ The declared comparison and budgets are in
 [`preview-1-budgets.md`](releases/preview-1-budgets.md). Record actual values
 and variability; the 4-vCPU/8-GiB VM allocation is not performance evidence.
 
-## Current signed Settings iteration
+## Current signed New York appearance iteration
 
-VM 115 now runs signed build `git-fd2125f63159`, still version
-`0.1.0-preview.2`, with booted manifest
-`sha256:ae59a68dbfc9eb6f5f22fe7000f1073b266d578b49cb2c7d490ab38975dd023f`.
-Open **Zeus → Settings** or **Welcome → Open Settings** for everyday controls.
-The [final iteration receipt](iterations/git-fd2125f63159/README.md) records
-the source, image, signature and release-asset gates, the native installation
-through **Open Updates**, explicit reboot, and the post-reboot status. The
-[earlier updater qualification](iterations/git-17d205103f3a/README.md) separately
-records the background-install and authentication-cancellation tests.
-The booted image is
-`/var/lib/zeus/updater/downloads/zeusos-0.1.0-preview.2-git-fd2125f63159.oci`.
-The previous build `git-17d205103f3a` remains in the rollback slot; no rollback
-cycle was run. See the [timestamped metrics history](metrics.md) for runtime
-observations; physical battery remains unmeasured on this VM.
+VM 115 runs signed build `git-31f0851a9d07`, still version `0.1.0-preview.2`,
+with booted manifest
+`sha256:0caa0eeb446a397ed594292be9d1133a0b608e0cd151ff9a551afd56a434d561`.
+New York dusk artwork fills the desktop, lock and native login. **Settings →
+Appearance** offers the city and retained gradient backgrounds. The optional
+`zeus-lock-background@kanterlabs` extension adjusts only native background blur
+and brightness; safe desktop and high contrast restore native effects.
+The [city receipt](iterations/git-31f0851a9d07/README.md) records signed assets,
+native Updates installation, explicit restart, native password entry,
+100%/200% layout, high contrast, preservation and measurements.
 
-The current verified pre-Settings backup is
-`/mnt/pve/sata-ssd/zeusos/backups/settings-20260909/vzdump-qemu-115-2026_09_09-03_53_43.vma.zst`.
-Its zstd and full decompressed VMA checks passed. The previous verified
-pre-updater backup remains at
-`/mnt/pve/sata-ssd/zeusos/backups/updater-20260909/vzdump-qemu-115-2026_09_09-01_16_44.vma.zst`.
-Its zstd and decompressed VMA checks passed. The archive name follows the
-Proxmox host clock; do not infer an event time from it. The earlier populated
-pre-upgrade backup remains separately as a historical record at
-`/mnt/pve/sata-ssd/zeusos/backups/boot-power-20260909/vzdump-qemu-115-2026_09_08-17_06_26.vma.zst`; its zstd and decompressed VMA checks also passed.
-No previous backup or global retention policy was changed. Temp was held at
-Never during repeated test boots and restored through its normal policy API for
-handoff.
+The booted archive is
+`/var/lib/zeus/updater/downloads/zeusos-0.1.0-preview.2-git-31f0851a9d07.oci`.
+The previous **git-fd2125f63159** Settings image remains in the rollback slot.
+No rollback cycle, owner reseed, disk replacement or restore was performed.
+The Temp/updater/Settings backends are unchanged. The owner's extension list
+received one additive UUID; unrelated preferences were preserved.
+
+The current verified populated pre-city backup is
+`/mnt/pve/sata-ssd/zeusos/backups/city-20260909/vzdump-qemu-115-2026_09_09-11_05_02.vma.zst`.
+Its zstd and full decompressed VMA checks passed. Earlier verified backups remain:
+
+- Settings: `/mnt/pve/sata-ssd/zeusos/backups/settings-20260909/vzdump-qemu-115-2026_09_09-03_53_43.vma.zst`
+- Updates: `/mnt/pve/sata-ssd/zeusos/backups/updater-20260909/vzdump-qemu-115-2026_09_09-01_16_44.vma.zst`
+- Boot/power: `/mnt/pve/sata-ssd/zeusos/backups/boot-power-20260909/vzdump-qemu-115-2026_09_08-17_06_26.vma.zst`
+
+Archive names follow the Proxmox host clock; use UTC evidence timestamps for
+measurements. No backup or global retention policy was changed. Temp was held
+at Never for qualification boots and restored to On boot for handoff.
+The [metrics history](metrics.md) retains all boot/idle samples and limits.
+Physical laptop battery and radio behavior remain unqualified on this VM.
 
 ## Previous Preview 2 visual deployment (historical)
 

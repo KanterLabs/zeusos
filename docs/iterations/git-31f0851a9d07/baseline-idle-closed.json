@@ -1,0 +1,112 @@
+{
+  "label": "city-baseline-closed",
+  "measurement_started_at_utc": "2026-09-09T20:20:09.548967338Z",
+  "measurement_ended_at_utc": "2026-09-09T20:22:09.559557090Z",
+  "seconds": 120.01,
+  "settle_seconds": 20,
+  "samples": [
+    {
+      "cpu_percent": 0.15,
+      "memory_used_mib": 939.8
+    },
+    {
+      "cpu_percent": 0.15,
+      "memory_used_mib": 939.8
+    },
+    {
+      "cpu_percent": 0.2,
+      "memory_used_mib": 939.8
+    },
+    {
+      "cpu_percent": 0.05,
+      "memory_used_mib": 939.8
+    },
+    {
+      "cpu_percent": 0.2,
+      "memory_used_mib": 939.8
+    },
+    {
+      "cpu_percent": 0.05,
+      "memory_used_mib": 939.8
+    },
+    {
+      "cpu_percent": 0.2,
+      "memory_used_mib": 939.8
+    },
+    {
+      "cpu_percent": 0.1,
+      "memory_used_mib": 939.8
+    },
+    {
+      "cpu_percent": 0.1,
+      "memory_used_mib": 939.8
+    },
+    {
+      "cpu_percent": 0.15,
+      "memory_used_mib": 939.8
+    },
+    {
+      "cpu_percent": 0.1,
+      "memory_used_mib": 939.8
+    },
+    {
+      "cpu_percent": 0.15,
+      "memory_used_mib": 939.8
+    },
+    {
+      "cpu_percent": 0.2,
+      "memory_used_mib": 939.8
+    },
+    {
+      "cpu_percent": 0.1,
+      "memory_used_mib": 939.8
+    },
+    {
+      "cpu_percent": 0.15,
+      "memory_used_mib": 939.8
+    },
+    {
+      "cpu_percent": 0.951,
+      "memory_used_mib": 941.1
+    },
+    {
+      "cpu_percent": 0.851,
+      "memory_used_mib": 938.2
+    },
+    {
+      "cpu_percent": 1.152,
+      "memory_used_mib": 939.0
+    },
+    {
+      "cpu_percent": 0.751,
+      "memory_used_mib": 940.2
+    },
+    {
+      "cpu_percent": 0.15,
+      "memory_used_mib": 940.2
+    },
+    {
+      "cpu_percent": 0.1,
+      "memory_used_mib": 940.2
+    },
+    {
+      "cpu_percent": 0.15,
+      "memory_used_mib": 940.2
+    },
+    {
+      "cpu_percent": 0.25,
+      "memory_used_mib": 940.2
+    },
+    {
+      "cpu_percent": 0.15,
+      "memory_used_mib": 938.4
+    }
+  ],
+  "median_cpu_percent": 0.15,
+  "median_memory_used_mib": 939.8,
+  "context_switches_per_second": 176.5,
+  "processes_started": 172,
+  "temp_cleanup_activations": 0,
+  "limits": "VM idle activity; no physical battery, energy or hardware-wakeup measurement",
+  "qualification_note": "Three failed read-only SSH guest probes overlapped this sample. Retained as an observational run; use the repeat for comparison."
+}

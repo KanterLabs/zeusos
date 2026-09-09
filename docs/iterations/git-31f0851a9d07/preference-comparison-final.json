@@ -1,0 +1,29 @@
+{
+  "only_requested_changes": true,
+  "effective_differences": [
+    {
+      "section": "desktop/background",
+      "key": "picture-uri",
+      "before": "'file:///usr/share/backgrounds/zeus/zeus-wallpaper-light.svg'",
+      "after": "'file:///usr/share/backgrounds/zeus/zeus-city-new-york-dusk.png'"
+    },
+    {
+      "section": "desktop/background",
+      "key": "picture-uri-dark",
+      "before": "'file:///usr/share/backgrounds/zeus/zeus-wallpaper-dark.svg'",
+      "after": "'file:///usr/share/backgrounds/zeus/zeus-city-new-york-dusk.png'"
+    },
+    {
+      "section": "desktop/screensaver",
+      "key": "picture-uri",
+      "before": "'file:///usr/share/backgrounds/zeus/zeus-wallpaper-dark.svg'",
+      "after": "'file:///usr/share/backgrounds/zeus/zeus-city-new-york-dusk.png'"
+    },
+    {
+      "section": "shell",
+      "key": "enabled-extensions",
+      "before": "['dash-to-dock@micxgx.gmail.com', 'zeus-shell@kanterlabs']",
+      "after": "['dash-to-dock@micxgx.gmail.com', 'zeus-shell@kanterlabs', 'zeus-lock-background@kanterlabs']"
+    }
+  ]
+}

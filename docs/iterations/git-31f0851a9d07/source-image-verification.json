@@ -1,0 +1,15 @@
+{
+  "recorded_at_utc": "2026-09-09T20:44:13.301675+00:00",
+  "source_commit": "31f0851a9d075910fa6c976add6df753ad62b0f2",
+  "python_tests_passed": 148,
+  "lock_lifecycle_tests_passed": 9,
+  "source_ci_run": 34401810109,
+  "gnome_settings_validated": 82,
+  "gtk3_gtk4_theme_parsers": "passed",
+  "native_st_theme_parser": "passed using image St18 typelib",
+  "native_non_light_dark_resources_unchanged": 6,
+  "png_decode": "passed; GdkPixbuf 1586x992",
+  "wallpaper_catalog_entries": 3,
+  "initial_harness_issue": "First standalone GJS parser check requested nonexistent St1.0; repeated with installed St18 and correct typelib/library paths passed. No payload change was needed.",
+  "runtime_qualification": "passed; see installed-ui-verification.json"
+}

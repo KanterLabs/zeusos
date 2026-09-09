@@ -1,0 +1,7 @@
+{
+  "manifest_digest": "sha256:0caa0eeb446a397ed594292be9d1133a0b608e0cd151ff9a551afd56a434d561",
+  "config_digest": "sha256:d30219ae8ebd935b3d5e124dc96e15a144a7b20ed734d5fcac13637af9d85066",
+  "source_commit": "31f0851a9d075910fa6c976add6df753ad62b0f2",
+  "version": "0.1.0-preview.2",
+  "build_id": "git-31f0851a9d07"
+}

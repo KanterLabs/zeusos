@@ -1,0 +1,6 @@
+{
+  "restart_clicked_at_utc": "2026-09-09T20:49:00.085548+00:00",
+  "candidate_observed_at_utc": "2026-09-09T20:49:23.829719+00:00",
+  "build_id": "git-31f0851a9d07",
+  "kind": "explicit native update reboot; excluded from cold-boot comparison"
+}

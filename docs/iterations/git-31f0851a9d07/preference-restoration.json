@@ -1,0 +1,35 @@
+{
+  "appearance_user_values_restored": [
+    {
+      "schema": "org.gnome.desktop.background",
+      "key": "secondary-color",
+      "test_user_value": "'#101A36'",
+      "restored_user_value": null
+    },
+    {
+      "schema": "org.gnome.desktop.background",
+      "key": "primary-color",
+      "test_user_value": "'#101A36'",
+      "restored_user_value": null
+    },
+    {
+      "schema": "org.gnome.desktop.screensaver",
+      "key": "primary-color",
+      "test_user_value": "'#101A36'",
+      "restored_user_value": null
+    },
+    {
+      "schema": "org.gnome.desktop.screensaver",
+      "key": "secondary-color",
+      "test_user_value": "'#101A36'",
+      "restored_user_value": null
+    },
+    {
+      "schema": "org.gnome.desktop.interface",
+      "key": "color-scheme",
+      "test_user_value": "'prefer-dark'",
+      "restored_user_value": "'prefer-light'"
+    }
+  ],
+  "control_center_last_panel_restored": "power"
+}

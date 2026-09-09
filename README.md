@@ -2,11 +2,13 @@
 
 A focused Fedora bootc laptop desktop with a macOS-inspired layout, original Zeus artwork, and native GNOME security and accessibility.
 
-The current version is **0.1.0-preview.2**. It includes a translucent top bar and floating dock, original icons, traffic-light window controls, compact application search (Super+Space), coordinated light/dark artwork, and a branded native login screen. GNOME/Wayland runs Files, Firefox, Ptyxis, Settings, and Welcome. The Rust `zeus` helper provides diagnostics, safe desktop fallback, signed updates, and validated SSH launch.
+The current version is **0.1.0-preview.2**. It includes a translucent top bar and floating dock, original icons, traffic-light window controls, compact application search (Super+Space), a New York dusk wallpaper, and a branded native login screen. GNOME/Wayland runs Files, Firefox, Ptyxis, Settings, and Welcome. The Rust `zeus` helper provides diagnostics, safe desktop fallback, signed updates, and validated SSH launch.
 
-The latest build adds compact **Zeus Settings** for network, Bluetooth, displays, power, sound, appearance, Temp and Updates. Open it from the Zeus menu, Welcome or application search. It uses the existing native controls and adds no packages or background services. [Latest iteration and verification](docs/iterations/git-fd2125f63159/README.md) records the signed update, preservation checks and timestamped measurements. Physical battery remains unmeasured on the review VM; see the [metrics history](docs/metrics.md).
+The latest build brings **New York at dusk** to the desktop, lock screen and native login, with a larger, lighter lock clock and restrained translucent login controls. City and gradient backgrounds remain selectable in **Settings → Appearance**. [Screenshots and verification](docs/iterations/git-31f0851a9d07/README.md) record the signed update, accessibility, preservation and performance checks. The change adds no packages or background services.
 
-![Zeus Settings on the desktop](docs/iterations/git-fd2125f63159/settings-light.png)
+![New York desktop on the deployed preview](docs/iterations/git-31f0851a9d07/desktop.png)
+
+**Zeus Settings** remains available from the Zeus menu, Welcome or application search for network, Bluetooth, displays, power, sound, appearance, Temp and Updates. Physical battery remains unmeasured on the review VM; see the [metrics history](docs/metrics.md).
 
 Deployment and measured results are recorded in the [preview VM runbook](docs/preview-vm.md) and [release notes](docs/releases/preview-2.md). An image build alone is not a graphical or performance test.
 
@@ -43,7 +45,7 @@ zeus update install
 zeus dev --target user@your-dev-host
 ```
 
-Safe desktop disables the optional Zeus shell and dock and removes managed GTK styling imports; native GNOME remains usable and personal files and preferences stay in place. Applying an OS update or reboot is always explicit. The preview does not configure an unattended update channel.
+Safe desktop disables the optional Zeus shell, dock and lock effects and removes managed GTK styling imports; native GNOME remains usable and personal files and preferences stay in place. Applying an OS update or reboot is always explicit. The preview does not configure an unattended update channel.
 
 Open **Updates** from application search or **Welcome → Open Updates** to check
 for a signed preview build, review its notes, and install it after administrator
@@ -57,6 +59,7 @@ update reboots. See the [updater contract](docs/features/os-updater.md).
 cargo fmt --manifest-path zeus/Cargo.toml --check
 cargo test --manifest-path zeus/Cargo.toml --locked --offline
 python3 -m unittest discover -s tests -v
+node --test tests/lock_background.test.mjs
 ```
 
 GitHub Actions uses `homelab` for image policy checks and `homelab-heavy` for Rust compilation/tests. Runtime validation uses the actual review VM, including native login, application launches, stock-shell fallback, data preservation and idle sampling. [Measurement budgets](docs/releases/preview-1-budgets.md) were declared before the first desktop boot.

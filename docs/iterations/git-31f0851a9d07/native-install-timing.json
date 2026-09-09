@@ -1,0 +1,6 @@
+{
+  "install_clicked_at_utc": "2026-09-09T20:46:42.094667+00:00",
+  "ready_observed_at_utc": "2026-09-09T20:47:57.686851+00:00",
+  "seconds": 75.592,
+  "method": "Native Install click, Polkit password entry, signed metadata/archive fetch and bootc staging; 5s status observation cadence. Excludes explicit restart."
+}

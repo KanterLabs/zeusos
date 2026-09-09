@@ -1,0 +1,20 @@
+{
+  "recorded_at_utc": "2026-09-09T20:58:04.722563+00:00",
+  "build_id": "git-31f0851a9d07",
+  "native_gdm_user_and_password_screens": "visually checked at 1280x800 scale1 and 1920x1200 scale2",
+  "native_password_login": "passed at scale1",
+  "native_lock_clock_and_password_screens": "visually checked at scale1 and scale2",
+  "successful_native_unlocks": 3,
+  "native_unlock_at_200_percent": "passed",
+  "high_contrast": "native GDM and lock presentation restored; checked at GDM scale2 and lock scale1",
+  "safe_desktop": "disable while locked restored stock blur; restore reapplied clearer city background",
+  "scale_change_while_locked": "clearer blur remained functional at scale2, then scale1 restored",
+  "reduced_motion": "Lock clock remained usable with animations disabled; original preference restored before unlocking.",
+  "wallpaper_picker": "three native entries; selected retained Light gradient then city, settled settings confirmed city URI",
+  "light_dark": "both desktop styles checked; original prefer-light restored",
+  "extension": "ACTIVE; no JS/extension errors in user journal",
+  "gdm_accessibility_preference": "original unset high-contrast restored",
+  "display_final": "1280x800 scale1; temporary Mutter method1, no monitor file edits",
+  "owner_preferences": "only requested city system defaults and additive optional extension differ",
+  "limits": "Mouse/keyboard and VM display qualification; no physical touchscreen, multi-monitor, battery or laptop suspend test."
+}

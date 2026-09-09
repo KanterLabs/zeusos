@@ -58,9 +58,9 @@ asset gates and native evidence. CI run `34343529224` passed 123 Python tests;
 no rollback cycle was run. See the [timestamped metrics history](../metrics.md)
 for runtime observations; physical battery remains unmeasured on this VM.
 
-## Latest laptop Settings iteration
+## Laptop Settings iteration
 
-Build **git-fd2125f63159** now runs on VM 115, still **0.1.0-preview.2**. It adds
+Build **git-fd2125f63159** was installed on VM 115, still **0.1.0-preview.2**. It adds
 the compact native **Zeus Settings** home, with network, Bluetooth, display,
 power, sound, appearance, Temp and Updates destinations and local hardware
 availability. Welcome, the Zeus menu and application search can open it. It adds
@@ -76,3 +76,14 @@ After 60 seconds settling, five samples at four-second intervals measured a medi
 ## Limits
 
 The surfaces use translucency and highlights, without real-time Liquid Glass refraction. The Proxmox console uses software rendering; these checks do not qualify laptop battery life, physical GPU acceleration, fractional scaling or the full accessibility matrix. The original Preview 1 functional and rollback results remain historical evidence, not a claim that this revision repeated every earlier test.
+
+## Latest New York appearance iteration
+
+Build **git-31f0851a9d07** runs on VM 115, still **0.1.0-preview.2**. The desktop,
+lock and native login share New York dusk artwork. A larger, lighter lock clock,
+translucent login surfaces and restrained lock blur accompany the existing Zeus
+panel and dock. Native high contrast and authentication remain available.
+The [city receipt and screenshots](../iterations/git-31f0851a9d07/README.md)
+record native Updates installation, scaling/fallback checks, preservation and
+timestamped measurements. The predecessor **git-fd2125f63159** is retained for
+rollback. No new installer image or runtime package was added.

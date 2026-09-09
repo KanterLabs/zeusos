@@ -1,0 +1,18 @@
+{
+  "verified_at_utc": "2026-09-09T20:45:46.251088+00:00",
+  "feed_commit": "bb673a1233fff0a252726c61251b031ce6675e4b",
+  "files": [
+    {
+      "file": "preview.json",
+      "bytes": 952,
+      "sha256": "99644b8119f77ee9726923cb7d345191409e9e54d57a8580e4b8710fec147f6b",
+      "matches_signed_pair": true
+    },
+    {
+      "file": "preview.json.sig",
+      "bytes": 306,
+      "sha256": "ab6cc418991b52d5e414c141d15343827d8abea6273652217c698b67ac02be27",
+      "matches_signed_pair": true
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "declared_at_utc": "2026-09-09T20:14:42.108282+00:00",
+  "protocol": "Three cold starts per image; 20s settle then 120s closed-desktop idle, same 1280x800 scale1 display, Temp Never; builder stopped and backup work complete during samples. Shared host otherwise unisolated.",
+  "review_thresholds": {
+    "median_os_startup_regression_seconds": 1.0,
+    "closed_idle_cpu_regression_percentage_points": 0.25,
+    "closed_idle_memory_regression_mib": 64,
+    "new_runtime_packages": 0,
+    "new_background_services": 0,
+    "full_oci_archive_growth_mib": 10
+  },
+  "physical_battery_test": "Unavailable on VM; no battery inference"
+}

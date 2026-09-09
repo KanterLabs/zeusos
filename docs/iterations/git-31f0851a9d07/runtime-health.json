@@ -1,0 +1,76 @@
+{
+  "checked_at_utc": "2026-09-09T21:06:06.321536+00:00",
+  "build_id": "git-31f0851a9d07",
+  "version": "0.1.0-preview.2",
+  "selinux": "Enforcing",
+  "secure_boot": "SecureBoot enabled",
+  "failed_system_units": [],
+  "failed_user_units": [],
+  "gdm": "active",
+  "power_profile": "balanced",
+  "updater": {
+    "schema_version": 1,
+    "ok": true,
+    "state": "up_to_date",
+    "current": {
+      "version": "0.1.0-preview.2",
+      "build_id": "git-31f0851a9d07",
+      "source_commit": "31f0851a9d075910fa6c976add6df753ad62b0f2",
+      "sequence": 1788986041
+    },
+    "candidate": {
+      "version": "0.1.0-preview.2",
+      "build_id": "git-31f0851a9d07",
+      "source_commit": "31f0851a9d075910fa6c976add6df753ad62b0f2",
+      "sequence": 1788986041,
+      "published_at": "2026-09-09T20:38:49Z",
+      "notes": "New York skyline at dusk across the desktop, native login and lock screen. Larger lighter lock clock, quieter translucent login controls, and a clearer lock background with high-contrast and safe-desktop fallback. City and previous gradients remain selectable in Appearance. Same 0.1.0-preview.2 version.\n",
+      "archive_size": 1834208768,
+      "archive_sha256": "0e3fa07066ee6ebae885e96d284ce0e6756312e35e4153f4ec1034c76a30443b",
+      "image_digest": "sha256:0caa0eeb446a397ed594292be9d1133a0b608e0cd151ff9a551afd56a434d561"
+    },
+    "progress": null,
+    "message": "The selected update is installed.",
+    "error": null,
+    "checked_at": "2026-09-09T20:45:55Z"
+  },
+  "lock_extension": "zeus-lock-background@kanterlabs\n  Name: Zeus Lock Background\n  Description: Keeps the native GNOME lock wallpaper recognizable while preserving the native lock dialog.\n  Path: /usr/share/gnome-shell/extensions/zeus-lock-background@kanterlabs\n  Version: 1\n  Enabled: Yes\n  State: ACTIVE",
+  "installed_files": [
+    {
+      "path": "/usr/share/backgrounds/zeus/zeus-city-new-york-dusk.png",
+      "sha256": "9fc75b819d3237bc4f345fd004165fa8c1cd22904258982fd63cf291b9b9b6b0",
+      "mode": "0o644",
+      "matches_source": true
+    },
+    {
+      "path": "/usr/share/gnome-background-properties/zeus.xml",
+      "sha256": "9cf37be0aad5db8eaf101b954995887cd32d69dc0d2d51ed37cc2dc7f311f026",
+      "mode": "0o644",
+      "matches_source": true
+    },
+    {
+      "path": "/usr/share/gnome-shell/extensions/zeus-lock-background@kanterlabs/extension.js",
+      "sha256": "1944c58f63730de7a8dee9f48afaedb220ce7227ebb4b9287ec672e8fd3b7566",
+      "mode": "0o644",
+      "matches_source": true
+    },
+    {
+      "path": "/usr/share/gnome-shell/extensions/zeus-lock-background@kanterlabs/metadata.json",
+      "sha256": "934bbc2f04f185d5cb7fb915c5d87848499ec08cfbee47eea04d16a457f2e2cb",
+      "mode": "0o644",
+      "matches_source": true
+    },
+    {
+      "path": "/usr/share/zeus/greeter.css",
+      "sha256": "99045f4914ca5e53608de8e972286884474cf7f4142f84e570dcbf76b00de853",
+      "mode": "0o664",
+      "matches_source": true
+    },
+    {
+      "path": "/usr/libexec/zeus-desktop-safe",
+      "sha256": "43e1247089f54ed25d8fbf3b5f51b532348ab9b0ab89dfac5840903f9db29577",
+      "mode": "0o775",
+      "matches_source": true
+    }
+  ]
+}

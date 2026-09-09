@@ -1,0 +1,139 @@
+{
+  "recorded_at_utc": "2026-09-09T21:09:32.401394+00:00",
+  "version": "0.1.0-preview.2",
+  "build_id": "git-31f0851a9d07",
+  "source_commit": "31f0851a9d075910fa6c976add6df753ad62b0f2",
+  "image_manifest_digest": "sha256:0caa0eeb446a397ed594292be9d1133a0b608e0cd151ff9a551afd56a434d561",
+  "image_config_digest": "sha256:d30219ae8ebd935b3d5e124dc96e15a144a7b20ed734d5fcac13637af9d85066",
+  "update_sequence": 1788986041,
+  "vmid": 115,
+  "vm_allocation": "4 vCPU / 8 GiB / 64 GiB / VirtIO / UEFI Secure Boot",
+  "rollback_build_id": "git-fd2125f63159",
+  "archive": {
+    "name": "zeusos-0.1.0-preview.2-git-31f0851a9d07.oci",
+    "sha256": "0e3fa07066ee6ebae885e96d284ce0e6756312e35e4153f4ec1034c76a30443b",
+    "bytes": 1834208768
+  },
+  "validation": {
+    "python_tests": 148,
+    "lock_lifecycle_tests": 9,
+    "payload_ci_run": 34401810109,
+    "gnome_settings": 82,
+    "native_st_and_gtk_theme_parsers": "passed",
+    "unchanged_non_light_dark_theme_resources": 6,
+    "signed_release_assets_verified": 6,
+    "public_feed_pair_verified": true,
+    "native_updates_install_and_explicit_restart": true,
+    "booted_exact_signed_digest": true,
+    "predecessor_retained": true,
+    "native_ui": "installed-ui-verification.json",
+    "populated_backup_zstd_and_vma": "passed",
+    "preserved_file_hashes": 7,
+    "preserved_temp_sample_bytes": 48,
+    "temp_policy_restored": "boot",
+    "only_requested_gnome_preferences_changed": true,
+    "installed_files_match_payload": true,
+    "new_packages": 0,
+    "new_background_services": 0,
+    "selinux": "Enforcing",
+    "secure_boot": "SecureBoot enabled",
+    "failed_system_units": 0,
+    "failed_user_units": 0,
+    "builder_final_state": "stopped",
+    "reinstall_reseed_disk_replacement_restore": false,
+    "vm_rollback_cycle": "not run",
+    "private_signing_key_on_builder_or_image": false
+  },
+  "artwork": {
+    "path": "desktop/rootfs/usr/share/backgrounds/zeus/zeus-city-new-york-dusk.png",
+    "native_dimensions": [
+      1586,
+      992
+    ],
+    "mode": "built-in image generation, one refinement",
+    "provenance_record": "../../artwork/new-york-dusk.md",
+    "claim": "generated photographic-style image; no 4K or original camera photograph claim"
+  },
+  "performance": {
+    "recorded_at_utc": "2026-09-09T21:09:32.401394+00:00",
+    "baseline_build": "git-fd2125f63159",
+    "candidate_build": "git-31f0851a9d07",
+    "cold_boots_per_image": 3,
+    "os_startup_s": {
+      "baseline": {
+        "samples": [
+          7.041,
+          7.168,
+          6.925
+        ],
+        "median": 7.041
+      },
+      "candidate": {
+        "samples": [
+          6.834,
+          7.265,
+          6.797
+        ],
+        "median": 6.834
+      }
+    },
+    "host_to_active_greeter_s": {
+      "baseline": {
+        "samples": [
+          17.699,
+          18.66,
+          18.513
+        ],
+        "median": 18.513
+      },
+      "candidate": {
+        "samples": [
+          17.609,
+          18.646,
+          17.599
+        ],
+        "median": 17.609
+      }
+    },
+    "closed_idle": {
+      "baseline": {
+        "measurement_started_at_utc": "2026-09-09T20:31:40.825480479Z",
+        "measurement_ended_at_utc": "2026-09-09T20:33:40.836128575Z",
+        "seconds": 120.01,
+        "settle_seconds": 20,
+        "median_cpu_percent": 0.15,
+        "median_memory_used_mib": 1057.5,
+        "context_switches_per_second": 121.5,
+        "processes_started": 7,
+        "temp_cleanup_activations": 0
+      },
+      "candidate": {
+        "measurement_started_at_utc": "2026-09-09T21:02:32.783349962Z",
+        "measurement_ended_at_utc": "2026-09-09T21:04:32.793998188Z",
+        "seconds": 120.01,
+        "settle_seconds": 20,
+        "median_cpu_percent": 0.15,
+        "median_memory_used_mib": 904.7,
+        "context_switches_per_second": 124.0,
+        "processes_started": 3,
+        "temp_cleanup_activations": 0
+      }
+    },
+    "declared_thresholds": {
+      "median_os_startup_regression_seconds": 1.0,
+      "closed_idle_cpu_regression_percentage_points": 0.25,
+      "closed_idle_memory_regression_mib": 64,
+      "new_runtime_packages": 0,
+      "new_background_services": 0,
+      "full_oci_archive_growth_mib": 10
+    },
+    "limits": "Three cold starts and one qualifying 120s idle window per build; shared host otherwise unisolated. Baseline repeat followed additional lock/unlock and earlier failed probes; candidate idle followed a fresh login after cold boot. First baseline is retained as contaminated observational evidence. Values do not establish a lasting speedup, memory reduction or physical battery result.",
+    "observed_changes": {
+      "median_os_startup_s": -0.207,
+      "idle_cpu_percentage_points": 0.0,
+      "idle_memory_mib": -152.8
+    },
+    "within_declared_review_thresholds": true
+  },
+  "publication_observation": "Raw main feed initially returned cached older metadata. During propagation the native client briefly reported a verification failure; a later check verified the correct signed pair before installation. The exact failing pair was not retained."
+}

@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "ok": true,
+  "state": "ready",
+  "current": {
+    "version": "0.1.0-preview.2",
+    "build_id": "git-fd2125f63159",
+    "source_commit": "fd2125f6315947d97292c4f3a250c3b91d742280",
+    "sequence": 1788960729
+  },
+  "candidate": {
+    "version": "0.1.0-preview.2",
+    "build_id": "git-31f0851a9d07",
+    "source_commit": "31f0851a9d075910fa6c976add6df753ad62b0f2",
+    "sequence": 1788986041,
+    "published_at": "2026-09-09T20:38:49Z",
+    "notes": "New York skyline at dusk across the desktop, native login and lock screen. Larger lighter lock clock, quieter translucent login controls, and a clearer lock background with high-contrast and safe-desktop fallback. City and previous gradients remain selectable in Appearance. Same 0.1.0-preview.2 version.\n",
+    "archive_size": 1834208768,
+    "archive_sha256": "0e3fa07066ee6ebae885e96d284ce0e6756312e35e4153f4ec1034c76a30443b",
+    "image_digest": "sha256:0caa0eeb446a397ed594292be9d1133a0b608e0cd151ff9a551afd56a434d561"
+  },
+  "progress": null,
+  "message": "The verified update is ready. Restart when convenient.",
+  "error": null,
+  "checked_at": null
+}

@@ -1,0 +1,81 @@
+{
+  "recorded_at_utc": "2026-09-09T21:09:32.401394+00:00",
+  "baseline_build": "git-fd2125f63159",
+  "candidate_build": "git-31f0851a9d07",
+  "cold_boots_per_image": 3,
+  "os_startup_s": {
+    "baseline": {
+      "samples": [
+        7.041,
+        7.168,
+        6.925
+      ],
+      "median": 7.041
+    },
+    "candidate": {
+      "samples": [
+        6.834,
+        7.265,
+        6.797
+      ],
+      "median": 6.834
+    }
+  },
+  "host_to_active_greeter_s": {
+    "baseline": {
+      "samples": [
+        17.699,
+        18.66,
+        18.513
+      ],
+      "median": 18.513
+    },
+    "candidate": {
+      "samples": [
+        17.609,
+        18.646,
+        17.599
+      ],
+      "median": 17.609
+    }
+  },
+  "closed_idle": {
+    "baseline": {
+      "measurement_started_at_utc": "2026-09-09T20:31:40.825480479Z",
+      "measurement_ended_at_utc": "2026-09-09T20:33:40.836128575Z",
+      "seconds": 120.01,
+      "settle_seconds": 20,
+      "median_cpu_percent": 0.15,
+      "median_memory_used_mib": 1057.5,
+      "context_switches_per_second": 121.5,
+      "processes_started": 7,
+      "temp_cleanup_activations": 0
+    },
+    "candidate": {
+      "measurement_started_at_utc": "2026-09-09T21:02:32.783349962Z",
+      "measurement_ended_at_utc": "2026-09-09T21:04:32.793998188Z",
+      "seconds": 120.01,
+      "settle_seconds": 20,
+      "median_cpu_percent": 0.15,
+      "median_memory_used_mib": 904.7,
+      "context_switches_per_second": 124.0,
+      "processes_started": 3,
+      "temp_cleanup_activations": 0
+    }
+  },
+  "declared_thresholds": {
+    "median_os_startup_regression_seconds": 1.0,
+    "closed_idle_cpu_regression_percentage_points": 0.25,
+    "closed_idle_memory_regression_mib": 64,
+    "new_runtime_packages": 0,
+    "new_background_services": 0,
+    "full_oci_archive_growth_mib": 10
+  },
+  "limits": "Three cold starts and one qualifying 120s idle window per build; shared host otherwise unisolated. Baseline repeat followed additional lock/unlock and earlier failed probes; candidate idle followed a fresh login after cold boot. First baseline is retained as contaminated observational evidence. Values do not establish a lasting speedup, memory reduction or physical battery result.",
+  "observed_changes": {
+    "median_os_startup_s": -0.207,
+    "idle_cpu_percentage_points": 0.0,
+    "idle_memory_mib": -152.8
+  },
+  "within_declared_review_thresholds": true
+}

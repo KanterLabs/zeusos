@@ -1,0 +1,8 @@
+{
+  "predecessor_build": "git-fd2125f63159",
+  "shared_temp_updater_settings_backends": "unchanged; git diff of desktop/rootfs/usr/lib/zeus is empty",
+  "new_mutable_schema": false,
+  "owner_extension_list": "additive optional UUID; an older shell without the extension ignores it",
+  "owner_wallpaper_overrides": "remain unset or owner-controlled; no locked dconf keys introduced",
+  "rollback_cycle": "not run; retained predecessor verified in booted-bootc.json"
+}

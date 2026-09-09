@@ -1,7 +1,8 @@
 # New York desktop, lock screen and login
 
-Status: **ZOS-72 in progress**. Shane selected **New York skyline at dusk** for
-the desktop background, lock screen and pre-login screen. Continue using
+Status: **implemented and verified on VM115**, build **git-31f0851a9d07**
+(ZOS-72). Shane selected **New York skyline at dusk** for the desktop background,
+lock screen and pre-login screen. Continue using
 **0.1.0-preview.2** with separate Git build IDs.
 
 ## Appearance
@@ -29,34 +30,35 @@ photographic-style artwork. No video wallpaper or continuous animation is added.
   disable/unlock, and retain native effects for high-contrast mode or unavailable
   internals. Authentication, input handlers and password widgets remain native.
 - [x] Include the optional lock effect in safe-desktop disable/restore behavior.
-- [ ] Build and deploy a signed preview update through the existing updater.
+- [x] Build and deploy a signed preview update through the existing updater.
 
 Nine lifecycle tests exercise property restoration, partial failures, high contrast,
 monitor replacement, scaling and cancellation. The extension uses GNOME 50's
 private background actor path; a changed or unavailable path keeps native blur.
 It uses signals and cancellable one-shot idle work, with no recurring timer.
 
-The review owner's existing explicit extension list needs an additive entry for
-the new lock appearance. Preserve its other entries, wallpaper choices and
-unrelated preferences. The requested city replaces Zeus's current default
-wallpapers; updates must not lock out later owner wallpaper choices.
+The review owner's existing explicit extension list received one additive entry
+for the new lock appearance. Its other entries and unrelated preferences were
+preserved; temporary test choices were restored. The requested city replaces
+Zeus's current default wallpapers; updates must not lock out later owner
+wallpaper choices.
 
 ## Testing checklist
 
 - [x] Record pre-change GNOME preferences and seven populated-file hashes.
 - [x] Verify a fresh populated VM backup with zstd and full VMA verification.
-- [ ] Pass source checks, real-image GNOME/theme validation and image identity checks.
-- [ ] Verify native pre-login user selection, password entry and successful login.
-- [ ] Verify native lock clock, unlock prompt and successful unlocking.
-- [ ] Verify lock effect teardown, safe fallback, high contrast and repeated locking.
-- [ ] Check layout, focus and readable contrast at normal and 200% scaling;
+- [x] Pass source checks, real-image GNOME/theme validation and image identity checks.
+- [x] Verify native pre-login user selection, password entry and successful login.
+- [x] Verify native lock clock, unlock prompt and successful unlocking.
+- [x] Verify lock effect teardown, safe fallback, high contrast and repeated locking.
+- [x] Check layout, focus and readable contrast at normal and 200% scaling;
   restore temporary appearance, scaling and accessibility choices afterward.
-- [ ] Check all populated-file hashes and unrelated preferences after updating.
+- [x] Check all populated-file hashes and unrelated preferences after updating.
   Temp cleanup is held at Never during qualification reboots, then restored to
   the original On boot policy. No backup restore or owner reseed is an upgrade step.
-- [ ] Compare three cold starts and a closed-desktop idle window before/after;
+- [x] Compare three cold starts and a closed-desktop idle window before/after;
   record all results and limits in [metrics.md](../metrics.md).
-- [ ] Capture actual desktop, lock and pre-login screenshots from VM 115.
+- [x] Capture actual desktop, lock and pre-login screenshots from VM 115.
 
 Declared review thresholds: no added runtime package or service, less than
 10 MiB full OCI archive growth, at most +1 s median OS startup, +0.25 idle CPU
@@ -64,3 +66,7 @@ percentage points and +64 MiB idle memory. The measurement protocol is 20 second
 settling followed by 120 seconds sampling, with the same display, Temp held at
 Never, builder stopped and backup work complete during performance samples.
 These VM samples do not qualify physical battery runtime or laptop hardware.
+
+The [signed iteration receipt and actual screenshots](../iterations/git-31f0851a9d07/README.md)
+record the final result. All declared review thresholds passed; these VM samples
+do not establish a lasting performance improvement.

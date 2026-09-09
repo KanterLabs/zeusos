@@ -1,0 +1,13 @@
+{
+  "recorded_at_utc": "2026-09-09T20:11:54.351757+00:00",
+  "verification_started_at_utc": "2026-09-09T20:07:27.560445+00:00",
+  "backup_path": "/mnt/pve/sata-ssd/zeusos/backups/city-20260909/vzdump-qemu-115-2026_09_09-11_05_02.vma.zst",
+  "vmid": 115,
+  "method": "Fresh snapshot-mode backup; zstd test, full decompression to unique scratch, VMA verification and scratch removal",
+  "restore_performed": false,
+  "temp_policy_held_at_never_for_test_reboots": true,
+  "zstd_exit_code": 0,
+  "vma_exit_code": 0,
+  "archive_bytes": 30355153252,
+  "limits": "Archive integrity verification, not a restore. The archive filename uses the Proxmox host clock."
+}
