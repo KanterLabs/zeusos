@@ -15,6 +15,7 @@ from zeus.zeus_temp import (  # noqa: E402
     DestinationError,
     HomeManager,
     MIN_CUSTOM_INTERVAL,
+    MIN_RETRY_INTERVAL,
     PolicyError,
     TempCollisionError,
     UnsafeTempError,
@@ -96,6 +97,22 @@ class TempFixture(unittest.TestCase):
             self.assertTrue(second_boot["ok"], second_boot)
             self.assertFalse((home / "Temp" / "new.txt").exists())
 
+    def test_selecting_boot_after_never_waits_for_next_os_boot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            clock = FakeClock()
+            manager = self.manager(directory, clock=clock)
+            manager.setup()
+            manager.set_policy("never")
+            clock.boot = "boot-b"
+            item = Path(directory) / "Temp" / "recent.txt"
+            item.write_text("new download")
+            manager.set_policy("boot")
+            self.assertFalse(manager.sweep()["swept"])
+            self.assertTrue(item.exists())
+            clock.boot = "boot-c"
+            self.assertTrue(manager.sweep()["swept"])
+            self.assertFalse(item.exists())
+
     def test_preset_custom_never_schedule_and_wall_clock_replay(self):
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory)
@@ -127,6 +144,97 @@ class TempFixture(unittest.TestCase):
             forced = manager.sweep(force=True)
             self.assertTrue(forced["ok"], forced)
             self.assertFalse((home / "Temp" / "manual").exists())
+
+    def test_schedule_query_does_not_snapshot_temp(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            clock = FakeClock()
+            manager = self.manager(home, clock=clock, proc_root=None)
+            manager.setup()
+            manager.set_policy("hourly")
+
+            def unexpected_snapshot(_root):
+                raise AssertionError("schedule query must not inspect Temp contents")
+
+            manager._snapshot = unexpected_snapshot
+            plan = manager.schedule()
+
+            self.assertTrue(plan["ok"], plan)
+            self.assertTrue(plan["scheduled"], plan)
+            self.assertEqual(plan["next_cleanup_at"], 4600.0)
+
+    def test_setup_can_skip_usage_snapshot_for_session_startup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            manager = self.manager(home, proc_root=None)
+
+            def unexpected_snapshot(_root):
+                raise AssertionError("session setup must not inspect Temp contents")
+
+            manager._snapshot = unexpected_snapshot
+            result = manager.setup(include_usage=False)
+
+            self.assertTrue(result["ok"], result)
+            self.assertTrue(result["setup"], result)
+            self.assertTrue(result["enabled"], result)
+
+    def test_sweep_can_skip_post_sweep_usage_snapshot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            clock = FakeClock()
+            manager = self.manager(home, clock=clock, proc_root=None)
+            manager.setup()
+            manager.set_policy("hourly")
+            clock.advance(3600)
+            (home / "Temp" / "expired").write_text("expired")
+
+            def unexpected_usage(_root):
+                raise AssertionError("timer sweep must not inspect Temp contents twice")
+
+            manager._usage = unexpected_usage
+            result = manager.sweep(include_usage=False)
+
+            self.assertTrue(result["ok"], result)
+            self.assertTrue(result["swept"], result)
+            self.assertEqual(result["deleted"], 1)
+
+    def test_due_false_sweep_does_not_snapshot_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            clock = FakeClock()
+            manager = self.manager(home, clock=clock, proc_root=None)
+            manager.setup()
+            manager.set_policy("hourly")
+
+            def unexpected_snapshot(_root):
+                raise AssertionError("a not-due sweep must not inspect Temp contents")
+
+            manager._snapshot = unexpected_snapshot
+            result = manager.sweep()
+
+            self.assertTrue(result["ok"], result)
+            self.assertFalse(result["swept"])
+            self.assertEqual(result["reason"], "not-due")
+            self.assertEqual(result["status"]["next_cleanup_at"], 4600.0)
+
+    def test_timed_inspection_error_retries_after_interval(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            clock = FakeClock()
+            manager = self.manager(home, clock=clock, proc_root=None)
+            manager.setup()
+            manager.set_policy("hourly")
+            clock.advance(3600)
+            manager._scan_active = lambda candidates: (set(), False, ["temporary inspector failure"])
+
+            result = manager.sweep()
+
+            self.assertFalse(result["ok"], result)
+            self.assertTrue(result["retry_required"], result)
+            self.assertEqual(result["status"]["next_cleanup_at"], 8200.0)
+            self.assertGreaterEqual(
+                result["status"]["next_cleanup_at"], clock.value + MIN_RETRY_INTERVAL
+            )
 
     def test_keep_conflict_safe_and_destination_contained(self):
         with tempfile.TemporaryDirectory() as directory:

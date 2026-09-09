@@ -20,10 +20,14 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_style_preservation.py -v
       - name: Verify Temp cleanup and migration
         run: python3 -m unittest discover -s tests -p "test_temp*.py" -v
+      - name: Verify desktop interaction and battery measurement contracts
+        run: |
+          python3 -m unittest discover -s tests -p test_desktop_interactions.py -v
+          python3 -m unittest discover -s tests -p test_battery_measurement.py -v
       - name: Check build script syntax
         run: bash -n scripts/build.sh scripts/build-disk.sh scripts/export-iteration.sh
       - name: Check welcome application syntax
-        run: python3 -m py_compile zeus/assets/welcome.py scripts/build-greeter-theme.py
+        run: python3 -m py_compile zeus/assets/welcome.py scripts/build-greeter-theme.py scripts/measure-*.py
   cli:
     runs-on: homelab-heavy
     timeout-minutes: 10

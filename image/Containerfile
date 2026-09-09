@@ -38,10 +38,12 @@ COPY image/inputs.json /usr/share/zeus/inputs.json
 RUN chmod 0755 /usr/libexec/zeus-welcome && \
     glib-compile-schemas /usr/share/gnome-shell/extensions/zeus-shell@kanterlabs/schemas && \
     dconf update && \
+    systemd-hwdb update --usr && \
     gtk-update-icon-cache --force --ignore-theme-index /usr/share/icons/hicolor && \
     gtk-update-icon-cache --force --ignore-theme-index /usr/share/icons/Zeus && \
     systemctl set-default graphical.target && \
-    systemctl enable gdm.service NetworkManager.service firewalld.service sshd.service && \
+    systemctl disable nfs-client.target && \
+    systemctl enable gdm.service NetworkManager.service firewalld.service sshd.service power-profiles-daemon.service && \
     systemctl enable cloud-init-local.service cloud-init-network.service cloud-init-main.service cloud-config.service cloud-final.service && \
     systemctl mask bootc-fetch-apply-updates.timer && \
     systemctl enable zeus-tmpfiles.service zeus-temp-inspector.socket && \

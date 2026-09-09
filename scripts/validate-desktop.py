@@ -5,7 +5,7 @@ from pathlib import Path
 from gi.repository import Gio, GLib
 
 config = configparser.ConfigParser(interpolation=None, strict=True)
-config.read('/etc/dconf/db/local.d/00-zeus')
+config.read([str(path) for path in sorted(Path('/etc/dconf/db/local.d').iterdir()) if path.is_file()])
 assert config.sections(), 'No desktop defaults loaded'
 source = Gio.SettingsSchemaSource.get_default()
 count = 0

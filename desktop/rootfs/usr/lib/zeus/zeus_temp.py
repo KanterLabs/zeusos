@@ -25,6 +25,7 @@ import os
 import pwd
 import socket
 import stat
+import subprocess
 import sys
 import time
 import uuid
@@ -47,6 +48,8 @@ PRESET_INTERVALS = {
     "weekly": 7 * 24 * 60 * 60,
 }
 POLICY_MODES = {"boot", "hourly", "daily", "weekly", "custom", "never"}
+TIMED_POLICY_MODES = frozenset(PRESET_INTERVALS) | {"custom"}
+MIN_RETRY_INTERVAL = MIN_CUSTOM_INTERVAL
 _DEFAULT_PROC_ROOT = object()
 
 # These are the names used by the common browser download implementations.
@@ -784,7 +787,13 @@ class HomeManager:
             os.close(fd)
             raise
 
-    def setup(self, *, adopt: bool = False, collision: str | None = None) -> dict[str, Any]:
+    def setup(
+        self,
+        *,
+        adopt: bool = False,
+        collision: str | None = None,
+        include_usage: bool = True,
+    ) -> dict[str, Any]:
         """Provision Temp and the default boot policy.
 
         Existing ``~/Temp`` is adopted only when ``adopt=True`` (or the
@@ -859,7 +868,12 @@ class HomeManager:
                         raise UnsafeTempError("Temp root does not match the enrolled state")
                     # Preserve the policy and bookkeeping across idempotent
                     # setup calls and image updates.
-                result = self._status_locked(state, root=root, setup_created=created)
+                result = self._status_locked(
+                    state,
+                    root=root,
+                    setup_created=created,
+                    include_usage=bool(include_usage),
+                )
                 result.update({"setup": True, "created": created, "adopted": bool(not created and adopt)})
                 return result
             finally:
@@ -1206,6 +1220,85 @@ class HomeManager:
             return True, "due"
         return False, "not-due"
 
+    @staticmethod
+    def _retry_deadline(state: Mapping[str, Any], now: float) -> float | None:
+        """Return a bounded retry time after an uncertain timed sweep.
+
+        The old implementation left failed timed sweeps due immediately.  A
+        one-shot timer would then be rearmed for ``now`` and could wake the
+        machine in a tight loop while the same inspection problem persisted.
+        Keep retries at least as far apart as the smallest supported policy;
+        normal policies use their own interval when it is longer.
+        """
+
+        policy = state.get("policy")
+        if not isinstance(policy, Mapping) or policy.get("mode") not in TIMED_POLICY_MODES:
+            return None
+        interval = policy.get("interval_seconds")
+        if not isinstance(interval, (int, float)) or isinstance(interval, bool):
+            return None
+        return now + max(MIN_RETRY_INTERVAL, int(interval))
+
+    def schedule(self) -> dict[str, Any]:
+        """Return the persisted timer plan without scanning Temp contents.
+
+        This read-only seam is intentionally separate from :meth:`status`.
+        A scheduler needs the policy deadline and root enrollment checks, but
+        it must not walk the Temp tree just to decide whether a timer should
+        exist.  The returned fields are additive to the established status
+        contract and are consumed by the systemd scheduler wrapper.
+        """
+
+        try:
+            with self._lock() as state_dir_fd:
+                state = self._read_state(state_dir_fd)
+                if state is None:
+                    return {
+                        "ok": True,
+                        "enabled": False,
+                        "enrolled": False,
+                        "scheduled": False,
+                        "mode": None,
+                        "interval_seconds": None,
+                        "next_cleanup_at": None,
+                        "due": False,
+                        "due_reason": "not-enrolled",
+                    }
+                root = self._open_temp_root(expected=state["root"])
+                try:
+                    now = self._now()
+                    due, due_reason = self._due(state, now)
+                    mode = state["policy"]["mode"]
+                    next_at = state.get("next_cleanup_at")
+                    scheduled = mode in TIMED_POLICY_MODES and next_at is not None
+                    return {
+                        "ok": True,
+                        "enabled": True,
+                        "enrolled": True,
+                        "scheduled": scheduled,
+                        "mode": mode,
+                        "interval_seconds": state["policy"]["interval_seconds"],
+                        "next_cleanup_at": float(next_at) if next_at is not None else None,
+                        "due": due,
+                        "due_reason": due_reason,
+                    }
+                finally:
+                    os.close(root.fd)
+        except TempError as error:
+            return {
+                "ok": False,
+                "enabled": False,
+                "enrolled": False,
+                "scheduled": False,
+                "mode": None,
+                "interval_seconds": None,
+                "next_cleanup_at": None,
+                "due": False,
+                "due_reason": "error",
+                "error": str(error),
+                "error_type": type(error).__name__,
+            }
+
     def _usage(self, root: _Root) -> tuple[int, int, list[str], list[dict[str, Any]]]:
         candidates, issues = self._snapshot(root)
         total = 0
@@ -1235,6 +1328,7 @@ class HomeManager:
         root: _Root | None = None,
         setup_created: bool = False,
         state_error: str | None = None,
+        include_usage: bool = True,
     ) -> dict[str, Any]:
         result: dict[str, Any] = {
             "ok": state_error is None,
@@ -1293,18 +1387,21 @@ class HomeManager:
         result["last_boot_id"] = state.get("last_boot_id")
         result["last_result"] = state.get("last_result")
         try:
-            if root is None:
-                root = self._open_temp_root(expected=state["root"])
-                owns_root = True
-            else:
-                owns_root = False
+            if include_usage:
+                if root is None:
+                    root = self._open_temp_root(expected=state["root"])
+                    owns_root = True
+                else:
+                    owns_root = False
             result["enabled"] = True
-            used, count, issues, files = self._usage(root)
-            result["space_used"] = used
-            result["space_used_bytes"] = used
-            result["file_count"] = count
-            result["files"] = files
-            result["errors"].extend(issues)
+            if include_usage:
+                assert root is not None
+                used, count, issues, files = self._usage(root)
+                result["space_used"] = used
+                result["space_used_bytes"] = used
+                result["file_count"] = count
+                result["files"] = files
+                result["errors"].extend(issues)
             now = self._now()
             due, reason = self._due(state, now)
             result["due"] = due
@@ -1394,6 +1491,11 @@ class HomeManager:
                     state["next_cleanup_at"] = now + int(chosen["interval_seconds"])
                 else:
                     state["next_cleanup_at"] = None
+                if chosen["mode"] == "boot":
+                    # Selecting On boot schedules the next OS boot. A stale
+                    # last_boot_id from time spent in Never must not authorize
+                    # a same-boot service restart to clear newly downloaded files.
+                    state["last_boot_id"] = self._boot_id()
                 self._write_state(state_dir_fd, state)
                 result = self._status_locked(state, root=root)
                 result["policy_changed"] = True
@@ -1463,11 +1565,13 @@ class HomeManager:
             state["last_error"] = "; ".join(result["errors"]) or "inspection uncertainty"
             state["in_progress"] = False
             state["last_result"] = dict(result)
-            # Keep timed operations due so the service retries.  Boot remains
-            # recorded as attempted and is intentionally deferred to the next
-            # OS boot.
-            if mode in PRESET_INTERVALS or mode == "custom":
-                state["next_cleanup_at"] = now
+            # Keep timed operations retryable, but leave enough space between
+            # attempts that a persistent inspection failure cannot create a
+            # one-shot timer busy loop.  Boot remains recorded as attempted
+            # and is intentionally deferred to the next OS boot.
+            retry_at = self._retry_deadline(state, now)
+            if retry_at is not None:
+                state["next_cleanup_at"] = retry_at
             self._write_state(state_dir_fd, state)
             result["retry_required"] = True
             return result
@@ -1488,7 +1592,7 @@ class HomeManager:
             state["last_sweep_at"] = now
             state["last_result"] = dict(result)
             state["last_error"] = None
-            if mode in PRESET_INTERVALS or mode == "custom":
+            if mode in TIMED_POLICY_MODES:
                 state["next_cleanup_at"] = now + int(state["policy"]["interval_seconds"])
             self._write_state(state_dir_fd, state)
             return result
@@ -1547,24 +1651,39 @@ class HomeManager:
         # below, and retaining the same dictionary would create a JSON cycle.
         state["last_result"] = dict(result)
         state["last_error"] = "; ".join(result["errors"]) if result["errors"] else None
-        if mode in PRESET_INTERVALS or mode == "custom":
+        if mode in TIMED_POLICY_MODES:
             if result["ok"]:
                 # Schedule from the actual completed run.  This collapses all
                 # missed intervals after sleep/shutdown into one sweep.
                 state["next_cleanup_at"] = now + int(state["policy"]["interval_seconds"])
             else:
-                state["next_cleanup_at"] = now
+                retry_at = self._retry_deadline(state, now)
+                if retry_at is not None:
+                    state["next_cleanup_at"] = retry_at
         self._write_state(state_dir_fd, state)
         return result
 
-    def sweep(self, force: bool = False) -> dict[str, Any]:
+    def sweep(self, force: bool = False, *, include_usage: bool = True) -> dict[str, Any]:
         """Run one due sweep, or an explicit clear when ``force`` is true."""
 
         with self._lock() as state_dir_fd:
             state, root = self._load_enrolled(state_dir_fd)
             try:
                 result = self._sweep_locked(state_dir_fd, state, root, force=bool(force))
-                status = self._status_locked(state, root=root)
+                # A one-shot timer may still invoke this command after a
+                # deadline was cancelled or while a clock is before the next
+                # deadline.  Preserve the established result/status shape,
+                # but do not walk Temp merely to report that no sweep ran.
+                no_op_reasons = {
+                    "never",
+                    "boot-complete",
+                    "not-scheduled",
+                    "not-due",
+                }
+                report_usage = bool(include_usage) and (
+                    bool(result.get("swept")) or result.get("reason") not in no_op_reasons
+                )
+                status = self._status_locked(state, root=root, include_usage=report_usage)
                 result["status"] = status
                 return result
             finally:
@@ -1842,11 +1961,51 @@ def status() -> dict[str, Any]:
 
 
 def set_policy(mode: str, interval_seconds: int | None = None) -> dict[str, Any]:
-    return _manager().set_policy(mode, interval_seconds)
+    result = _manager().set_policy(mode, interval_seconds)
+    # Persistence releases the engine lock before taking the scheduler lock.
+    # The scheduler then reads the latest policy, including concurrent edits.
+    result["policy_saved"] = True
+    return _synchronize_timer(result)
 
 
-def sweep(force: bool = False) -> dict[str, Any]:
-    return _manager().sweep(force=force)
+def schedule() -> dict[str, Any]:
+    """Return the deadline plan used by the systemd scheduler wrapper."""
+
+    return _manager().schedule()
+
+
+def _synchronize_timer(result: dict[str, Any]) -> dict[str, Any]:
+    """Synchronize installed scheduling after a completed owner operation."""
+
+    try:
+        completed = subprocess.run(
+            [sys.executable, "/usr/libexec/zeus-temp-scheduler", "arm"],
+            capture_output=True, text=True, timeout=15, check=False,
+        )
+        plan = json.loads(completed.stdout)
+        if not isinstance(plan, dict):
+            raise ValueError("invalid scheduler response")
+        result["scheduler"] = plan
+        if completed.returncode == 0 and plan.get("ok") is True:
+            return result
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        pass
+    result["ok"] = False
+    result["scheduler_error"] = True
+    result["error"] = (
+        "Policy saved, but cleanup scheduling could not be updated. Retry Apply."
+        if result.get("policy_saved") else
+        "Cleanup finished, but its next schedule could not be updated. Reapply the cleanup policy."
+    )
+    return result
+
+
+def sweep(
+    force: bool = False, *, include_usage: bool = True, synchronize_timer: bool = True,
+) -> dict[str, Any]:
+    result = _manager().sweep(force=force, include_usage=include_usage)
+    # TimerScheduler.run already owns its lock and rearms after this call.
+    return _synchronize_timer(result) if synchronize_timer else result
 
 
 def keep(names: Iterable[os.PathLike[str] | str] | os.PathLike[str] | str, destination: os.PathLike[str] | str | None = None) -> dict[str, Any]:
@@ -1876,6 +2035,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     policy_parser.add_argument("interval_seconds", nargs="?", type=int)
     policy_parser.add_argument("--interval-seconds", dest="interval_option", type=int)
     policy_parser.add_argument("--json", action="store_true", help=argparse.SUPPRESS)
+    schedule_parser = subparsers.add_parser(
+        "schedule",
+        help="show the persisted cleanup deadline without scanning Temp",
+    )
+    schedule_parser.add_argument("--json", action="store_true", help=argparse.SUPPRESS)
     sweep_parser = subparsers.add_parser("sweep", help="run a due sweep or explicit clear")
     sweep_parser.add_argument("--force", action="store_true", help="clear now regardless of schedule")
     sweep_parser.add_argument("--json", action="store_true", help=argparse.SUPPRESS)
@@ -1893,6 +2057,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.command == "policy":
             interval = args.interval_option if args.interval_option is not None else args.interval_seconds
             value = set_policy(args.mode, interval)
+        elif args.command == "schedule":
+            value = schedule()
         elif args.command == "sweep":
             value = sweep(force=bool(args.force))
         elif args.command == "keep":

@@ -4,9 +4,129 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
+import subprocess
 import sys
+import uuid
 sys.path.insert(0, '/usr/lib/zeus')
 import zeus_temp
+
+
+BOOKMARK_GTK_VERSIONS = ('3.0', '4.0')
+BOOKMARK_MAX_BYTES = 1024 * 1024
+
+
+def _read_bookmarks(path):
+    """Read an owner-owned bookmark file without following a symlink."""
+
+    flags = (
+        os.O_RDONLY
+        | getattr(os, 'O_CLOEXEC', 0)
+        | getattr(os, 'O_NOFOLLOW', 0)
+        | getattr(os, 'O_NONBLOCK', 0)
+    )
+    try:
+        fd = os.open(path, flags)
+    except FileNotFoundError:
+        return '', 0o600
+    except OSError:
+        return None
+    try:
+        value = os.fstat(fd)
+        if not stat.S_ISREG(value.st_mode) or value.st_uid != os.getuid() or value.st_size > BOOKMARK_MAX_BYTES:
+            return None
+        chunks = []
+        while True:
+            chunk = os.read(fd, 64 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        try:
+            content = b''.join(chunks).decode('utf-8')
+        except UnicodeDecodeError:
+            return None
+        return content, stat.S_IMODE(value.st_mode)
+    except OSError:
+        return None
+    finally:
+        os.close(fd)
+
+
+def _bookmark_content(content, uri):
+    """Keep the first Temp URI and remove only duplicate Temp entries."""
+
+    lines = content.splitlines(keepends=True)
+    found = False
+    output = []
+    for line in lines:
+        body = line.rstrip('\r\n')
+        fields = body.strip().split(None, 1)
+        if fields and fields[0] == uri:
+            if found:
+                continue
+            found = True
+        output.append(line)
+    if not found:
+        if output and not output[-1].endswith(('\n', '\r')):
+            output[-1] += '\n'
+        output.append(f'{uri} Temp\n')
+    return ''.join(output)
+
+
+def _write_bookmarks(path, content, mode):
+    """Atomically replace one bookmark file while retaining its mode."""
+
+    temporary = path.parent / f'.{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp'
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_CLOEXEC', 0) | getattr(os, 'O_NOFOLLOW', 0)
+    try:
+        fd = os.open(temporary, flags, mode)
+        try:
+            os.fchmod(fd, mode)
+            payload = content.encode('utf-8')
+            view = memoryview(payload)
+            while view:
+                written = os.write(fd, view)
+                view = view[written:]
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        os.replace(temporary, path)
+        return True
+    except OSError:
+        return False
+    finally:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+
+
+def _ensure_bookmark(home, version):
+    gtk = home / '.config' / f'gtk-{version}'
+    try:
+        if gtk.is_symlink():
+            return False
+        gtk.mkdir(mode=0o700, exist_ok=True)
+        gtk_stat = os.lstat(gtk)
+        if not stat.S_ISDIR(gtk_stat.st_mode) or gtk_stat.st_uid != os.getuid():
+            return False
+    except OSError:
+        return False
+
+    bookmarks = gtk / 'bookmarks'
+    value = _read_bookmarks(bookmarks)
+    if value is None:
+        return False
+    original, mode = value
+    updated = _bookmark_content(original, (home / 'Temp').as_uri())
+    if updated == original:
+        return True
+    return _write_bookmarks(bookmarks, updated, mode)
+
+
+def _ensure_bookmarks(home):
+    for version in BOOKMARK_GTK_VERSIONS:
+        _ensure_bookmark(home, version)
 
 def route(home):
     config = home / '.config'
@@ -19,32 +139,28 @@ def route(home):
     accepted = ['"$HOME/Downloads"', '"$HOME/Temp"', json.dumps(str(home / 'Downloads')), json.dumps(str(home / 'Temp'))]
     if match and match.group(1).strip() not in accepted:
         print('Preserved custom download destination; Temp remains available separately.')
-        return
-    line = 'XDG_DOWNLOAD_DIR="$HOME/Temp"'
-    updated = original[:match.start()] + line + original[match.end():] if match else original.rstrip() + '\n' + line + '\n'
-    if updated != original:
-        temporary = config / '.user-dirs.zeus-new'
-        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, 'w') as f:
-            f.write(updated)
-        os.replace(temporary, source)
-    # A normal bookmark gives the dedicated folder its own readable label.
-    gtk = config / 'gtk-3.0'
-    bookmarks = gtk / 'bookmarks'
-    if gtk.is_symlink() or bookmarks.is_symlink():
-        return
-    gtk.mkdir(exist_ok=True)
-    content = bookmarks.read_text() if bookmarks.exists() else ''
-    uri = (home / 'Temp').as_uri()
-    if not any(x.split(' ', 1)[0] == uri for x in content.splitlines()):
-        with bookmarks.open('a') as f:
-            f.write(('\n' if content and not content.endswith('\n') else '') + uri + ' Temp\n')
+    else:
+        line = 'XDG_DOWNLOAD_DIR="$HOME/Temp"'
+        updated = original[:match.start()] + line + original[match.end():] if match else original.rstrip() + '\n' + line + '\n'
+        if updated != original:
+            temporary = config / '.user-dirs.zeus-new'
+            fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, 'w') as f:
+                f.write(updated)
+            os.replace(temporary, source)
+    _ensure_bookmarks(home)
 
 if __name__ == '__main__':
     try:
-        zeus_temp.setup()
+        zeus_temp.setup(include_usage=False)
         route(Path.home())
-        print(json.dumps(zeus_temp.sweep()))
+        # The wrapper sweeps once, emits only counts, and synchronizes the
+        # deadline without a second UI usage scan or a recurring minute timer.
+        completed = subprocess.run(
+            [sys.executable, '/usr/libexec/zeus-temp-scheduler', 'run'],
+            check=False, timeout=18,
+        )
+        raise SystemExit(completed.returncode)
     except Exception as error:
         print(f'Temp setup/cleanup deferred: {error}', file=sys.stderr)
         raise SystemExit(1)

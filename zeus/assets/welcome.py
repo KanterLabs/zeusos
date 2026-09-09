@@ -110,6 +110,44 @@ CSS = """
   margin-top: 18px;
 }
 
+.shortcuts {
+  background: alpha(@accent_bg_color, 0.08);
+  border: 1px solid alpha(@accent_bg_color, 0.13);
+  border-radius: 18px;
+  margin: 0 40px 24px;
+  padding: 18px 20px 19px;
+}
+
+.shortcut-list {
+  margin-top: 4px;
+}
+
+.shortcut-row {
+  min-height: 30px;
+}
+
+.shortcut-key {
+  background: @card_bg_color;
+  border: 1px solid alpha(@window_fg_color, 0.12);
+  border-radius: 8px;
+  color: @window_fg_color;
+  font-size: 0.82em;
+  font-weight: 700;
+  min-width: 150px;
+  padding: 5px 9px;
+}
+
+.shortcut-copy {
+  color: alpha(@window_fg_color, 0.72);
+  margin-left: 12px;
+}
+
+.shortcut-note {
+  color: alpha(@window_fg_color, 0.60);
+  font-size: 0.82em;
+  margin-top: 10px;
+}
+
 .journey {
   background: alpha(@accent_bg_color, 0.12);
   border-radius: 18px;
@@ -250,6 +288,7 @@ class WelcomeWindow(Adw.ApplicationWindow):
         )
         cards_section.append(cards)
         content.append(cards_section)
+        content.append(self._build_shortcuts())
 
         journey = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         journey.add_css_class("journey")
@@ -272,6 +311,37 @@ class WelcomeWindow(Adw.ApplicationWindow):
             )
         )
         return content
+
+    def _build_shortcuts(self):
+        shortcuts = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        shortcuts.add_css_class("shortcuts")
+        shortcuts.append(make_label("KEYBOARD SHORTCUTS", "section-title"))
+
+        shortcut_list = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        shortcut_list.add_css_class("shortcut-list")
+        for shortcut, action in (
+            ("Super + Space", "Find applications"),
+            ("Super + E", "Open Files"),
+            ("Super + Shift + T", "Open Temp"),
+            ("Super + Return", "Open Terminal"),
+        ):
+            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+            row.add_css_class("shortcut-row")
+            key = make_label(shortcut, "shortcut-key")
+            key.set_xalign(0.5)
+            row.append(key)
+            row.append(make_label(action, "shortcut-copy", wrap=True, max_width_chars=60))
+            shortcut_list.append(row)
+        shortcuts.append(shortcut_list)
+        shortcuts.append(
+            make_label(
+                "Shortcuts can be customized in Settings; existing personal settings are preserved.",
+                "shortcut-note",
+                wrap=True,
+                max_width_chars=96,
+            )
+        )
+        return shortcuts
 
     def _make_card(self, icon_name, title, copy, action_text, callback):
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)

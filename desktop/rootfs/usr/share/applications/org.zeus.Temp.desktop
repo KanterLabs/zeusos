@@ -9,3 +9,8 @@ Terminal=false
 Categories=GTK;GNOME;Utility;FileManager;
 Keywords=temporary;downloads;cleanup;
 StartupNotify=true
+Actions=OpenInFiles;
+
+[Desktop Action OpenInFiles]
+Name=Open in Files
+Exec=/usr/libexec/zeus-temp-window --open-in-files

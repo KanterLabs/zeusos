@@ -47,7 +47,13 @@
   border-radius: 9px;
   padding-left: 8px;
   padding-right: 8px;
+  transition-property: background-color;
   transition-duration: 160ms;
+}
+
+#panel.zeus-panel.zeus-reduced-motion .panel-button,
+#panel.zeus-panel.zeus-reduced-motion .zeus-menu-button {
+  transition-duration: 0ms;
 }
 
 #panel.zeus-panel .panel-button:hover,

@@ -1,11 +1,14 @@
 [Unit]
-Description=Check the Zeus Temp cleanup schedule
+Description=Run Zeus Temp cleanup at its persisted deadline
+# The scheduler creates this marker only for timed policies.  The install
+# overlay intentionally does not enable this timer; boot and Never therefore
+# have no background cleanup activation.
+ConditionPathExists=%t/zeus-temp-clean.armed
 
 [Timer]
-OnStartupSec=60
-OnUnitActiveSec=60
-AccuracySec=10
+# A timer unit needs a value even while dormant.  The scheduler drop-in
+# replaces this distant baseline with one exact persisted deadline.
+OnCalendar=2100-01-01 00:00:00 UTC
+Persistent=true
+AccuracySec=1s
 Unit=zeus-temp-clean.service
-
-[Install]
-WantedBy=timers.target

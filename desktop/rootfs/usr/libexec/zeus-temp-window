@@ -11,16 +11,24 @@ from __future__ import annotations
 
 import concurrent.futures
 import datetime as datetime_module
+import json
 import os
 from pathlib import Path
 import sys
+import stat
 from typing import Any, Callable, Mapping
+import uuid
 
 import gi
 
 gi.require_version("Adw", "1")
 gi.require_version("Gtk", "4.0")
 from gi.repository import Adw, Gio, GLib, Gtk, Pango
+try:
+    gi.require_version("Gdk", "4.0")
+    from gi.repository import Gdk
+except (ImportError, ValueError):  # pragma: no cover - older GTK builds
+    Gdk = None
 
 
 BACKEND_PATH = "/usr/lib/zeus"
@@ -39,6 +47,11 @@ else:
 APPLICATION_ID = "org.zeus.Temp"
 MIN_CUSTOM_MINUTES = 15
 MAX_CUSTOM_MINUTES = 365 * 24 * 60
+REFRESH_DEBOUNCE_MS = 250
+UI_STATE_VERSION = 1
+UI_STATE_FILENAME = "temp-ui.json"
+UI_ACKNOWLEDGEMENT_KEY = "first_use_disclosure_acknowledged"
+ENGINE_STATE_FILENAME = "temp-policy.json"
 
 POLICIES = (
     ("boot", "On boot"),
@@ -63,6 +76,93 @@ POLICY_ALIASES = {
     "disabled": "never",
     "off": "never",
 }
+
+
+def _ui_state_path(home: Path | None = None) -> Path:
+    """Return UI-only state without sharing the cleanup engine's state file."""
+
+    owner_home = home or Path.home()
+    configured = os.environ.get("XDG_STATE_HOME")
+    if configured:
+        state_home = Path(os.path.expanduser(configured))
+        if not state_home.is_absolute():
+            state_home = owner_home / state_home
+    else:
+        state_home = owner_home / ".local" / "state"
+    return state_home / "zeus" / UI_STATE_FILENAME
+
+
+def _read_ui_state(path: Path | None = None) -> dict[str, Any]:
+    """Read UI acknowledgement state; malformed/future state fails closed."""
+
+    state_path = path or _ui_state_path()
+    try:
+        if state_path.is_symlink() or not state_path.is_file():
+            return {}
+        value = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return {}
+    if not isinstance(value, dict) or value.get("schema_version") != UI_STATE_VERSION:
+        return {}
+    return value
+
+
+def _disclosure_acknowledged(path: Path | None = None) -> bool:
+    return _read_ui_state(path).get(UI_ACKNOWLEDGEMENT_KEY) is True
+
+
+def _write_ui_state(path: Path | None = None, **updates: Any) -> bool:
+    """Atomically persist UI-only state while leaving engine policy untouched."""
+
+    state_path = path or _ui_state_path()
+    try:
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        if state_path.parent.is_symlink() or state_path.is_symlink():
+            return False
+        try:
+            existing = state_path.lstat()
+        except FileNotFoundError:
+            existing = None
+        if existing is not None and not stat.S_ISREG(existing.st_mode):
+            return False
+        state = _read_ui_state(state_path)
+        state.update(updates)
+        state["schema_version"] = UI_STATE_VERSION
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = (json.dumps(state, sort_keys=True, indent=2) + "\n").encode("utf-8")
+        temporary = state_path.parent / f".{state_path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
+        fd = os.open(
+            temporary,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+        )
+        try:
+            view = memoryview(payload)
+            while view:
+                written = os.write(fd, view)
+                view = view[written:]
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        try:
+            os.replace(temporary, state_path)
+        finally:
+            try:
+                temporary.unlink()
+            except FileNotFoundError:
+                pass
+        return True
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def _disclosure_text() -> str:
+    return (
+        "Temp is for downloads you can replace. With On boot (the default), an OS update reboot "
+        "also counts as a boot, so eligible Temp items may be permanently deleted. Cleanup does "
+        "not move them to Trash. Select an item and choose Keep permanently before cleanup for "
+        "anything you want to save. Your existing Downloads folder and its files are preserved."
+    )
 
 
 CSS = """
@@ -520,6 +620,9 @@ class TempWindow(Adw.ApplicationWindow):
         self._refresh_again = False
         self._operation_in_flight = False
         self._refresh_source: int | None = None
+        self._refresh_when_visible = False
+        self._file_monitors: dict[str, tuple[Gio.FileMonitor, str]] = {}
+        self._surface: Any = None
         self._status: dict[str, Any] = {}
         self._files: list[dict[str, Any]] = []
         self._file_signature: tuple[tuple[Any, ...], ...] | None = None
@@ -533,10 +636,21 @@ class TempWindow(Adw.ApplicationWindow):
         self._folder_dialog: Gtk.FileDialog | None = None
         self._pending_keep_names: list[str] = []
         self._last_keep_count = 0
+        self._disclosure_dialog: Adw.AlertDialog | None = None
+        self._disclosure_pending = not _disclosure_acknowledged()
 
         self._install_css()
         self._build_window()
-        self._refresh_source = GLib.timeout_add_seconds(4, self._on_refresh_timer)
+        self.connect("notify::visible", self._on_visibility_changed)
+        self.connect("notify::mapped", self._on_visibility_changed)
+        self.connect("realize", self._on_realize)
+        for signal_name, callback in (("map", self._on_window_map), ("unmap", self._on_window_unmap)):
+            try:
+                self.connect(signal_name, callback)
+            except (TypeError, ValueError):
+                # Some GTK builds expose mapped state without map/unmap signals.
+                pass
+        self._sync_file_monitors()
         self._start_setup()
 
     def _install_css(self):
@@ -574,6 +688,234 @@ class TempWindow(Adw.ApplicationWindow):
             except (AttributeError, TypeError):
                 pass
         widget.set_tooltip_text(label)
+
+    @staticmethod
+    def _default_engine_state_path() -> Path:
+        configured = os.environ.get("XDG_STATE_HOME")
+        if configured:
+            state_home = Path(os.path.expanduser(configured))
+            if not state_home.is_absolute():
+                state_home = Path.home() / state_home
+        else:
+            state_home = Path.home() / ".local" / "state"
+        return state_home / "zeus" / ENGINE_STATE_FILENAME
+
+    @staticmethod
+    def _monitor_key(path: Path, kind: str) -> str:
+        return f"{kind}:{os.path.abspath(os.fspath(path))}"
+
+    def _managed_temp_path(self, status: Mapping[str, Any] | None = None) -> Path:
+        """Accept only the owner Temp folder when opening or monitoring it."""
+
+        candidate = _temp_root_from_status(status or self._status)
+        home = Path.home()
+        try:
+            resolved_home = home.resolve(strict=False)
+            resolved_candidate = candidate.resolve(strict=False)
+            relative = resolved_candidate.relative_to(resolved_home)
+            if relative != Path("Temp"):
+                raise ValueError("unexpected Temp path")
+        except (OSError, RuntimeError, ValueError):
+            return home / "Temp"
+        return candidate
+
+    def _on_monitor_changed(
+        self,
+        _monitor: Gio.FileMonitor,
+        file: Gio.File,
+        other_file: Gio.File | None,
+        _event_type: Gio.FileMonitorEvent,
+        monitor_data: tuple[str, Path],
+    ):
+        if self._closed:
+            return
+        kind, _watched = monitor_data
+        changed_names = self._monitor_event_names(file, other_file)
+        if kind == "home" and "Temp" not in changed_names:
+            return
+        if kind == "home":
+            self._invalidate_temp_monitors()
+        if kind == "state" and ENGINE_STATE_FILENAME not in changed_names:
+            return
+        if not self._is_visible():
+            self._refresh_when_visible = True
+            return
+        self._schedule_status_refresh()
+
+    @staticmethod
+    def _monitor_event_names(*files: Gio.File | None) -> set[str]:
+        names = set()
+        for file in files:
+            if file is None:
+                continue
+            try:
+                path = file.get_path()
+            except (AttributeError, RuntimeError):
+                continue
+            if path:
+                names.add(Path(path).name)
+        return names
+
+    def _invalidate_temp_monitors(self):
+        """Drop monitors tied to a replaced Temp directory inode."""
+
+        for key, (monitor, kind) in list(self._file_monitors.items()):
+            if kind != "temp":
+                continue
+            try:
+                monitor.cancel()
+            except (AttributeError, RuntimeError):
+                pass
+            self._file_monitors.pop(key, None)
+
+    def _on_window_map(self, _window: Gtk.Widget):
+        self._on_visibility_changed(self, None)
+
+    def _on_window_unmap(self, _window: Gtk.Widget):
+        if not self._closed:
+            self._refresh_when_visible = True
+
+    def _on_realize(self, _window: Gtk.Widget):
+        try:
+            surface = self.get_surface()
+        except (AttributeError, RuntimeError):
+            surface = None
+        if surface is None or surface is self._surface:
+            return
+        self._surface = surface
+        connect = getattr(surface, "connect", None)
+        if connect is not None:
+            try:
+                connect("notify::state", self._on_surface_state_changed)
+            except (TypeError, ValueError):
+                pass
+        self._on_surface_state_changed()
+
+    def _surface_is_hidden(self) -> bool:
+        surface = self._surface
+        if surface is None:
+            return False
+        get_state = getattr(surface, "get_state", None)
+        if get_state is None:
+            return False
+        try:
+            state = get_state()
+        except (AttributeError, RuntimeError, TypeError):
+            return False
+        toplevel_state = getattr(Gdk, "ToplevelState", None) if Gdk is not None else None
+        if toplevel_state is None:
+            return False
+        for name in ("MINIMIZED", "SUSPENDED"):
+            flag = getattr(toplevel_state, name, None)
+            if flag is None:
+                continue
+            try:
+                if state & flag:
+                    return True
+            except (TypeError, ValueError):
+                try:
+                    if int(state) & int(flag):
+                        return True
+                except (TypeError, ValueError):
+                    continue
+        return False
+
+    def _on_surface_state_changed(self, *_args: Any):
+        self._on_visibility_changed(self, None)
+
+    def _is_visible(self) -> bool:
+        try:
+            if not self.get_visible():
+                return False
+            get_mapped = getattr(self, "get_mapped", None)
+            if get_mapped is not None and not get_mapped():
+                return False
+        except (AttributeError, RuntimeError):
+            return False
+        return not self._surface_is_hidden()
+
+    def _on_visibility_changed(self, _window: Gtk.Widget, _param: Any):
+        if self._closed:
+            return
+        if not self._is_visible():
+            self._refresh_when_visible = True
+            return
+        if self._refresh_when_visible or not self._status:
+            self._refresh_when_visible = False
+            self._schedule_status_refresh()
+
+    def _schedule_status_refresh(self):
+        """Coalesce monitor events into one one-shot refresh."""
+
+        if self._closed:
+            return
+        if not self._is_visible():
+            self._refresh_when_visible = True
+            return
+        self._refresh_when_visible = False
+        if self._refresh_in_flight or self._refresh_source is not None:
+            self._refresh_again = True
+            return
+        self._refresh_source = GLib.timeout_add(
+            REFRESH_DEBOUNCE_MS,
+            self._on_refresh_debounce,
+        )
+
+    def _on_refresh_debounce(self) -> bool:
+        self._refresh_source = None
+        self._refresh_again = False
+        if self._closed or not self._is_visible():
+            self._refresh_when_visible = True
+            return GLib.SOURCE_REMOVE
+        self._request_status()
+        return GLib.SOURCE_REMOVE
+
+    def _monitor_directory(self, path: Path, kind: str, desired: dict[str, tuple[Path, str]]):
+        try:
+            if path.is_symlink() or not path.is_dir():
+                return
+        except OSError:
+            return
+        key = self._monitor_key(path, kind)
+        desired[key] = (path, kind)
+
+    def _sync_file_monitors(self):
+        """Watch Temp and policy state directories instead of polling."""
+
+        desired: dict[str, tuple[Path, str]] = {}
+        home = Path.home()
+        self._monitor_directory(home, "home", desired)
+
+        state_path_value = self._status.get("state_path")
+        state_path = (
+            Path(os.path.expanduser(state_path_value))
+            if isinstance(state_path_value, str) and state_path_value
+            else self._default_engine_state_path()
+        )
+        self._monitor_directory(state_path.parent, "state", desired)
+
+        temp_root = self._managed_temp_path()
+        self._monitor_directory(temp_root, "temp", desired)
+
+        for key, (monitor, _kind) in list(self._file_monitors.items()):
+            if key in desired:
+                continue
+            try:
+                monitor.cancel()
+            except (AttributeError, RuntimeError):
+                pass
+            self._file_monitors.pop(key, None)
+
+        flags = getattr(Gio.FileMonitorFlags, "WATCH_MOVES", 0)
+        for key, (path, kind) in desired.items():
+            if key in self._file_monitors:
+                continue
+            try:
+                monitor = Gio.File.new_for_path(str(path)).monitor_directory(flags, None)
+                monitor.connect("changed", self._on_monitor_changed, (kind, path))
+            except (GLib.Error, OSError, TypeError, ValueError):
+                continue
+            self._file_monitors[key] = (monitor, kind)
 
     def _build_window(self):
         toolbar = Adw.ToolbarView()
@@ -618,7 +960,7 @@ class TempWindow(Adw.ApplicationWindow):
         self._expiration_label.set_halign(Gtk.Align.START)
         hero.append(self._expiration_label)
         self._setup_banner = self._label(
-            "Temporary files follow the policy below. Existing Downloads is preserved.",
+            "Temporary files follow the policy below. Existing Downloads and its files are preserved.",
             "info-banner",
             wrap=True,
         )
@@ -722,17 +1064,22 @@ class TempWindow(Adw.ApplicationWindow):
 
         actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         actions.add_css_class("action-bar")
+        self._open_files_button = Gtk.Button(label="Open in Files")
+        self._open_files_button.set_tooltip_text("Open the Temp folder in Files")
+        self._set_accessible_label(self._open_files_button, "Open Temp in Files")
+        self._open_files_button.connect("clicked", self._on_open_in_files_clicked)
         self._open_button = Gtk.Button(label="Open")
         self._open_button.add_css_class("suggested-action")
         self._open_button.set_tooltip_text("Open the selected temporary file")
         self._open_button.connect("clicked", self._on_open_clicked)
-        self._keep_button = Gtk.Button(label="Keep…")
-        self._keep_button.set_tooltip_text("Move selected files to a permanent folder")
+        self._keep_button = Gtk.Button(label="Keep permanently…")
+        self._keep_button.set_tooltip_text("Move selected files to a permanent folder before cleanup")
         self._keep_button.connect("clicked", self._on_keep_clicked)
         self._clear_button = Gtk.Button(label="Clear now")
         self._clear_button.add_css_class("destructive-action")
         self._clear_button.set_tooltip_text("Permanently clear eligible items from Temp")
         self._clear_button.connect("clicked", self._on_clear_clicked)
+        actions.append(self._open_files_button)
         actions.append(self._open_button)
         actions.append(self._keep_button)
         spacer = Gtk.Box()
@@ -766,6 +1113,37 @@ class TempWindow(Adw.ApplicationWindow):
             self._request_status()
             return
         self._submit_backend("setup", temp_backend.setup, self._after_setup)
+
+    def _maybe_show_disclosure(self):
+        if (
+            self._closed
+            or not self._disclosure_pending
+            or self._disclosure_dialog is not None
+            or temp_backend is None
+            or not self._is_visible()
+        ):
+            return
+        self._disclosure_dialog = Adw.AlertDialog.new(
+            "Before using Temp",
+            _disclosure_text(),
+        )
+        self._disclosure_dialog.add_response("later", "Later")
+        self._disclosure_dialog.add_response("understand", "I understand")
+        self._disclosure_dialog.set_response_appearance(
+            "understand",
+            Adw.ResponseAppearance.SUGGESTED,
+        )
+        self._disclosure_dialog.set_default_response("understand")
+        self._disclosure_dialog.set_close_response("later")
+        self._disclosure_dialog.connect("response", self._on_disclosure_response)
+        self._disclosure_dialog.present(self)
+
+    def _on_disclosure_response(self, dialog: Adw.AlertDialog, response: str):
+        if response == "understand":
+            self._disclosure_pending = not _write_ui_state(
+                **{UI_ACKNOWLEDGEMENT_KEY: True},
+            )
+        self._disclosure_dialog = None
 
     def _after_setup(self, result: Any, error: Exception | None):
         self._setup_result = result
@@ -867,6 +1245,9 @@ class TempWindow(Adw.ApplicationWindow):
     def _request_status(self):
         if self._closed or temp_backend is None:
             return
+        if not self._is_visible():
+            self._refresh_when_visible = True
+            return
         if self._refresh_in_flight:
             self._refresh_again = True
             return
@@ -897,7 +1278,9 @@ class TempWindow(Adw.ApplicationWindow):
             self._show_toast("Temp returned an unreadable status.")
         if self._refresh_again:
             self._refresh_again = False
-            GLib.idle_add(self._request_status)
+            self._schedule_status_refresh()
+        self._sync_file_monitors()
+        self._maybe_show_disclosure()
 
     def _apply_status(self, status: Mapping[str, Any]):
         self._status = dict(status)
@@ -910,6 +1293,7 @@ class TempWindow(Adw.ApplicationWindow):
         if files_changed:
             self._file_signature = signature
             self._render_files()
+        self._sync_file_monitors()
 
         used_bytes = _used_bytes_from_status(status, self._files)
         count_value = _nested_first(status, ("usage", "temp", "directory"), "file_count", "count", "items_count")
@@ -963,10 +1347,10 @@ class TempWindow(Adw.ApplicationWindow):
     def _expiration_text(self, mode: str, interval: int) -> str:
         if mode == "custom":
             minutes = max(MIN_CUSTOM_MINUTES, round(interval / 60)) if interval else MIN_CUSTOM_MINUTES
-            return f"Temporary files — clears every {minutes} minutes"
+            return f"Temporary files — permanently clears every {minutes} minutes"
         if mode == "never":
             return "Temporary files — kept until you clear them"
-        return f"Temporary files — clears {POLICY_LABELS.get(mode, 'on the next boot').lower()}"
+        return f"Temporary files — permanently clears {POLICY_LABELS.get(mode, 'on the next boot').lower()}"
 
     def _render_files(self):
         if not hasattr(self, "_file_list"):
@@ -1033,6 +1417,7 @@ class TempWindow(Adw.ApplicationWindow):
         selected = self._selected_items()
         can_mutate = not self._collision and temp_backend is not None and not self._operation_in_flight
         if hasattr(self, "_open_button"):
+            self._open_files_button.set_sensitive(not self._operation_in_flight)
             self._open_button.set_sensitive(len(selected) == 1)
             self._keep_button.set_sensitive(bool(selected) and can_mutate)
             self._clear_button.set_sensitive(bool(self._files) and can_mutate)
@@ -1041,10 +1426,6 @@ class TempWindow(Adw.ApplicationWindow):
                 self._setup_action_button.set_sensitive(
                     self._collision and temp_backend is not None and not self._operation_in_flight
                 )
-
-    def _on_refresh_timer(self) -> bool:
-        self._request_status()
-        return GLib.SOURCE_CONTINUE
 
     def _on_refresh_clicked(self, _button: Gtk.Button):
         self._request_status()
@@ -1087,6 +1468,12 @@ class TempWindow(Adw.ApplicationWindow):
             return
         failure = _result_error(result)
         if failure:
+            if isinstance(result, Mapping) and result.get("policy_saved"):
+                # Keep Apply available to retry a scheduling failure even
+                # though the policy itself was persisted successfully.
+                self._policy_dirty = True
+                self._update_action_sensitivity()
+                self._request_status()
             self._show_toast(failure)
             return
         self._show_toast("Cleanup policy applied. Temp was not cleared.")
@@ -1144,8 +1531,25 @@ class TempWindow(Adw.ApplicationWindow):
         if not launched:
             self._show_toast("No application is available to open that item.")
 
+    def _on_open_in_files_clicked(self, _button: Gtk.Button):
+        path = self._managed_temp_path()
+        try:
+            if path.is_symlink() or not path.is_dir():
+                self._show_toast("The Temp folder is not available yet.")
+                return
+            launched = Gio.AppInfo.launch_default_for_uri(
+                Gio.File.new_for_path(str(path)).get_uri(),
+                None,
+            )
+        except (GLib.Error, OSError) as error:
+            detail = error.message if isinstance(error, GLib.Error) else str(error)
+            self._show_toast(f"Could not open Temp in Files: {detail}")
+            return
+        if not launched:
+            self._show_toast("No file manager is available to open Temp.")
+
     def _safe_item_path(self, item: Mapping[str, Any]) -> Path | None:
-        root = _temp_root_from_status(self._status)
+        root = self._managed_temp_path()
         raw_path = item.get("path")
         candidate = (
             Path(os.path.expanduser(str(raw_path)))
@@ -1283,6 +1687,12 @@ class TempWindow(Adw.ApplicationWindow):
         if self._refresh_source is not None:
             GLib.source_remove(self._refresh_source)
             self._refresh_source = None
+        for monitor, _kind in self._file_monitors.values():
+            try:
+                monitor.cancel()
+            except (AttributeError, RuntimeError):
+                pass
+        self._file_monitors.clear()
         try:
             self._executor.shutdown(wait=False, cancel_futures=True)
         except TypeError:  # pragma: no cover - compatibility with older Python
@@ -1308,10 +1718,22 @@ class TempApplication(Adw.Application):
     def do_shutdown(self):
         if self._window is not None:
             self._window.shutdown()
-        super().do_shutdown()
+        Gio.Application.do_shutdown(self)
 
 
 def main() -> int:
+    if "--open-in-files" in sys.argv[1:]:
+        path = Path.home() / "Temp"
+        if path.is_symlink() or not path.is_dir():
+            return 1
+        try:
+            launched = Gio.AppInfo.launch_default_for_uri(
+                Gio.File.new_for_path(str(path)).get_uri(),
+                None,
+            )
+        except GLib.Error:
+            return 1
+        return 0 if launched else 1
     return TempApplication().run(sys.argv)
 
 

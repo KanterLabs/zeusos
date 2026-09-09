@@ -48,3 +48,5 @@ mokutil
 gnome-text-editor
 loupe
 gnome-calculator
+power-profiles-daemon
+zram-generator-defaults

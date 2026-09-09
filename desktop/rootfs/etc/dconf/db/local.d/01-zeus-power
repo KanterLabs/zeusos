@@ -1,0 +1,13 @@
+# Conservative laptop defaults. The owner can override every preference.
+# Native power-profiles-daemon supplies balanced/power-saver controls in GNOME.
+[org/gnome/settings-daemon/plugins/power]
+idle-dim=true
+idle-brightness=30
+power-saver-profile-on-low-battery=true
+sleep-inactive-battery-type='suspend'
+sleep-inactive-battery-timeout=600
+power-button-action='suspend'
+
+# Keep the display asleep when unattended; no seconds clock or periodic effects.
+[org/gnome/desktop/session]
+idle-delay=uint32 180

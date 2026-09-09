@@ -4,5 +4,5 @@ After=zeus-temp-session.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/libexec/zeus-temp sweep
+ExecStart=/usr/libexec/zeus-temp-scheduler run
 TimeoutStartSec=20

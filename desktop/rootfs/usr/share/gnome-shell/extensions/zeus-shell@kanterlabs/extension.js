@@ -12,7 +12,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 const KEYBINDING_NAME = 'spotlight-keybinding';
 const MAX_RESULTS = 10;
-const DOCK_LOOKUP_ATTEMPTS = 24;
+const SEARCH_REFRESH_DELAY = 80;
 
 function actorNamed(actor, name) {
     if (!actor)
@@ -38,6 +38,38 @@ function setClass(actor, className, enabled) {
         actor.add_style_class_name(className);
     else
         actor.remove_style_class_name(className);
+}
+
+function booleanSetting(settings, property, fallback) {
+    try {
+        const value = settings?.[property];
+        return typeof value === 'boolean' ? value : fallback;
+    } catch {
+        return fallback;
+    }
+}
+
+function reducedMotionEnabled(settings) {
+    try {
+        const value = settings?.reduced_motion;
+        if (typeof value === 'boolean')
+            return value;
+
+        // St.ReducedMotion is an enum on newer shells and is absent on GNOME
+        // 50, where enable-animations is the available user preference.
+        const reduce = St.ReducedMotion?.REDUCE;
+        return reduce !== undefined && value === reduce;
+    } catch {
+        return false;
+    }
+}
+
+function animationsAllowed(settings = St.Settings.get()) {
+    // GNOME 50 exposes enable-animations.  Newer shells additionally expose
+    // reduced-motion, so use it when available without requiring that API on
+    // the preview's target shell.
+    return booleanSetting(settings, 'enable_animations', true) &&
+        !reducedMotionEnabled(settings);
 }
 
 const ZeusMenuButton = GObject.registerClass(
@@ -153,6 +185,7 @@ class SpotlightDialog {
         this._rows = [];
         this._selectedIndex = -1;
         this._searchSerial = 0;
+        this._refreshId = 0;
 
         this._overlay = new St.Widget({
             name: 'zeusSpotlightOverlay',
@@ -188,7 +221,7 @@ class SpotlightDialog {
             y_align: Clutter.ActorAlign.CENTER,
         }));
         heading.add_child(new St.Label({
-            text: 'Super  Space',
+            text: 'Super + Space',
             style_class: 'zeus-search-shortcut',
             y_align: Clutter.ActorAlign.CENTER,
         }));
@@ -207,7 +240,7 @@ class SpotlightDialog {
             style_class: 'zeus-search-entry-icon',
         }));
         this._entry.clutter_text.connect('text-changed', () =>
-            this._refreshResults());
+            this._queueRefreshResults());
         this._entry.clutter_text.connect('key-press-event', (_actor, event) =>
             this._onEntryKeyPress(event));
         this._dialog.add_child(this._entry);
@@ -255,8 +288,11 @@ class SpotlightDialog {
             return;
 
         this._open = true;
+        this._cancelRefresh();
         this._entry.text = '';
-        this._overlay.opacity = 0;
+        this._cancelRefresh();
+        const animate = animationsAllowed();
+        this._overlay.opacity = animate ? 0 : 255;
         Main.layoutManager.addChrome(this._overlay);
         this._overlay.show();
         this._modalGrab = Main.pushModal(this._overlay, {
@@ -265,11 +301,13 @@ class SpotlightDialog {
         this._entry.clutter_text.grab_key_focus();
         this._entry.clutter_text.set_cursor_visible(true);
         this._refreshResults();
-        this._overlay.ease({
-            opacity: 255,
-            duration: 160,
-            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-        });
+        if (animate) {
+            this._overlay.ease({
+                opacity: 255,
+                duration: 160,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+        }
     }
 
     close() {
@@ -277,6 +315,7 @@ class SpotlightDialog {
             return;
 
         this._open = false;
+        this._cancelRefresh();
         ++this._searchSerial;
         if (this._modalGrab) {
             try {
@@ -294,6 +333,30 @@ class SpotlightDialog {
     destroy() {
         this.close();
         this._overlay.destroy();
+    }
+
+    scheduleRefresh() {
+        this._queueRefreshResults();
+    }
+
+    _queueRefreshResults() {
+        if (!this._open || this._refreshId)
+            return;
+
+        this._refreshId = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT,
+            SEARCH_REFRESH_DELAY, () => {
+                this._refreshId = 0;
+                this._refreshResults();
+            });
+        GLib.Source.set_name_by_id(this._refreshId, '[zeus-shell] refresh search');
+    }
+
+    _cancelRefresh() {
+        if (!this._refreshId)
+            return;
+
+        GLib.source_remove(this._refreshId);
+        this._refreshId = 0;
     }
 
     _onEntryKeyPress(event) {
@@ -389,23 +452,38 @@ export default class ZeusShellExtension extends Extension {
         this._panelState = null;
         this._panel = null;
         this._dock = null;
-        this._dockLookupId = 0;
-        this._panelRetryId = 0;
+        this._panelWatchActors = [];
+        this._dockWatchActors = [];
+        this._dockRediscoveryId = 0;
         this._menuButton = null;
         this._panelDivider = null;
         this._appLabel = null;
         this._search = new SpotlightDialog(this);
+        this._appSystem = Shell.AppSystem.get_default();
+        this._installedApps = null;
         this._tracker = Shell.WindowTracker.get_default();
 
         Main.sessionMode.connectObject('updated',
             () => this._syncSessionMode(), this);
         this._tracker.connectObject('notify::focus-app',
             () => this._updateFocusedApp(), this);
+        this._appSystem.connectObject('installed-changed', () => {
+            this._installedApps = null;
+            this._search?.scheduleRefresh();
+        }, this);
 
         const shellSettings = St.Settings.get();
+        const appearanceChanged = () => this._syncAppearance();
         shellSettings.connectObject(
-            'notify::color-scheme', () => this._syncAppearance(),
-            'notify::high-contrast', () => this._syncAppearance(), this);
+            'notify::color-scheme', appearanceChanged,
+            'notify::high-contrast', appearanceChanged,
+            'notify::enable-animations', appearanceChanged, this);
+        try {
+            if (shellSettings.find_property?.('reduced-motion'))
+                shellSettings.connectObject('notify::reduced-motion', appearanceChanged, this);
+        } catch {
+            // GNOME 50 does not expose reduced-motion as a separate property.
+        }
 
         try {
             this._settings = this.getSettings();
@@ -437,16 +515,12 @@ export default class ZeusShellExtension extends Extension {
         this._keybindingInstalled = false;
         this._settings = null;
 
-        if (this._panelRetryId) {
-            GLib.source_remove(this._panelRetryId);
-            this._panelRetryId = 0;
-        }
-
-        if (this._dockLookupId) {
-            GLib.source_remove(this._dockLookupId);
-            this._dockLookupId = 0;
-        }
-
+        this._appSystem?.disconnectObject(this);
+        this._appSystem = null;
+        this._installedApps = null;
+        this._cancelDockRediscovery();
+        this._stopPanelWatch();
+        this._stopDockWatch();
         this._restorePanel();
         this._tracker?.disconnectObject(this);
         Main.sessionMode?.disconnectObject(this);
@@ -474,7 +548,7 @@ export default class ZeusShellExtension extends Extension {
     }
 
     launchDesktopId(desktopId) {
-        const app = Shell.AppSystem.get_default().lookup_app(desktopId);
+        const app = (this._appSystem ?? Shell.AppSystem.get_default()).lookup_app(desktopId);
         if (app)
             this.launchApp(app);
     }
@@ -489,7 +563,7 @@ export default class ZeusShellExtension extends Extension {
     }
 
     findApplications(query) {
-        const appSystem = Shell.AppSystem.get_default();
+        const appSystem = this._appSystem ?? Shell.AppSystem.get_default();
         const apps = [];
         const seen = new Set();
 
@@ -527,7 +601,7 @@ export default class ZeusShellExtension extends Extension {
 
             if (apps.length === 0) {
                 const terms = query.toLowerCase().split(/\s+/);
-                for (const info of appSystem.get_installed()) {
+                for (const info of this._getInstalledApplications(appSystem)) {
                     const haystack = [
                         info.get_name(),
                         info.get_description?.() ?? '',
@@ -551,14 +625,21 @@ export default class ZeusShellExtension extends Extension {
             console.debug(`Zeus could not load favorite applications: ${error.message}`);
         }
 
-        const installed = Array.from(appSystem.get_installed()).sort((a, b) =>
-            a.get_name().localeCompare(b.get_name()));
+        const installed = this._getInstalledApplications(appSystem);
         for (const info of installed) {
             addApp(info.get_id());
             if (apps.length >= MAX_RESULTS)
                 break;
         }
         return apps.slice(0, MAX_RESULTS);
+    }
+
+    _getInstalledApplications(appSystem) {
+        if (!this._installedApps) {
+            this._installedApps = Array.from(appSystem.get_installed()).sort((a, b) =>
+                a.get_name().localeCompare(b.get_name()));
+        }
+        return this._installedApps;
     }
 
     _syncSessionMode() {
@@ -570,30 +651,36 @@ export default class ZeusShellExtension extends Extension {
 
         this._customizePanel();
         if (!this._panelState)
-            this._schedulePanelRetry();
+            this._watchPanel();
     }
 
-    _schedulePanelRetry() {
-        if (this._panelRetryId)
+    _watchPanel() {
+        if (this._panelState || this._panelWatchActors.length > 0)
             return;
 
-        let attempts = 0;
-        this._panelRetryId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
-            attempts++;
-            if (!Main.sessionMode || Main.sessionMode.isGreeter ||
-                Main.sessionMode.isLocked) {
-                this._panelRetryId = 0;
-                return GLib.SOURCE_REMOVE;
-            }
+        const panel = Main.panel;
+        const actors = [panel, panel?._leftBox, panel?._centerBox, panel?._rightBox]
+            .filter(Boolean);
+        if (actors.length === 0)
+            return;
 
-            this._customizePanel();
-            if (this._panelState || attempts >= 50) {
-                this._panelRetryId = 0;
-                return GLib.SOURCE_REMOVE;
+        const panelChanged = () => {
+            if (this._panelState) {
+                this._stopPanelWatch();
+                return;
             }
-            return GLib.SOURCE_CONTINUE;
-        });
-        GLib.Source.set_name_by_id(this._panelRetryId, '[zeus-shell] locate panel');
+            this._customizePanel();
+        };
+        this._panelWatchActors = [...new Set(actors)];
+        for (const actor of this._panelWatchActors)
+            actor.connectObject('child-added', panelChanged, this);
+        panelChanged();
+    }
+
+    _stopPanelWatch() {
+        for (const actor of this._panelWatchActors)
+            actor?.disconnectObject(this);
+        this._panelWatchActors = [];
     }
 
     _customizePanel() {
@@ -608,8 +695,7 @@ export default class ZeusShellExtension extends Extension {
             const dateContainer = panel.statusArea?.dateMenu?.container ?? null;
             const activitiesContainer = panel.statusArea?.activities?.container ?? null;
             // Wait for Panel._updatePanel() to materialize native indicators;
-            // saving a partial state would make later startup retries unable
-            // to restore or reposition the date menu correctly.
+            // child-added signals below will retry this once those actors exist.
             if (!dateContainer || !activitiesContainer)
                 return;
 
@@ -623,6 +709,7 @@ export default class ZeusShellExtension extends Extension {
                 activitiesVisible: activitiesContainer?.visible ?? false,
             };
             this._panel = panel;
+            this._stopPanelWatch();
         }
 
         const {dateContainer, activitiesContainer} = this._panelState;
@@ -664,10 +751,9 @@ export default class ZeusShellExtension extends Extension {
     }
 
     _restorePanel() {
-        if (this._dockLookupId) {
-            GLib.source_remove(this._dockLookupId);
-            this._dockLookupId = 0;
-        }
+        this._cancelDockRediscovery();
+        this._stopPanelWatch();
+        this._stopDockWatch();
 
         const state = this._panelState;
         if (!state)
@@ -699,6 +785,7 @@ export default class ZeusShellExtension extends Extension {
 
         panel.remove_style_class_name('zeus-panel');
         this._removeAppearanceClasses(panel);
+        this._dock?.disconnectObject(this);
         this._removeAppearanceClasses(this._dock);
         this._dock = null;
         this._panel = null;
@@ -710,7 +797,9 @@ export default class ZeusShellExtension extends Extension {
             return;
 
         const app = this._tracker?.focus_app;
-        this._appLabel.text = app?.get_name() || 'Desktop';
+        const name = app?.get_name() || 'Desktop';
+        if (this._appLabel.text !== name)
+            this._appLabel.text = name;
     }
 
     _syncAppearance() {
@@ -721,39 +810,77 @@ export default class ZeusShellExtension extends Extension {
         const settings = St.Settings.get();
         const light = settings.color_scheme === St.SystemColorScheme.PREFER_LIGHT;
         const highContrast = settings.high_contrast;
+        const reducedMotion = !animationsAllowed(settings);
         for (const actor of [panel, this._dock, this._search?._overlay]) {
             setClass(actor, 'zeus-light', light);
             setClass(actor, 'zeus-dark', !light);
             setClass(actor, 'zeus-high-contrast', highContrast);
+            setClass(actor, 'zeus-reduced-motion', reducedMotion);
         }
     }
 
     _removeAppearanceClasses(actor) {
-        for (const className of ['zeus-light', 'zeus-dark', 'zeus-high-contrast', 'zeus-dock'])
+        for (const className of [
+            'zeus-light', 'zeus-dark', 'zeus-high-contrast', 'zeus-reduced-motion', 'zeus-dock',
+        ])
             setClass(actor, className, false);
     }
 
     _watchDock() {
-        if (this._dock || this._dockLookupId)
+        if (this._dock || this._dockWatchActors.length > 0 || this._dockRediscoveryId)
             return;
 
-        let attempts = 0;
-        this._dockLookupId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 250, () => {
-            attempts++;
-            const dock = actorNamed(Main.layoutManager?.uiGroup, 'dashtodockContainer');
-            if (dock) {
-                this._dockLookupId = 0;
-                this._dock = dock;
-                dock.add_style_class_name('zeus-dock');
-                this._syncAppearance();
-                return GLib.SOURCE_REMOVE;
-            }
-            if (attempts >= DOCK_LOOKUP_ATTEMPTS) {
-                this._dockLookupId = 0;
-                return GLib.SOURCE_REMOVE;
-            }
-            return GLib.SOURCE_CONTINUE;
+        const uiGroup = Main.layoutManager?.uiGroup;
+        if (!uiGroup)
+            return;
+
+        const dockAdded = () => {
+            const dock = actorNamed(uiGroup, 'dashtodockContainer');
+            if (!dock)
+                return;
+
+            this._stopDockWatch();
+            this._dock = dock;
+            this._cancelDockRediscovery();
+            dock.connectObject('destroy', () => {
+                if (this._dock !== dock)
+                    return;
+                this._dock = null;
+                // Clutter may emit destroy before removing the actor from its
+                // parent.  Let the current destruction finish before scanning
+                // uiGroup again, while keeping discovery event-driven.
+                this._scheduleDockRediscovery();
+            }, this);
+            dock.add_style_class_name('zeus-dock');
+            this._syncAppearance();
+        };
+        this._dockWatchActors = [uiGroup];
+        uiGroup.connectObject('child-added', dockAdded, this);
+        dockAdded();
+    }
+
+    _scheduleDockRediscovery() {
+        if (this._dock || this._dockRediscoveryId || !this._panelState)
+            return;
+
+        this._dockRediscoveryId = GLib.idle_add_once(GLib.PRIORITY_DEFAULT, () => {
+            this._dockRediscoveryId = 0;
+            if (this._panelState && !this._dock)
+                this._watchDock();
         });
-        GLib.Source.set_name_by_id(this._dockLookupId, '[zeus-shell] locate dock');
+    }
+
+    _cancelDockRediscovery() {
+        if (!this._dockRediscoveryId)
+            return;
+
+        GLib.source_remove(this._dockRediscoveryId);
+        this._dockRediscoveryId = 0;
+    }
+
+    _stopDockWatch() {
+        for (const actor of this._dockWatchActors)
+            actor?.disconnectObject(this);
+        this._dockWatchActors = [];
     }
 }

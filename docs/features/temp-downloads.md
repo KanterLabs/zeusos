@@ -110,13 +110,23 @@ Active-file detection uses a socket-activated, read-only root inspector authenti
 by the connecting UID. It returns device/inode identities only; deletion runs as
 the owner. An uncertain inspection defers deletion. Partial-download markers defer
 the entire sweep, preserving browser companion files. Boot cleanup gets one attempt
-per boot; an interrupted or deferred attempt waits until the next boot. Timers
-check once per minute, so the displayed deadline is approximate.
+per boot; an interrupted or deferred attempt waits until the next boot. Timed
+policies use a one-shot systemd timer for the persisted deadline. Boot and Never
+leave no armed timer. Sleep or shutdown collapses missed deadlines into one
+catch-up attempt; persistent inspection failures back off instead of looping.
 
-The native Temp app is available in the dock. Files receives a Temp bookmark and
-the XDG download destination; applications with their own explicit destinations
-keep those choices. Keep currently supports regular files into permanent folders
-inside the owner home. Existing directories can be opened in Files.
+The native Temp app is available in the dock and through Super+Shift+T. Files
+receives a Temp bookmark and the XDG download destination; applications with
+their own explicit destinations keep those choices. GTK3 and GTK4 bookmarks are
+deduplicated while retaining unrelated entries and labels. Open in Files is
+available in the window and launcher menu. Keep permanently… supports regular
+files into permanent folders inside the owner home.
+
+First use explains permanent expiration and OS update reboots. Its acknowledgement
+is stored separately from cleanup policy. The visible window refreshes from
+bounded filesystem monitors with debouncing, and defers scans while hidden.
+Monitors cover the home directory, policy state directory and top-level Temp;
+changes deep inside an existing subdirectory may require the Refresh button.
 
 ## Helm implementation cards
 

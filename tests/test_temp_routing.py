@@ -50,3 +50,43 @@ class Routing(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 module.route(home)
             self.assertEqual(target.read_text(), original)
+
+    def test_custom_destination_stays_custom_while_temp_is_bookmarked_in_both_gtk_versions(self):
+        with tempfile.TemporaryDirectory() as d:
+            home = Path(d)
+            config = home / '.config'
+            config.mkdir()
+            dirs = config / 'user-dirs.dirs'
+            original = 'XDG_DOWNLOAD_DIR="$HOME/Work folder"\nXDG_DOCUMENTS_DIR="$HOME/Documents"\n'
+            dirs.write_text(original)
+            gtk3 = config / 'gtk-3.0'
+            gtk3.mkdir()
+            uri = (home / 'Temp').as_uri()
+            bookmarks = gtk3 / 'bookmarks'
+            bookmarks.write_text(f'file:///tmp/owner-place Owner place\n{uri} Owner label\n{uri} Duplicate\n')
+
+            module.route(home)
+
+            self.assertEqual(dirs.read_text(), original)
+            content = bookmarks.read_text()
+            self.assertEqual(content.count(uri), 1)
+            self.assertIn(f'{uri} Owner label', content)
+            gtk4_bookmarks = config / 'gtk-4.0' / 'bookmarks'
+            self.assertEqual(gtk4_bookmarks.read_text(), f'{uri} Temp\n')
+
+    def test_symlinked_bookmark_is_left_untouched(self):
+        with tempfile.TemporaryDirectory() as d:
+            home = Path(d)
+            config = home / '.config'
+            config.mkdir()
+            (config / 'user-dirs.dirs').write_text('XDG_DOWNLOAD_DIR="$HOME/Downloads"\n')
+            gtk3 = config / 'gtk-3.0'
+            gtk3.mkdir()
+            target = home / 'owner-bookmarks'
+            target.write_text('file:///tmp/owner Owner\n')
+            (gtk3 / 'bookmarks').symlink_to(target)
+
+            module.route(home)
+
+            self.assertEqual(target.read_text(), 'file:///tmp/owner Owner\n')
+            self.assertTrue((gtk3 / 'bookmarks').is_symlink())
