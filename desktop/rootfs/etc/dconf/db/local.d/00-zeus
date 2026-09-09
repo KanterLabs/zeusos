@@ -44,11 +44,11 @@ favorite-apps=['org.gnome.Nautilus.desktop', 'org.gnome.Ptyxis.desktop', 'org.mo
 [org/gnome/shell/extensions/dash-to-dock]
 disable-overview-on-startup=true
 dock-position='BOTTOM'
-dock-fixed=false
+dock-fixed=true
 extend-height=false
-intellihide=true
+intellihide=false
 intellihide-mode='FOCUS_APPLICATION_WINDOWS'
-autohide=true
+autohide=false
 require-pressure-to-show=false
 autohide-in-fullscreen=true
 dash-max-icon-size=48
@@ -67,8 +67,8 @@ scroll-switch-workspace=true
 isolate-workspaces=false
 isolate-monitors=false
 show-dock-urgent-notify=true
-transparency-mode='FIXED'
-custom-background-color=true
+transparency-mode='DEFAULT'
+custom-background-color=false
 background-color='#101A36'
 background-opacity=0.86
 apply-custom-theme=false
@@ -76,7 +76,7 @@ apply-custom-theme=false
 [org/gnome/settings-daemon/plugins/media-keys]
 # gnome-settings-daemon dispatches this through GNOME Shell's supported
 # FocusSearch D-Bus action. It avoids a custom search implementation.
-search=[]
+search=@as []
 on-screen-keyboard=['<Super><Alt>k']
 custom-keybindings=['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/zeus-terminal/']
 
