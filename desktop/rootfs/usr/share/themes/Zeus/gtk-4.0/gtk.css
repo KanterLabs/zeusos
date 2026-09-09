@@ -281,3 +281,28 @@ progressbar progress {
   background-color: var(--zeus-accent);
   border-radius: 999px;
 }
+
+/* Keep a 24px native pointer/keyboard target while painting a 16px circle in
+ * its content box. This avoids the tall oval produced by generic button
+ * padding without shrinking the titlebar control's activation area. */
+windowcontrols > button.close,
+windowcontrols > button.minimize,
+windowcontrols > button.maximize,
+windowcontrols > button.restore {
+  min-width: 16px;
+  min-height: 16px;
+  padding: 4px;
+  margin: 0;
+  border-radius: 50%;
+  border: 0;
+  background-clip: content-box;
+}
+
+windowcontrols > button.close > image,
+windowcontrols > button.minimize > image,
+windowcontrols > button.maximize > image,
+windowcontrols > button.restore > image {
+  min-width: 8px;
+  min-height: 8px;
+  margin: 0;
+}

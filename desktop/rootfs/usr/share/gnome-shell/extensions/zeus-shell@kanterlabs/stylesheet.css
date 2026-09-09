@@ -324,3 +324,9 @@
   border: 2px solid currentColor;
   background-color: transparent;
 }
+
+/* Native panel buttons otherwise keep GNOME’s overview foreground. */
+#panel.zeus-panel .panel-button { color: #1c2742; }
+#panel.zeus-panel.zeus-dark .panel-button { color: #f1f4ff; }
+#panel.zeus-panel.zeus-high-contrast .panel-button { color: #000000; }
+#panel.zeus-panel.zeus-dark.zeus-high-contrast .panel-button { color: #ffffff; }

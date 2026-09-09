@@ -272,3 +272,32 @@ tooltip {
   border-radius: 9px;
   padding: 5px 8px;
 }
+
+/* Keep a 24px native pointer/keyboard target while painting a 16px circle in
+ * its content box. This avoids the tall oval produced by generic button
+ * padding without shrinking the titlebar control's activation area. */
+.titlebar button.close,
+.titlebar button.minimize,
+.titlebar button.maximize,
+headerbar button.close,
+headerbar button.minimize,
+headerbar button.maximize {
+  min-width: 16px;
+  min-height: 16px;
+  padding: 4px;
+  margin: 0;
+  border-radius: 50%;
+  border: 0;
+  background-clip: content-box;
+}
+
+.titlebar button.close > image,
+.titlebar button.minimize > image,
+.titlebar button.maximize > image,
+headerbar button.close > image,
+headerbar button.minimize > image,
+headerbar button.maximize > image {
+  min-width: 8px;
+  min-height: 8px;
+  margin: 0;
+}

@@ -124,14 +124,14 @@ class SearchResultButton extends St.Button {
             console.debug(`Zeus search could not load an icon: ${error.message}`);
         }
 
-        this.label = new St.Label({
+        this._labelActor = new St.Label({
             text: app.get_name(),
             style_class: 'zeus-search-result-label',
             y_align: Clutter.ActorAlign.CENTER,
             x_expand: true,
         });
-        row.add_child(this.label);
-        this.label_actor = this.label;
+        row.add_child(this._labelActor);
+        this.label_actor = this._labelActor;
         this.set_child(row);
 
         this.connect('clicked', () => this._activate(this.app));
@@ -203,6 +203,7 @@ class SpotlightDialog {
         });
         this._entry.set_primary_icon(new St.Icon({
             icon_name: 'system-search-symbolic',
+            icon_size: 22,
             style_class: 'zeus-search-entry-icon',
         }));
         this._entry.clutter_text.connect('text-changed', () =>
@@ -241,6 +242,12 @@ class SpotlightDialog {
             }
             return Clutter.EVENT_PROPAGATE;
         });
+
+        // Keep the modal usable even when the initial focus hand-off lands on
+        // the overlay.  Only navigation/activation keys are handled here;
+        // printable input still propagates to St.Entry and the focused app.
+        this._overlay.connect('key-press-event', (_actor, event) =>
+            this._onEntryKeyPress(event));
     }
 
     open() {
@@ -253,9 +260,10 @@ class SpotlightDialog {
         Main.layoutManager.addChrome(this._overlay);
         this._overlay.show();
         this._modalGrab = Main.pushModal(this._overlay, {
-            actionMode: Shell.ActionMode.NORMAL,
+            actionMode: Shell.ActionMode.POPUP,
         });
-        this._entry.grab_key_focus();
+        this._entry.clutter_text.grab_key_focus();
+        this._entry.clutter_text.set_cursor_visible(true);
         this._refreshResults();
         this._overlay.ease({
             opacity: 255,
@@ -325,35 +333,52 @@ class SpotlightDialog {
         this._rows[this._selectedIndex].setSelected(true);
     }
 
-    async _refreshResults() {
-        const serial = ++this._searchSerial;
-        const query = this._entry.get_text().trim();
-        const apps = this._extension.findApplications(query);
-
-        await Promise.resolve();
-        if (!this._open || serial !== this._searchSerial)
-            return;
-
+    _clearResults() {
         for (const row of this._rows)
             row.destroy();
         this._rows = [];
         this._resultsBox.remove_all_children();
         this._selectedIndex = -1;
+    }
 
-        if (apps.length === 0) {
-            this._resultsBox.add_child(this._emptyLabel);
+    _refreshResults() {
+        const serial = ++this._searchSerial;
+        if (!this._open)
             return;
-        }
 
-        for (const app of apps) {
-            const row = new SearchResultButton(app, selectedApp =>
-                this._extension.launchApp(selectedApp));
-            this._rows.push(row);
-            this._resultsBox.add_child(row);
-        }
+        try {
+            const query = String(this._entry.get_text() ?? '').trim();
+            const apps = this._extension.findApplications(query);
+            if (!this._open || serial !== this._searchSerial)
+                return;
 
-        this._selectedIndex = 0;
-        this._rows[0].setSelected(true);
+            this._clearResults();
+            for (const app of apps) {
+                try {
+                    const row = new SearchResultButton(app, selectedApp =>
+                        this._extension.launchApp(selectedApp));
+                    this._rows.push(row);
+                    this._resultsBox.add_child(row);
+                } catch (error) {
+                    console.error(`Zeus could not render search result: ${error.message}`);
+                }
+            }
+
+            if (this._rows.length === 0) {
+                this._resultsBox.add_child(this._emptyLabel);
+                return;
+            }
+
+            this._selectedIndex = 0;
+            this._rows[0].setSelected(true);
+        } catch (error) {
+            console.error(`Zeus search update failed: ${error.message}`);
+            if (!this._open || serial !== this._searchSerial)
+                return;
+
+            this._clearResults();
+            this._resultsBox.add_child(this._emptyLabel);
+        }
     }
 }
 
@@ -365,6 +390,7 @@ export default class ZeusShellExtension extends Extension {
         this._panel = null;
         this._dock = null;
         this._dockLookupId = 0;
+        this._panelRetryId = 0;
         this._menuButton = null;
         this._panelDivider = null;
         this._appLabel = null;
@@ -411,6 +437,11 @@ export default class ZeusShellExtension extends Extension {
         this._keybindingInstalled = false;
         this._settings = null;
 
+        if (this._panelRetryId) {
+            GLib.source_remove(this._panelRetryId);
+            this._panelRetryId = 0;
+        }
+
         if (this._dockLookupId) {
             GLib.source_remove(this._dockLookupId);
             this._dockLookupId = 0;
@@ -426,8 +457,19 @@ export default class ZeusShellExtension extends Extension {
         if (!this._search || Main.sessionMode.isGreeter || Main.sessionMode.isLocked)
             return;
 
-        if (Main.overview?.visible)
+        if (Main.overview?.visible) {
             Main.overview.hide();
+            // Overview hides asynchronously.  Opening the modal on the next
+            // main-loop turn prevents its search actor from remaining behind
+            // the Spotlight overlay when the shortcut is pressed there.
+            GLib.idle_add_once(GLib.PRIORITY_DEFAULT, () => {
+                if (this._search && !Main.sessionMode.isGreeter &&
+                    !Main.sessionMode.isLocked)
+                    this._search.open();
+            });
+            return;
+        }
+
         this._search.open();
     }
 
@@ -520,14 +562,38 @@ export default class ZeusShellExtension extends Extension {
     }
 
     _syncSessionMode() {
-        if (!Main.sessionMode || Main.sessionMode.isGreeter || Main.sessionMode.isLocked ||
-            !Main.sessionMode.hasOverview) {
+        if (!Main.sessionMode || Main.sessionMode.isGreeter || Main.sessionMode.isLocked) {
             this._search?.close();
             this._restorePanel();
             return;
         }
 
         this._customizePanel();
+        if (!this._panelState)
+            this._schedulePanelRetry();
+    }
+
+    _schedulePanelRetry() {
+        if (this._panelRetryId)
+            return;
+
+        let attempts = 0;
+        this._panelRetryId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
+            attempts++;
+            if (!Main.sessionMode || Main.sessionMode.isGreeter ||
+                Main.sessionMode.isLocked) {
+                this._panelRetryId = 0;
+                return GLib.SOURCE_REMOVE;
+            }
+
+            this._customizePanel();
+            if (this._panelState || attempts >= 50) {
+                this._panelRetryId = 0;
+                return GLib.SOURCE_REMOVE;
+            }
+            return GLib.SOURCE_CONTINUE;
+        });
+        GLib.Source.set_name_by_id(this._panelRetryId, '[zeus-shell] locate panel');
     }
 
     _customizePanel() {
@@ -541,6 +607,12 @@ export default class ZeusShellExtension extends Extension {
         if (!this._panelState) {
             const dateContainer = panel.statusArea?.dateMenu?.container ?? null;
             const activitiesContainer = panel.statusArea?.activities?.container ?? null;
+            // Wait for Panel._updatePanel() to materialize native indicators;
+            // saving a partial state would make later startup retries unable
+            // to restore or reposition the date menu correctly.
+            if (!dateContainer || !activitiesContainer)
+                return;
+
             this._panelState = {
                 panel,
                 dateContainer,

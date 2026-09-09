@@ -100,8 +100,8 @@ contents. Record its output as redacted evidence if it is retained.
 The current local desktop actions are also reversible and narrow:
 
 ```sh
-zeus desktop safe       # disable the Dash to Dock preview extension
-zeus desktop restore    # re-enable it
+zeus desktop safe       # disable Zeus shell/dock and managed GTK imports
+zeus desktop restore    # restore the Zeus presentation
 sudo zeus update status  # read-only bootc status; no reboot
 /usr/libexec/zeus-welcome
 ```
@@ -165,18 +165,18 @@ fails.
    backup is:
 
    ```text
-   /mnt/pve/sata-ssd/dump/vzdump-qemu-115-2026_09_08-11_53_40.vma.zst
+   /mnt/pve/sata-ssd/dump/vzdump-qemu-115-2026_09_08-14_52_08.vma.zst
    ```
 
    The recorded storage reference is
-   `sata-ssd:backup/vzdump-qemu-115-2026_09_08-11_53_40.vma.zst`. The checks
+   `sata-ssd:backup/vzdump-qemu-115-2026_09_08-14_52_08.vma.zst`. The checks
    below are the exact integrity checks used for this backup:
 
    ```sh
-   ssh pve 'zstd -t /mnt/pve/sata-ssd/dump/vzdump-qemu-115-2026_09_08-11_53_40.vma.zst'
+   ssh pve 'zstd -t /mnt/pve/sata-ssd/dump/vzdump-qemu-115-2026_09_08-14_52_08.vma.zst'
    # First decompress on the roomy SATA volume, with restrictive permissions.
-   ssh pve 'umask 077; zstd -dc /mnt/pve/sata-ssd/dump/vzdump-qemu-115-2026_09_08-11_53_40.vma.zst > /mnt/pve/sata-ssd/zeusos/verification/populated-preview.vma'
-   ssh pve 'vma verify /mnt/pve/sata-ssd/zeusos/verification/populated-preview.vma'
+   ssh pve 'umask 077; zstd -dc /mnt/pve/sata-ssd/dump/vzdump-qemu-115-2026_09_08-14_52_08.vma.zst > /mnt/pve/sata-ssd/zeusos/verification/visual-preview.vma'
+   ssh pve 'vma verify /mnt/pve/sata-ssd/zeusos/verification/visual-preview.vma'
    ```
 
    Both archive checks are recorded as passed. They verify archive integrity,
@@ -277,9 +277,9 @@ The declared comparison and budgets are in
 [`preview-1-budgets.md`](releases/preview-1-budgets.md). Record actual values
 and variability; the 4-vCPU/8-GiB VM allocation is not performance evidence.
 
-## Verified release and remaining qualification
+## Preview 1 historical qualification
 
-The running release uses source `38bb7fc53002a76dbfa4a5c891c3d1b1bbdb4f20`
+The previous Preview 1 release used source `38bb7fc53002a76dbfa4a5c891c3d1b1bbdb4f20`
 and booted OCI manifest `sha256:3fa00c6a1d5eaa5529deb6c6138ffedfedb354d999da9735d268e70e808cd06b`.
 The exact QCOW2 and OCI archive hashes, sizes, package inventory and validation
 results are in the [release receipt](releases/preview-1/build-receipt.json) and
