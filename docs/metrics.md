@@ -496,6 +496,76 @@ Raw evidence: [boot/idle comparison](iterations/git-31f0851a9d07/performance-com
 [install](iterations/git-31f0851a9d07/native-install-timing.json) and
 [update reboot](iterations/git-31f0851a9d07/update-reboot-observation.json).
 
+### 2026-09-09 — Chrome default and native Temp qualification
+
+- Recorded at (UTC): `2026-09-09T22:52:41.677903+00:00`.
+- Version/build: `0.1.0-preview.2` / `git-9c2cfbdcb703`; historical reference
+  `git-31f0851a9d07`.
+- Environment: VM115, 4 vCPU, 8 GiB, 64 GiB VirtIO, 1280×800/100%, UEFI
+  Secure Boot and enforcing SELinux. Builder stopped; backup verification
+  finished; Temp held Never during sampling and restored On boot afterward.
+- Protocol: three cold starts; separate closed-desktop and one-tab Chrome idle
+  windows, each with 20 s settle, 120 s duration and 5 s samples. No guest
+  probes or GUI actions overlapped the idle windows; shared host unisolated.
+
+| Measurement | City reference | Chrome build | Unit |
+| --- | --- | --- | --- |
+| OS startup samples | 6.834, 7.265, 6.797 | 7.033, 7.030, 7.108 | s |
+| OS startup median | 6.834 | 7.033 | s |
+| Host-to-GDM samples | 17.609, 18.646, 17.599 | 46.938, 17.681, 17.606 | s |
+| Host-to-GDM median | 17.609 | 17.681 | s |
+| Closed idle CPU | 0.150 | 0.150 | % |
+| Closed idle memory | 904.7 | 911.3 | MiB |
+| Chrome open idle CPU / memory | not measured | 0.200 / 1,253.1 | % / MiB |
+| Runtime packages | 1,011 | 1,023 | count |
+| OCI size | 1,834,208,768 | 1,925,267,456 | bytes |
+
+Cold-start measurement windows:
+
+| Trial | UTC start | UTC end |
+| --- | --- | --- |
+| 1 | `2026-09-09T22:32:57.609645040Z` | `2026-09-09T22:33:44.709277318Z` |
+| 2 | `2026-09-09T22:34:57.028778909Z` | `2026-09-09T22:35:14.871813299Z` |
+| 3 | `2026-09-09T22:36:08.061553721Z` | `2026-09-09T22:36:25.843579879Z` |
+
+Closed idle ran `2026-09-09T22:38:17.950163646Z` →
+`2026-09-09T22:40:17.961012087Z`: 128.9 context switches/s,
+6 process starts and 0 Temp cleanup activations. Chrome-open idle ran
+`2026-09-09T22:44:09.432502833Z` →
+`2026-09-09T22:46:09.442765694Z`: 159.5 context switches/s,
+16 process starts and 0 Temp cleanup activations. Its single visible page was
+HTTPS Example Domain; browser initialization and this fresh profile remain
+part of the workload. Closing the final window left no Chrome or crashpad
+processes within the 0.481 s observation.
+
+The first 46.938 s host sample is retained; its extra host/firmware/network/probe
+delay is unexplained while OS startup remained 7.033 s. Median OS startup is
+0.199 s above the historical reference and closed memory is 6.6 MiB higher;
+these are small shared-host observations, not a controlled Firefox comparison.
+The full OCI grew 86.840 MiB. Three SELinux RPMs also advanced with the current
+repositories; the package diff records all changes.
+
+Native Updates was clicked at 22:13:52.496652 UTC, authentication submitted at
+22:14:40.126594 and ready status observed at 22:15:47.142750. These are observed
+UI timings, not pure installer CPU time. The explicit restart-to-new-build SSH
+observation was 22.209 s. The publication record retains the briefly premature
+feed pointer, its restoration before installation and final verified publication.
+
+159 Python tests, 9 lock lifecycle tests and Rust/CLI checks passed. Native
+Chrome defaults, HTTPS, recommended policies, sandbox and a real Temp download
+passed; the isolated active-download/Keep fixture passed in 3.624 s with zero
+surviving fixture processes. Eight owner hashes and the original VM keyring
+are preserved. The earlier login-keyring password mismatch and its local repair
+are recorded. Physical battery, radios, AirPods and laptop migration remain
+unmeasured/unexecuted; no laptop backup was started.
+
+[Receipt and screenshots](iterations/git-9c2cfbdcb703/README.md),
+[comparison and all cold boots](iterations/git-9c2cfbdcb703/performance-comparison.json),
+[closed idle](iterations/git-9c2cfbdcb703/idle-closed.json),
+[Chrome-open idle](iterations/git-9c2cfbdcb703/idle-chrome-open.json),
+[package diff](iterations/git-9c2cfbdcb703/package-diff.json) and
+[qualification notes](iterations/git-9c2cfbdcb703/qualification-notes.json).
+
 ## Entry template
 
 Insert this compact block immediately above the Entry template section for every

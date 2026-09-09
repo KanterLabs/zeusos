@@ -45,7 +45,7 @@ checks when the address is current.
 - Keep the review guest's owner files and settings across candidates. A
   Proxmox snapshot is a convenience point and is not a backup. Verify the
   backup gate below before any update or state migration.
-- Native Updates is qualified on VM 115 for signed build `git-31f0851a9d07`
+- Native Updates is qualified on VM 115 for signed build `git-9c2cfbdcb703`
   after a native Updates installation and explicit reboot. The post-reboot
   status reported `The selected update is installed.` There is no unattended
   update or automatic reboot.
@@ -320,9 +320,23 @@ The declared comparison and budgets are in
 [`preview-1-budgets.md`](releases/preview-1-budgets.md). Record actual values
 and variability; the 4-vCPU/8-GiB VM allocation is not performance evidence.
 
-## Current signed New York appearance iteration
+## Current signed Chrome iteration
 
-VM 115 runs signed build `git-31f0851a9d07`, still version `0.1.0-preview.2`,
+VM 115 runs signed build `git-9c2cfbdcb703`, still version `0.1.0-preview.2`.
+Official Chrome Stable replaces Firefox; the retained predecessor is the city
+build `git-31f0851a9d07`. New downloads use Temp and background apps default off.
+The [Chrome receipt](iterations/git-9c2cfbdcb703/README.md) records the native
+Updates installation, package and sandbox checks, recommended policies, real
+Temp downloads, preserved files and dated boot/idle samples.
+
+The exact installed archive remains available at
+`/var/lib/zeus/updater/downloads/zeusos-0.1.0-preview.2-git-9c2cfbdcb703.oci`.
+Chrome is serviced through signed Zeus image updates; it adds no independent
+guest update timer. Builder VM116 remains stopped after qualification.
+
+## Previous signed New York appearance iteration (historical)
+
+This iteration deployed signed build `git-31f0851a9d07`, version `0.1.0-preview.2`,
 with booted manifest
 `sha256:0caa0eeb446a397ed594292be9d1133a0b608e0cd151ff9a551afd56a434d561`.
 New York dusk artwork fills the desktop, lock and native login. **Settings →

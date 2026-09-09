@@ -1,0 +1,9 @@
+{
+  "recorded_at_utc": "2026-09-09T22:07:34.742001+00:00",
+  "issue": "An orchestration command continued after the release-asset check failed for an upload still in progress. It briefly published the new signed pointer.",
+  "premature_pointer_commit": "7a26ff2",
+  "restored_pointer_commit": "edeed6d",
+  "restored_build": "git-31f0851a9d07",
+  "owner_installation_started": false,
+  "resolution": "Restored the prior exact signed pair. Require completed upload and explicit successful six-asset digest verification before republishing."
+}

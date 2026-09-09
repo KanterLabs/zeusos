@@ -1,0 +1,10 @@
+{
+  "install_clicked_at_utc": "2026-09-09T22:13:52.496652+00:00",
+  "build_id": "git-9c2cfbdcb703",
+  "method": "native Updates window, native Polkit, explicit native restart",
+  "native_authentication_submitted_at_utc": "2026-09-09T22:14:40.126594+00:00",
+  "ready_observed_at_utc": "2026-09-09T22:15:47.142750+00:00",
+  "native_restart_confirmed_at_utc": "2026-09-09T22:17:03.414598+00:00",
+  "new_build_ssh_observed_at_utc": "2026-09-09T22:17:25.623361+00:00",
+  "restart_to_new_build_ssh_seconds": 22.209
+}

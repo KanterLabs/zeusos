@@ -4,7 +4,9 @@ A focused Fedora bootc laptop desktop with a macOS-inspired layout, original Zeu
 
 The current version is **0.1.0-preview.2**. It includes a translucent top bar and floating dock, original icons, traffic-light window controls, compact application search (Super+Space), a New York dusk wallpaper, and a branded native login screen. GNOME/Wayland runs Files, Google Chrome, Ptyxis, Settings, and Welcome. The Rust `zeus` helper provides diagnostics, safe desktop fallback, signed updates, and validated SSH launch.
 
-The latest build brings **New York at dusk** to the desktop, lock screen and native login, with a larger, lighter lock clock and restrained translucent login controls. City and gradient backgrounds remain selectable in **Settings → Appearance**. [Screenshots and verification](docs/iterations/git-31f0851a9d07/README.md) record the signed update, accessibility, preservation and performance checks. The change adds no packages or background services.
+The latest build replaces Firefox with **official Google Chrome Stable**, makes Chrome the dock and web-link default, and sends new downloads to **Temp**. Chrome's background apps default off and browser updates arrive through signed Zeus Updates. [Screenshots and verification](docs/iterations/git-9c2cfbdcb703/README.md) record the deployment, preservation and performance checks. Product version remains **0.1.0-preview.2**.
+
+**New York at dusk** remains the desktop, lock screen and native login background. City and gradient backgrounds stay selectable in **Settings → Appearance**. The [first-laptop checklist](docs/laptop-readiness.md) records the Nimo N154G target and the remaining hardware and migration checks.
 
 ![New York desktop on the deployed preview](docs/iterations/git-31f0851a9d07/desktop.png)
 

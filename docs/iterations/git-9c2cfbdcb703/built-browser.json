@@ -1,0 +1,12 @@
+{
+  "package": "google-chrome-stable-153.0.8010.36-1.x86_64",
+  "version": "Google Chrome 153.0.8010.36",
+  "firefox_installed": false,
+  "chrome_repository": "signed metadata and packages; enabled only during image builds",
+  "browser_updates": "signed Zeus OS updates",
+  "defaults": {
+    "DownloadDirectory": "${user_home}/Temp",
+    "BackgroundModeEnabled": false
+  },
+  "sandbox": "packaged root-owned setuid helper retained; no sandbox bypass"
+}

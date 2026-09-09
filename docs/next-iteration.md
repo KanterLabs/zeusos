@@ -74,8 +74,9 @@ Welcome's launchers, and the Zeus menu in the existing shell extension.
 Shane requested good AirPods support after the Settings preview. The
 [AirPods implementation and testing contract](features/airpods.md) records
 the native audio foundation, integration work and physical-device qualification.
-The current image already includes AAC and headset codecs. The first target is
-AirPods Pro 2 (Lightning family), A2698, with reported firmware 8B21. Model-specific
+The current image already includes AAC and headset codecs. Shane replaced the
+earlier photographed pair with a newer AirPods Pro pair; its exact model and
+firmware still need to be recorded before physical testing. Model-specific
 controls and real AirPods reliability are still unqualified; the VM and Proxmox host
 currently expose no Bluetooth controller. Search and Apps remain unclaimed Backlog.
 Optional AirPods battery and noise controls have their own unclaimed Backlog card,

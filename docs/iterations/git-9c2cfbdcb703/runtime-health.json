@@ -1,0 +1,145 @@
+{
+  "recorded_at_utc": "2026-09-09T22:49:24.377398+00:00",
+  "build_id": "git-9c2cfbdcb703",
+  "handlers": {
+    "x-scheme-handler/http": "google-chrome.desktop",
+    "x-scheme-handler/https": "google-chrome.desktop",
+    "text/html": "google-chrome.desktop",
+    "application/xhtml+xml": "google-chrome.desktop"
+  },
+  "favorites": [
+    "org.gnome.Nautilus.desktop",
+    "org.gnome.Ptyxis.desktop",
+    "google-chrome.desktop",
+    "org.gnome.Settings.desktop",
+    "org.zeus.Temp.desktop",
+    "org.zeus.Welcome.desktop"
+  ],
+  "one_time_migration_marker": true,
+  "chrome_processes": [
+    {
+      "type": "browser",
+      "sandbox_bypass": false,
+      "wayland": false,
+      "seccomp": "0",
+      "state": "S (sleeping)"
+    },
+    {
+      "type": "zygote",
+      "sandbox_bypass": false,
+      "wayland": false,
+      "seccomp": "0",
+      "state": "S (sleeping)"
+    },
+    {
+      "type": "zygote",
+      "sandbox_bypass": false,
+      "wayland": false,
+      "seccomp": "0",
+      "state": "S (sleeping)"
+    },
+    {
+      "type": "zygote",
+      "sandbox_bypass": false,
+      "wayland": false,
+      "seccomp": "0",
+      "state": "S (sleeping)"
+    },
+    {
+      "type": "gpu-process",
+      "sandbox_bypass": false,
+      "wayland": true,
+      "seccomp": "0",
+      "state": "S (sleeping)"
+    },
+    {
+      "type": "utility",
+      "sandbox_bypass": false,
+      "wayland": false,
+      "seccomp": "0",
+      "state": "S (sleeping)"
+    },
+    {
+      "type": "utility",
+      "sandbox_bypass": false,
+      "wayland": false,
+      "seccomp": "2",
+      "state": "S (sleeping)"
+    },
+    {
+      "type": "renderer",
+      "sandbox_bypass": false,
+      "wayland": true,
+      "seccomp": "2",
+      "state": "S (sleeping)"
+    },
+    {
+      "type": "utility",
+      "sandbox_bypass": false,
+      "wayland": false,
+      "seccomp": "2",
+      "state": "S (sleeping)"
+    },
+    {
+      "type": "renderer",
+      "sandbox_bypass": false,
+      "wayland": true,
+      "seccomp": "2",
+      "state": "S (sleeping)"
+    },
+    {
+      "type": "utility",
+      "sandbox_bypass": false,
+      "wayland": false,
+      "seccomp": "2",
+      "state": "S (sleeping)"
+    },
+    {
+      "type": "broker",
+      "sandbox_bypass": false,
+      "wayland": false,
+      "seccomp": "2",
+      "state": "S (sleeping)"
+    },
+    {
+      "type": "renderer",
+      "sandbox_bypass": false,
+      "wayland": true,
+      "seccomp": "2",
+      "state": "S (sleeping)"
+    },
+    {
+      "type": "renderer",
+      "sandbox_bypass": false,
+      "wayland": true,
+      "seccomp": "2",
+      "state": "S (sleeping)"
+    },
+    {
+      "type": "utility",
+      "sandbox_bypass": false,
+      "wayland": false,
+      "seccomp": "2",
+      "state": "S (sleeping)"
+    },
+    {
+      "type": "broker",
+      "sandbox_bypass": false,
+      "wayland": false,
+      "seccomp": "2",
+      "state": "S (sleeping)"
+    }
+  ],
+  "login_keyring_unlocked": true,
+  "chrome_metrics_consent_marker_present": false,
+  "selinux": "Enforcing",
+  "secure_boot": "SecureBoot enabled",
+  "failed_system_units": "",
+  "failed_user_units": "",
+  "appearance": {
+    "color_scheme": "'prefer-light'",
+    "animations": "true",
+    "text_scale": "1.0",
+    "high_contrast": "false"
+  }
+}

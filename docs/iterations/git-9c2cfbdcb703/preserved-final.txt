@@ -1,0 +1,8 @@
+/var/home/shane/Downloads/zeus-preservation-test.txt: OK
+/var/home/shane/Documents/zeus-temp-test.txt: OK
+/var/home/shane/.local/state/zeusos/after-backup.txt: OK
+/var/home/shane/.local/state/zeusos/after-update.txt: OK
+/var/home/shane/.local/state/zeusos/preservation.txt: OK
+/var/home/shane/.local/state/zeusos/visual-after-backup.txt: OK
+/var/home/shane/Temp/zeus-temp-test.txt: OK
+/var/home/shane/.local/state/zeusos/chrome-after-backup.txt: OK

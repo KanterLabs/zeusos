@@ -1,0 +1,39 @@
+{
+  "recorded_at_utc": "2026-09-09T22:52:41.677903+00:00",
+  "build_id": "git-9c2cfbdcb703",
+  "native_dock_launch": "passed",
+  "http_https_html_xhtml_default": "google-chrome.desktop",
+  "native_https_pages": [
+    "https://example.com",
+    "https://github.com/KanterLabs/zeusos"
+  ],
+  "effective_policy_status": {
+    "BackgroundModeEnabled": "recommended false; OK",
+    "DownloadDirectory": "recommended ${user_home}/Temp; OK; editable Change control"
+  },
+  "native_download": {
+    "path": "~/Temp/zeus-chrome-download.txt",
+    "sha256": "63ea7fe3f3a41ca8f96d17a4b52b9b8e0c2485a40564e48edf20435eac3e6e53",
+    "bytes": 84,
+    "save_as_prompt": false,
+    "server_request_confirmed_chrome": true
+  },
+  "sandbox_page": {
+    "layer1": "Namespace",
+    "pid_namespace": true,
+    "network_namespace": true,
+    "seccomp_bpf": true,
+    "seccomp_tsync": true,
+    "yama_ptrace_broker": false,
+    "yama_ptrace_nonbroker": false,
+    "chrome_verdict": "You are adequately sandboxed."
+  },
+  "native_wayland_processes": true,
+  "chrome_safe_storage_item_in_unlocked_login_keyring": true,
+  "metrics_consent_marker_present": false,
+  "chrome_and_crashpad_exit": "0 live, 0 zombies after native final-window close",
+  "display": "1280x800 scale1",
+  "preserved_owner_files": 8,
+  "temp_policy_final": "boot",
+  "limits": "No physical laptop, battery, Bluetooth, AirPods or same-disk Fedora migration was tested. Full OS rollback boot cycle not repeated."
+}

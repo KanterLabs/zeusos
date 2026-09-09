@@ -1,0 +1,92 @@
+{
+  "recorded_at_utc": "2026-09-09T22:40:10.129621+00:00",
+  "build_id": "git-9c2cfbdcb703",
+  "reference_build_id": "git-31f0851a9d07",
+  "os_startup_seconds": {
+    "samples": [
+      7.033,
+      7.03,
+      7.108
+    ],
+    "median": 7.033,
+    "reference_median": 6.834
+  },
+  "host_to_active_greeter_seconds": {
+    "samples": [
+      46.938,
+      17.681,
+      17.606
+    ],
+    "median": 17.681,
+    "reference_median": 17.609
+  },
+  "cold_boots": [
+    {
+      "measurement_started_at_utc": "2026-09-09T22:32:57.609645040Z",
+      "measurement_ended_at_utc": "2026-09-09T22:33:44.709277318Z",
+      "cold_start_to_active_greeter_s": 46.938,
+      "first_ssh_s": 46.938,
+      "systemd_analyze": "Startup finished in 1.506s (kernel) + 2.401s (initrd) + 3.125s (userspace) = 7.033s \ngraphical.target reached after 3.124s in userspace.",
+      "measurement": "Host qm start command to active GDM greeter; SSH polling interval0.5s; includes firmware and probe overhead"
+    },
+    {
+      "measurement_started_at_utc": "2026-09-09T22:34:57.028778909Z",
+      "measurement_ended_at_utc": "2026-09-09T22:35:14.871813299Z",
+      "cold_start_to_active_greeter_s": 17.681,
+      "first_ssh_s": 17.681,
+      "systemd_analyze": "Startup finished in 1.496s (kernel) + 2.350s (initrd) + 3.183s (userspace) = 7.030s \ngraphical.target reached after 3.182s in userspace.",
+      "measurement": "Host qm start command to active GDM greeter; SSH polling interval0.5s; includes firmware and probe overhead"
+    },
+    {
+      "measurement_started_at_utc": "2026-09-09T22:36:08.061553721Z",
+      "measurement_ended_at_utc": "2026-09-09T22:36:25.843579879Z",
+      "cold_start_to_active_greeter_s": 17.606,
+      "first_ssh_s": 17.606,
+      "systemd_analyze": "Startup finished in 1.446s (kernel) + 2.346s (initrd) + 3.316s (userspace) = 7.108s \ngraphical.target reached after 3.314s in userspace.",
+      "measurement": "Host qm start command to active GDM greeter; SSH polling interval0.5s; includes firmware and probe overhead"
+    }
+  ],
+  "outlier_note": "Trial1 host-to-greeter was 46.938 seconds while OS startup was 7.033 seconds. The cause of the additional host/firmware/network/probe delay is unconfirmed; no sample was discarded.",
+  "limits": "Same VM allocation and display, builder stopped and backup finished; shared host otherwise unisolated. Historical city reference, not a newly matched Firefox benchmark. VM results are not battery measurements.",
+  "closed_idle": {
+    "label": "chrome-closed-desktop",
+    "measurement_started_at_utc": "2026-09-09T22:38:17.950163646Z",
+    "measurement_ended_at_utc": "2026-09-09T22:40:17.961012087Z",
+    "seconds": 120.01,
+    "settle_seconds": 20,
+    "median_cpu_percent": 0.15,
+    "median_memory_used_mib": 911.3,
+    "context_switches_per_second": 128.9,
+    "processes_started": 6,
+    "temp_cleanup_activations": 0,
+    "limits": "VM idle activity; no physical battery, energy or hardware-wakeup measurement"
+  },
+  "chrome_open_idle": {
+    "label": "chrome-open-one-example-tab",
+    "measurement_started_at_utc": "2026-09-09T22:44:09.432502833Z",
+    "measurement_ended_at_utc": "2026-09-09T22:46:09.442765694Z",
+    "seconds": 120.01,
+    "settle_seconds": 20,
+    "median_cpu_percent": 0.2,
+    "median_memory_used_mib": 1253.1,
+    "context_switches_per_second": 159.5,
+    "processes_started": 16,
+    "temp_cleanup_activations": 0,
+    "limits": "VM idle activity; no physical battery, energy or hardware-wakeup measurement"
+  },
+  "image_cost": {
+    "archive_bytes": 1925267456,
+    "previous_archive_bytes": 1834208768,
+    "growth_bytes": 91058688,
+    "growth_mib": 86.84,
+    "packages": 1023,
+    "previous_packages": 1011,
+    "net_package_change": 12
+  },
+  "observed_changes": {
+    "os_startup_seconds": 0.199,
+    "host_to_greeter_seconds": 0.072,
+    "closed_idle_cpu_percentage_points": 0,
+    "closed_idle_memory_mib": 6.6
+  }
+}

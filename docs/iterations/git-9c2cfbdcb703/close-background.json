@@ -1,0 +1,7 @@
+{
+  "closed_at_utc": "2026-09-09T22:49:59.771073+00:00",
+  "live_processes_after": 0,
+  "zombie_processes_after": 0,
+  "seconds_until_no_live_chrome_or_crashpad": 0.481,
+  "method": "native Alt+F4 on final Chrome window; process metadata only; no forced termination"
+}

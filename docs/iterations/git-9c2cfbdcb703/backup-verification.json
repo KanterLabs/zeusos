@@ -1,0 +1,10 @@
+{
+  "started_at_utc": "2026-09-09T21:52:01.521033+00:00",
+  "archive": "/mnt/pve/sata-ssd/zeusos/backups/chrome-20260909/vzdump-qemu-115-2026_09_09-12_48_08.vma.zst",
+  "size_bytes": 31840491278,
+  "completed_at_utc": "2026-09-09T21:56:42.909181+00:00",
+  "zstd_test": "passed",
+  "vma_verify": "passed",
+  "scratch_removed": true,
+  "restore_performed": false
+}

@@ -1,0 +1,12 @@
+{
+  "recorded_at_utc": "2026-09-09T22:52:41.677903+00:00",
+  "test_method_corrections": [
+    "An SSH gio launch lacked the native display environment; native dock launch passed.",
+    "The first runtime fixture inherited a session bus; a refined fixture isolates both DBus and display and passed with zero surviving fixture processes.",
+    "The first process assertion assumed NUL-separated Chrome arguments; Chrome rewrites the process title as a single space-separated field. The corrected read-only check and native sandbox page passed.",
+    "A cold-boot command refused to run until the guest completed graceful shutdown. No hard stop was used."
+  ],
+  "vm_keyring_repair": "The earlier owner-requested account password change left the existing login keyring locked. Its 105-byte file and zero reported items were preserved byte-for-byte outside the active keyring directory. Fresh native login created a new encrypted login keyring; Chrome Safe Storage exists and the original hash remains verified. This VM repair is not an automatic populated-laptop migration.",
+  "shutdown_observation": "The keyring logout/relogin recovery required a graceful shutdown with a delayed daemon exit; normal cold boots followed.",
+  "browser_metrics_limit": "Fresh native profile and browser initialization can affect the single open-idle window. Neither browser-open nor historical closed-idle values establish a controlled Firefox comparison."
+}

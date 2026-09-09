@@ -1,0 +1,9 @@
+{
+  "source_commit": "9c2cfbdcb703a6455aa0b30ff4680780e105ab7b",
+  "build_id": "git-9c2cfbdcb703",
+  "version": "0.1.0-preview.2",
+  "manifest_digest": "sha256:0a59558b893e40a36308f0170e2c27ff64a0fef05b39ab22d1d49b7032c5007d",
+  "config_digest": "sha256:e646d7fedb86df84e68524abfbf03cda019260069921f37a113ef86013c187ea",
+  "architecture": "amd64",
+  "source_labels_verified": true
+}

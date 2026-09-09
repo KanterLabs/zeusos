@@ -43,6 +43,12 @@ rollback qualification record must distinguish this from restoring user data.
 
 ## Qualification
 
+The deployed [September 9 Chrome iteration](../iterations/git-9c2cfbdcb703/README.md)
+records the installed package, native defaults, policies, sandbox and Temp checks.
+It also records a VM-specific login-keyring repair after the earlier account
+password change; the original keyring was preserved. This is not an automatic
+keyring reset or a migration policy for populated laptops.
+
 - Verify image package inventory: official Chrome present, Firefox absent.
 - Confirm desktop launch and default HTTP/HTTPS/HTML handlers in a native session.
 - Inspect effective Chrome policies and verify a real download lands in Temp.

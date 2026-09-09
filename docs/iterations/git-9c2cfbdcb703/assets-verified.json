@@ -1,0 +1,42 @@
+{
+  "ok": true,
+  "verified_at_utc": "2026-09-09T22:08:32.398985+00:00",
+  "assets": [
+    {
+      "name": "zeusos-0.1.0-preview.2-git-9c2cfbdcb703.oci",
+      "size": 1925267456,
+      "digest": "sha256:ed8b65731cf12478a2a3541fb56649d4c1bd68b04e7ef020b4842d3ec6b001d5",
+      "state": "uploaded"
+    },
+    {
+      "name": "build-info-git-9c2cfbdcb703.json",
+      "size": 165,
+      "digest": "sha256:69b8bedf925f120548008863955f15fd379c9e0c8431e1e9d7f76a00845930cd",
+      "state": "uploaded"
+    },
+    {
+      "name": "SHA256SUMS-git-9c2cfbdcb703",
+      "size": 110,
+      "digest": "sha256:35aa673d545e8641051f53773c74aa3e3dd3430fde6cc27cbd16da33f94a66fd",
+      "state": "uploaded"
+    },
+    {
+      "name": "SHA256SUMS-git-9c2cfbdcb703.sig",
+      "size": 310,
+      "digest": "sha256:f060c56bbdbf9e3d5c8dbb5cf5d46b4f224130c3bd93cc79d47ce1c9be197756",
+      "state": "uploaded"
+    },
+    {
+      "name": "update-git-9c2cfbdcb703.json",
+      "size": 1045,
+      "digest": "sha256:59b3707ce7f611a3ae8ccc202f5477adbb3ebb25c12b0024b84e50e5f22b7382",
+      "state": "uploaded"
+    },
+    {
+      "name": "update-git-9c2cfbdcb703.json.sig",
+      "size": 306,
+      "digest": "sha256:dac09e833d9376c1d98f06a4c8fba86791155b19929866d79cc60c6bf82c976c",
+      "state": "uploaded"
+    }
+  ]
+}

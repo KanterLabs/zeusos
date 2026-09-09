@@ -1,0 +1,38 @@
+{
+  "recorded_at_utc": "2026-09-09T21:57:11.455216+00:00",
+  "reference_build": "git-31f0851a9d07",
+  "product_version": "0.1.0-preview.2",
+  "vm": {
+    "id": 115,
+    "vcpus": 4,
+    "ram_mib": 8192,
+    "display": "1280x800 scale1",
+    "shared_host": true
+  },
+  "before_measurement": [
+    "backup verification complete",
+    "builder VM116 stopped",
+    "Temp held Never",
+    "native fresh login; original accessibility and appearance preferences"
+  ],
+  "closed_desktop_idle": {
+    "settle_seconds": 20,
+    "sample_seconds": 120,
+    "interval_seconds": 5,
+    "reference_cpu_percent": 0.15,
+    "reference_memory_used_mib": 904.7
+  },
+  "cold_boot": {
+    "samples": 3,
+    "reference_median_os_seconds": 6.834,
+    "reference_median_host_to_greeter_seconds": 17.609
+  },
+  "browser_checks": [
+    "native Chrome launch with sandbox intact",
+    "HTTP/HTTPS/HTML default resolution",
+    "effective recommended policy; new download in real Temp",
+    "real slow Chrome download protected in disposable Temp fixture",
+    "Chrome children exit after final window closes"
+  ],
+  "interpretation": "Record image/package size tradeoff, absolute Chrome-open memory and all failures. Small shared-host samples are regression observations, not proof of battery gains or controlled Firefox/Chrome comparison."
+}
