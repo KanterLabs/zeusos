@@ -1,0 +1,42 @@
+[
+  {
+    "file": "LICENSE",
+    "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.154.0/LICENSE",
+    "sha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc"
+  },
+  {
+    "file": "NOTICE",
+    "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.154.0/NOTICE",
+    "sha256": "9d71575ecfd9a843fc1677b0efb08053c6ba9fd686a0de1a6f5382fd3c220915"
+  },
+  {
+    "file": "ripgrep-COPYING",
+    "url": "https://raw.githubusercontent.com/BurntSushi/ripgrep/15.2.0/COPYING",
+    "sha256": "01c266bced4a434da0051174d6bee16a4c82cf634e2679b6155d40d75012390f"
+  },
+  {
+    "file": "ripgrep-LICENSE-MIT",
+    "url": "https://raw.githubusercontent.com/BurntSushi/ripgrep/15.2.0/LICENSE-MIT",
+    "sha256": "0f96a83840e146e43c0ec96a22ec1f392e0680e6c1226e6f3ba87e0740af850f"
+  },
+  {
+    "file": "ripgrep-UNLICENSE",
+    "url": "https://raw.githubusercontent.com/BurntSushi/ripgrep/15.2.0/UNLICENSE",
+    "sha256": "7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c"
+  },
+  {
+    "file": "bubblewrap-COPYING",
+    "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.154.0/codex-rs/vendor/bubblewrap/COPYING",
+    "sha256": "b7993225104d90ddd8024fd838faf300bea5e83d91203eab98e29512acebd69c"
+  },
+  {
+    "file": "zsh-LICENCE",
+    "url": "https://raw.githubusercontent.com/zsh-users/zsh/77045ef899e53b9598bebc5a41db93a548a40ca6/LICENCE",
+    "sha256": "d06fdf3ef9b1ec69d6b9e170b0a9516fbad3523261ff1668bde3bfea6e0ef5f5"
+  },
+  {
+    "file": "PCRE2-LICENCE",
+    "url": "https://raw.githubusercontent.com/PCRE2Project/pcre2/pcre2-10.45/LICENCE.md",
+    "sha256": "9cf7ac6976099a1d856826d3ef1b093bd6b84489dc6100628ac79e740cf9885a"
+  }
+]

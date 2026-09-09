@@ -10,6 +10,11 @@ RUN dnf install -y --enable-repo=google-chrome --setopt=install_weak_deps=False 
 # the running immutable OS receives browser upgrades through signed Zeus Updates.
 COPY image/repos/google-chrome.repo /etc/yum.repos.d/google-chrome.repo
 
+FROM desktop-base AS codex-package
+COPY image/codex.lock.json /tmp/codex.lock.json
+COPY scripts/install-codex.py /tmp/install-codex.py
+RUN python3 /tmp/install-codex.py --lock /tmp/codex.lock.json --destination /usr/lib/codex
+
 FROM ${BASE_IMAGE} AS cli-builder
 RUN dnf install -y --setopt=install_weak_deps=False cargo rust gcc && dnf clean all
 ENV CARGO_HOME=/tmp/cargo
@@ -40,18 +45,24 @@ COPY desktop/rootfs/ /
 COPY image/rootfs/ /
 COPY --from=branding-builder /usr/share/gnome-shell/gnome-shell-theme.gresource /usr/share/gnome-shell/gnome-shell-theme.gresource
 COPY --from=cli-builder /src/zeus/target/release/zeus /usr/bin/zeus
+COPY --from=codex-package /usr/lib/codex /usr/lib/codex
+COPY image/codex.lock.json /usr/share/zeus/codex.lock.json
+COPY image/licenses/codex/ /usr/share/licenses/zeus-codex/
 COPY zeus/assets/welcome.py /usr/libexec/zeus-welcome
 COPY zeus/assets/org.zeus.Welcome.desktop /usr/share/applications/org.zeus.Welcome.desktop
 COPY image/inputs.json /usr/share/zeus/inputs.json
 COPY security/allowed_signers /usr/share/zeus/update-allowed-signers
 COPY scripts/validate-bluetooth-audio.py /tmp/zeus-validate-bluetooth-audio.py
 COPY scripts/validate-browser.py /tmp/zeus-validate-browser.py
+COPY scripts/validate-codex.py /tmp/zeus-validate-codex.py
 # Foreign-architecture build emulators register dozens of binfmt handlers at
 # every boot. They are optional development tools, not laptop runtime packages.
 RUN dnf remove -y --disable-repo='*' 'qemu-user-static*' && \
+    ln -s /usr/lib/codex/bin/codex /usr/bin/codex && \
+    python3 /tmp/zeus-validate-codex.py && \
     python3 /tmp/zeus-validate-bluetooth-audio.py --load-plugins --json && \
     python3 /tmp/zeus-validate-browser.py && \
-    rm /tmp/zeus-validate-bluetooth-audio.py /tmp/zeus-validate-browser.py && \
+    rm /tmp/zeus-validate-bluetooth-audio.py /tmp/zeus-validate-browser.py /tmp/zeus-validate-codex.py && \
     chmod 0644 /usr/share/backgrounds/zeus/zeus-city-new-york-dusk.png /usr/share/gnome-background-properties/zeus.xml && \
     chmod 0644 /usr/share/gnome-shell/extensions/zeus-lock-background@kanterlabs/extension.js /usr/share/gnome-shell/extensions/zeus-lock-background@kanterlabs/metadata.json && \
     chmod 0755 /usr/libexec/zeus-welcome /usr/libexec/zeus-settings-window && \

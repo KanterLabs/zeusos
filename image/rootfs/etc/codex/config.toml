@@ -1,0 +1,3 @@
+# Codex is updated by signed Zeus OS images. Personal configuration takes
+# precedence over these system defaults; credentials never belong here.
+check_for_update_on_startup = false

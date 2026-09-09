@@ -36,7 +36,13 @@ The output `out/disk/qcow2/disk.qcow2` contains no owner password or SSH key. In
 
 ## Desktop tools
 
+**Codex CLI** is included as an official standalone package. Open Terminal in
+your project and run `codex`, then sign in with your own account. This command
+runs locally; the full remote T3/Codex launcher remains planned. No Node runtime
+or Codex boot service is added. See [Codex packaging and usage](docs/features/codex-cli.md).
+
 ```sh
+codex --version
 zeus version
 zeus doctor --json
 zeus desktop safe
@@ -82,4 +88,8 @@ The review VM now has a qualified signed preview updater for owner-triggered Upd
 - [Original design](docs/design-v0.1.md)
 - [Planning overview](docs/backlog-overview.md)
 
-Project code is MIT licensed. Original desktop artwork is CC0-1.0; Fedora packages and Google Chrome retain their upstream licenses. Chrome is Google's official proprietary browser; its binaries and trademarks are not covered by the Zeus code or artwork licenses.
+Project code is MIT licensed. Original desktop artwork is CC0-1.0; Fedora packages,
+Google Chrome, and Codex with its bundled helpers retain their upstream licenses.
+[Codex notices](image/licenses/codex/README.md) are also installed with the image.
+Chrome is Google's official proprietary browser; its binaries and trademarks are
+not covered by the Zeus code or artwork licenses.

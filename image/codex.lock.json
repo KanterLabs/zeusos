@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "product": "codex",
+  "version": "0.154.0",
+  "release_tag": "rust-v0.154.0",
+  "target": "x86_64-unknown-linux-musl",
+  "url": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-package-x86_64-unknown-linux-musl.tar.gz",
+  "sha256": "fc6e3e3b85f2cf7d664520ee5c66a7fe4aa12bae7d46834f47e2f165fd0d6f78",
+  "size": 126585776,
+  "directories": [
+    {
+      "path": "bin",
+      "mode": 493
+    },
+    {
+      "path": "codex-path",
+      "mode": 493
+    },
+    {
+      "path": "codex-resources",
+      "mode": 493
+    },
+    {
+      "path": "codex-resources/zsh",
+      "mode": 493
+    },
+    {
+      "path": "codex-resources/zsh/bin",
+      "mode": 493
+    }
+  ],
+  "files": [
+    {
+      "path": "bin/codex",
+      "size": 262858016,
+      "sha256": "3188814c35471432d4123203e0eb38e5bddc60226e3d7ddf0e59e649ea140022",
+      "mode": 493
+    },
+    {
+      "path": "bin/codex-code-mode-host",
+      "size": 69431360,
+      "sha256": "0c57be435e73b70d9106c850d751cd259a7f04da958a453d7ef59090d82b70f1",
+      "mode": 493
+    },
+    {
+      "path": "codex-package.json",
+      "size": 205,
+      "sha256": "b039964d28d57b2a7e929ee9986303582501c7cc9787f6c018b6d3c7b35c87d7",
+      "mode": 420
+    },
+    {
+      "path": "codex-path/rg",
+      "size": 5408904,
+      "sha256": "e62198eb19b136b88c330af83647b5a962cb99b6b1f066758568f12de1974849",
+      "mode": 493
+    },
+    {
+      "path": "codex-resources/bwrap",
+      "size": 529776,
+      "sha256": "01fb705f067bd5365b63d8ad2323a61c8d007733ca5e649437e086f3fb9935d8",
+      "mode": 493
+    },
+    {
+      "path": "codex-resources/zsh/bin/zsh",
+      "size": 898480,
+      "sha256": "67faaaa89242c4a332e16e508a1977cffc24bf7fca31d4411cdfd101f3831ef3",
+      "mode": 493
+    }
+  ]
+}
