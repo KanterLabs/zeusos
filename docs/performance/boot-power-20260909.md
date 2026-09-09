@@ -49,6 +49,11 @@ measurement when an actual battery is available.
 - Hardware database compilation moves into image construction. The unused NFS
   client target is disabled at boot, removing its network dependency from the
   graphical login path. NFS packages remain available for configured use.
+- The laptop image omits 18 `qemu-user-static` emulator packages (171 MiB of
+  installed package contents). The intermediate image registered 31 foreign
+  binary handlers at boot, and `systemd-binfmt` took 883 ms in its critical path.
+  Cross-architecture emulation becomes an optional development-image feature;
+  native applications and the separate QEMU guest agent remain supported.
 
 The GRUB timeout was already one second and stays there, with recovery entries
 retained. The generic initramfs keeps laptop/storage drivers; no VM-only driver

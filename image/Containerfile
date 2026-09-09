@@ -35,7 +35,10 @@ COPY --from=cli-builder /src/zeus/target/release/zeus /usr/bin/zeus
 COPY zeus/assets/welcome.py /usr/libexec/zeus-welcome
 COPY zeus/assets/org.zeus.Welcome.desktop /usr/share/applications/org.zeus.Welcome.desktop
 COPY image/inputs.json /usr/share/zeus/inputs.json
-RUN chmod 0755 /usr/libexec/zeus-welcome && \
+# Foreign-architecture build emulators register dozens of binfmt handlers at
+# every boot. They are optional development tools, not laptop runtime packages.
+RUN dnf remove -y --disable-repo='*' 'qemu-user-static*' && \
+    chmod 0755 /usr/libexec/zeus-welcome && \
     glib-compile-schemas /usr/share/gnome-shell/extensions/zeus-shell@kanterlabs/schemas && \
     dconf update && \
     systemd-hwdb update --usr && \
