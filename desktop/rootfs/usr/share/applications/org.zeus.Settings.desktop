@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Zeus Settings
+GenericName=System settings
+Comment=Manage Wi-Fi, Bluetooth, displays, sound, power and appearance
+Exec=/usr/libexec/zeus-settings-window
+Icon=org.zeus.Settings
+Terminal=false
+Categories=GTK;GNOME;Settings;System;
+Keywords=settings;zeus;laptop;controls;wifi;network;wireless;bluetooth;brightness;display;sound;power;battery;appearance;
+StartupNotify=true

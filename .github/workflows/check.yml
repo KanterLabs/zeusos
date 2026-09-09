@@ -32,6 +32,10 @@ jobs:
         run: python3 -m py_compile desktop/rootfs/usr/lib/zeus/update_manifest.py desktop/rootfs/usr/lib/zeus/zeus_update.py desktop/rootfs/usr/libexec/zeus-update-window scripts/make-update-manifest.py
       - name: Check welcome application syntax
         run: python3 -m py_compile zeus/assets/welcome.py scripts/build-greeter-theme.py scripts/measure-*.py scripts/validate-*.py
+      - name: Verify native laptop Settings
+        run: |
+          python3 -m unittest discover -s tests -p test_settings_window.py -v
+          python3 -m py_compile desktop/rootfs/usr/libexec/zeus-settings-window
   cli:
     runs-on: homelab-heavy
     timeout-minutes: 10

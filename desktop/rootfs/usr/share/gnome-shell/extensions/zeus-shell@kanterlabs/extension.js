@@ -114,7 +114,8 @@ class ZeusMenuButton extends PanelMenu.Button {
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
         this._addLauncher('Files', 'org.gnome.Nautilus.desktop');
-        this._addLauncher('Settings', 'org.gnome.Settings.desktop');
+        this._addLauncher('Settings', 'org.zeus.Settings.desktop');
+        this._addLauncher('All Settings', 'org.gnome.Settings.desktop');
         this._addLauncher('Terminal', 'org.gnome.Ptyxis.desktop');
     }
 

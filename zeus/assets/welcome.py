@@ -305,11 +305,11 @@ class WelcomeWindow(Adw.ApplicationWindow):
         )
         cards.attach(
             self._make_card(
-                "utilities-terminal-symbolic",
-                "Terminal",
-                "Open Ptyxis for a direct, comfortable command line when you need it.",
-                "Open Terminal",
-                self._open_terminal,
+                "preferences-system-symbolic",
+                "Settings",
+                "Wi-Fi, Bluetooth, brightness and battery controls, together in one place.",
+                "Open Settings",
+                self._open_settings,
             ),
             2,
             0,
@@ -452,7 +452,14 @@ class WelcomeWindow(Adw.ApplicationWindow):
         self._launch_command(["/usr/libexec/zeus-temp-window"], "Temp")
 
     def _open_settings(self, _button):
-        self._launch_command(["gnome-control-center"], "Settings")
+        desktop = Gio.DesktopAppInfo.new("org.zeus.Settings.desktop")
+        if desktop is not None:
+            try:
+                desktop.launch([], self.get_display().get_app_launch_context())
+                return
+            except GLib.Error:
+                pass
+        self._launch_command(["/usr/libexec/zeus-settings-window", "gnome-control-center"], "Settings")
 
     def _open_updates(self, _button):
         desktop = Gio.DesktopAppInfo.new(f"{UPDATES_APPLICATION_ID}.desktop")

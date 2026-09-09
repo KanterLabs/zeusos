@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title description">
+  <title id="title">Zeus Settings</title>
+  <desc id="description">A cool blue rounded tile with a friendly white settings gear.</desc>
+  <defs>
+    <linearGradient id="tile" x1="28" y1="16" x2="226" y2="240" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6D90EE"/>
+      <stop offset="0.50" stop-color="#4056B8"/>
+      <stop offset="1" stop-color="#2B2E7B"/>
+    </linearGradient>
+    <linearGradient id="gear" x1="72" y1="58" x2="187" y2="205" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.58" stop-color="#D7E4FF"/>
+      <stop offset="1" stop-color="#B1C6F1"/>
+    </linearGradient>
+    <filter id="shadow" x="-25%" y="-25%" width="150%" height="155%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8" result="blur"/>
+      <feOffset dy="8" result="offset"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.25"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="10" y="10" width="236" height="236" rx="58" fill="url(#tile)"/>
+  <path d="M29 94C41 54 79 28 122 22C169 16 211 34 234 71C245 90 247 111 245 133C239 188 204 225 156 239H99C56 230 29 205 17 167V120C18 111 22 101 29 94Z" fill="#FFFFFF" fill-opacity="0.06"/>
+  <g filter="url(#shadow)" fill="url(#gear)">
+    <g>
+      <rect x="118" y="48" width="20" height="54" rx="9"/>
+      <rect x="118" y="154" width="20" height="54" rx="9"/>
+      <rect x="48" y="118" width="54" height="20" rx="9"/>
+      <rect x="154" y="118" width="54" height="20" rx="9"/>
+      <rect x="118" y="48" width="20" height="54" rx="9" transform="rotate(45 128 128)"/>
+      <rect x="118" y="154" width="20" height="54" rx="9" transform="rotate(45 128 128)"/>
+      <rect x="48" y="118" width="54" height="20" rx="9" transform="rotate(45 128 128)"/>
+      <rect x="154" y="118" width="54" height="20" rx="9" transform="rotate(45 128 128)"/>
+    </g>
+    <circle cx="128" cy="128" r="66"/>
+    <circle cx="128" cy="128" r="27" fill="#4056B8"/>
+    <circle cx="128" cy="128" r="18" fill="#556FC8" fill-opacity="0.72"/>
+  </g>
+  <circle cx="56" cy="57" r="3" fill="#D9EAFF" fill-opacity="0.76"/>
+  <circle cx="203" cy="204" r="3" fill="#B9C7FF" fill-opacity="0.64"/>
+</svg>

@@ -1,0 +1,638 @@
+#!/usr/bin/env python3
+"""Native Zeus Settings home for the controls people use every day.
+
+Zeus keeps hardware policy in Fedora's supported GNOME stack.  This window is
+only a compact, accessible directory for those native panels plus the existing
+Temp and Updates tools.  Panel launches use fixed desktop IDs or fixed argv
+arrays, and the one hardware snapshot is read-only and taken during open.
+"""
+
+from __future__ import annotations
+
+import sys
+from typing import Any
+
+import gi
+
+gi.require_version("Adw", "1")
+gi.require_version("Gtk", "4.0")
+from gi.repository import Adw, Gio, GLib, Gtk, Pango
+
+
+MODEL_PATH = "/usr/lib/zeus"
+if MODEL_PATH not in sys.path:
+    sys.path.insert(0, MODEL_PATH)
+
+import settings_model
+
+
+APPLICATION_ID = "org.zeus.Settings"
+NATIVE_SETTINGS_DESKTOP_ID = "org.gnome.Settings.desktop"
+GNOME_CONTROL_CENTER_COMMAND = "/usr/bin/gnome-control-center"
+
+
+CSS = """
+.zeus-window {
+  background: @window_bg_color;
+}
+
+.settings-hero {
+  padding: 20px 36px 12px;
+}
+
+.eyebrow {
+  color: @accent_color;
+  font-size: 0.78em;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+}
+
+.hero-title {
+  color: @window_fg_color;
+  font-size: 2em;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  margin-top: 6px;
+}
+
+.hero-copy {
+  color: alpha(@window_fg_color, 0.74);
+  font-size: 1em;
+  line-height: 1.38;
+  margin-top: 6px;
+}
+
+.content-section {
+  margin: 0 36px 12px;
+}
+
+.section-heading {
+  color: @window_fg_color;
+  font-size: 1.04em;
+  font-weight: 760;
+}
+
+.section-copy {
+  color: alpha(@window_fg_color, 0.64);
+  margin-top: 3px;
+}
+
+.control-grid {
+  margin-top: 8px;
+}
+
+.control-card {
+  background: @card_bg_color;
+  border: 1px solid alpha(@window_fg_color, 0.10);
+  border-radius: 16px;
+  min-height: 60px;
+  padding: 10px 13px;
+}
+
+.control-card:hover,
+.control-card:focus-visible {
+  background: alpha(@accent_bg_color, 0.10);
+  border-color: alpha(@accent_color, 0.34);
+}
+
+.control-card:active {
+  background: alpha(@accent_bg_color, 0.17);
+}
+
+.control-icon {
+  background: alpha(@accent_bg_color, 0.13);
+  border-radius: 11px;
+  color: @accent_color;
+  margin-right: 11px;
+  padding: 8px;
+}
+
+.control-title {
+  color: @window_fg_color;
+  font-size: 1.02em;
+  font-weight: 730;
+}
+
+.control-summary {
+  color: alpha(@window_fg_color, 0.67);
+  font-weight: 400;
+  line-height: 1.28;
+  margin-top: 4px;
+}
+
+.control-chevron {
+  color: alpha(@window_fg_color, 0.46);
+  margin-left: 10px;
+}
+
+.hardware-card {
+  background: alpha(@accent_bg_color, 0.09);
+  border: 1px solid alpha(@accent_bg_color, 0.16);
+  border-radius: 16px;
+  padding: 12px 16px;
+}
+
+.hardware-icon {
+  color: @accent_color;
+  margin-right: 11px;
+}
+
+.hardware-title {
+  color: @window_fg_color;
+  font-weight: 720;
+}
+
+.hardware-copy,
+.brightness-copy {
+  color: alpha(@window_fg_color, 0.68);
+  line-height: 1.32;
+  margin-top: 3px;
+}
+
+.brightness-row {
+  border-top: 1px solid alpha(@window_fg_color, 0.10);
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.brightness-title {
+  color: @window_fg_color;
+  font-size: 0.90em;
+  font-weight: 680;
+}
+
+.local-section {
+  margin-bottom: 10px;
+}
+
+.footer {
+  background: alpha(@window_fg_color, 0.045);
+  border-top: 1px solid alpha(@window_fg_color, 0.08);
+  padding: 10px 36px 12px;
+}
+
+.footer-title {
+  color: @window_fg_color;
+  font-weight: 700;
+}
+
+.footer-copy {
+  color: alpha(@window_fg_color, 0.64);
+  font-size: 0.84em;
+  margin-top: 2px;
+}
+
+.bottom-space {
+  min-height: 8px;
+}
+"""
+
+
+def _label(
+    text: str,
+    css_class: str,
+    *,
+    wrap: bool = False,
+    max_width_chars: int | None = None,
+) -> Gtk.Label:
+    label = Gtk.Label(label=text)
+    label.set_xalign(0)
+    label.add_css_class(css_class)
+    if wrap:
+        label.set_wrap(True)
+        label.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
+        label.set_hexpand(True)
+        if max_width_chars is not None:
+            label.set_max_width_chars(max_width_chars)
+    return label
+
+
+def _safe_hardware_snapshot() -> settings_model.HardwareState:
+    """Return an honest unknown state if sysfs cannot be read at startup."""
+
+    try:
+        return settings_model.discover_hardware()
+    except (OSError, RuntimeError, TypeError, ValueError):
+        return settings_model.HardwareState(None, None, None, None)
+
+
+class SettingsWindow(Adw.ApplicationWindow):
+    """A compact native directory for system and Zeus settings."""
+
+    def __init__(self, application: Adw.Application):
+        super().__init__(application=application, title="Settings")
+        self.set_default_size(760, 720)
+        self.set_size_request(520, 500)
+        self.add_css_class("zeus-window")
+        self._closed = False
+        self._hardware = _safe_hardware_snapshot()
+        self._version, self._build_id = settings_model.read_build_identity()
+
+        self._install_css()
+        self._build_window()
+        # Hardware can change while the window is open (for example after a
+        # dock or adapter is connected).  Refresh only on an activation signal;
+        # there is no timer or background watcher while Settings is idle.
+        self.connect("notify::is-active", self._on_active_changed)
+
+    def _install_css(self):
+        provider = Gtk.CssProvider()
+        provider.load_from_data(CSS.encode("utf-8"))
+        display = self.get_display()
+        if display is not None:
+            Gtk.StyleContext.add_provider_for_display(
+                display,
+                provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+            )
+
+    @staticmethod
+    def _set_accessible_label(widget: Gtk.Widget, label: str):
+        accessible_property = getattr(Gtk, "AccessibleProperty", None)
+        update_property = getattr(widget, "update_property", None)
+        if accessible_property is not None and update_property is not None:
+            try:
+                update_property([accessible_property.LABEL], [label])
+                return
+            except (AttributeError, TypeError, ValueError):
+                pass
+        try:
+            widget.set_tooltip_text(label)
+        except (AttributeError, RuntimeError):
+            pass
+
+    def _build_window(self):
+        toolbar = Adw.ToolbarView()
+        header = Adw.HeaderBar()
+        # Let libadwaita provide the native compact traffic-light controls and
+        # inherit the active light/dark/high-contrast theme.
+        header.set_show_start_title_buttons(True)
+        header.set_show_end_title_buttons(True)
+        header.set_title_widget(_label("Settings", "section-heading"))
+        all_settings = Gtk.Button(label="All Settings")
+        all_settings.add_css_class("flat")
+        self._set_accessible_label(all_settings, "Open all settings")
+        all_settings.set_tooltip_text("Open the complete system settings")
+        all_settings.connect("clicked", self._open_native_settings)
+        header.pack_end(all_settings)
+        toolbar.add_top_bar(header)
+
+        self._toast_overlay = Adw.ToastOverlay()
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(860)
+        clamp.set_tightening_threshold(600)
+        clamp.set_child(self._build_content())
+        scroller.set_child(clamp)
+        self._toast_overlay.set_child(scroller)
+        toolbar.set_content(self._toast_overlay)
+        self.set_content(toolbar)
+
+    def _build_content(self) -> Gtk.Widget:
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+
+        hero = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        hero.add_css_class("settings-hero")
+        hero.append(_label("ZEUS OS", "eyebrow"))
+        hero.append(_label("Make it yours", "hero-title"))
+        hero.append(
+            _label(
+                "A quiet home for the controls you use every day.",
+                "hero-copy",
+                wrap=True,
+                max_width_chars=82,
+            )
+        )
+        content.append(hero)
+
+        controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        controls.add_css_class("content-section")
+        controls.append(_label("Everyday controls", "section-heading"))
+        self._brightness_label = _label(
+            self._brightness_text(),
+            "section-copy",
+            wrap=True,
+            max_width_chars=82,
+        )
+        controls.append(self._brightness_label)
+        grid = Gtk.Grid(column_spacing=11, row_spacing=11)
+        grid.set_column_homogeneous(True)
+        grid.add_css_class("control-grid")
+        for index, item in enumerate(settings_model.PANEL_DESTINATIONS):
+            grid.attach(
+                self._destination_button(item),
+                index % 2,
+                index // 2,
+                1,
+                1,
+            )
+        controls.append(grid)
+        content.append(controls)
+
+        local = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        local.add_css_class("content-section")
+        local.add_css_class("local-section")
+        local.append(_label("Zeus tools", "section-heading"))
+        local.append(
+            _label(
+                "Temp and OS updates, whenever you are ready.",
+                "section-copy",
+                wrap=True,
+                max_width_chars=82,
+            )
+        )
+        local_grid = Gtk.Grid(column_spacing=11, row_spacing=11)
+        local_grid.set_column_homogeneous(True)
+        local_grid.add_css_class("control-grid")
+        for index, item in enumerate(settings_model.LOCAL_DESTINATIONS):
+            local_grid.attach(self._destination_button(item), index, 0, 1, 1)
+        local.append(local_grid)
+        content.append(local)
+
+        # Keep the actionable cards together; hardware notes remain useful
+        # context below them and never displace Temp or Updates from the first
+        # view at the normal window size.
+        content.append(self._build_hardware_card())
+
+        footer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        footer.add_css_class("footer")
+        footer.append(_label("Zeus OS", "footer-title"))
+        footer.append(
+            _label(
+                f"Version {self._version} · Build {self._build_id}",
+                "footer-copy",
+                wrap=True,
+                max_width_chars=82,
+            )
+        )
+        content.append(footer)
+
+        bottom_space = Gtk.Box()
+        bottom_space.add_css_class("bottom-space")
+        content.append(bottom_space)
+        return content
+
+    def _build_hardware_card(self) -> Gtk.Widget:
+        section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        section.add_css_class("content-section")
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        card.add_css_class("hardware-card")
+
+        top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        icon = Gtk.Image.new_from_icon_name("computer-symbolic")
+        icon.set_pixel_size(22)
+        icon.add_css_class("hardware-icon")
+        icon.set_valign(Gtk.Align.START)
+        top.append(icon)
+        copy = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        copy.set_hexpand(True)
+        copy.append(_label("This device", "hardware-title"))
+        self._hardware_summary_label = _label(
+            settings_model.hardware_summary(self._hardware),
+            "hardware-copy",
+            wrap=True,
+            max_width_chars=92,
+        )
+        copy.append(self._hardware_summary_label)
+        top.append(copy)
+        card.append(top)
+
+        section.append(card)
+        return section
+
+    def _on_active_changed(self, _window: Gtk.Window, _param_spec: Any):
+        """Refresh the display-only hardware note when the window is focused."""
+
+        if self._closed:
+            return
+        is_active = getattr(self, "is_active", None)
+        if callable(is_active):
+            try:
+                if not is_active():
+                    return
+            except (AttributeError, RuntimeError, TypeError):
+                pass
+        state = _safe_hardware_snapshot()
+        if state == self._hardware:
+            return
+        self._hardware = state
+        summary_label = getattr(self, "_hardware_summary_label", None)
+        if summary_label is not None:
+            summary_label.set_text(settings_model.hardware_summary(state))
+        brightness_label = getattr(self, "_brightness_label", None)
+        if brightness_label is not None:
+            brightness_label.set_text(self._brightness_text())
+
+    def _brightness_text(self) -> str:
+        if self._hardware.backlight is True:
+            return "Brightness is available in the top-right system menu."
+        if self._hardware.backlight is False:
+            return "Brightness: no laptop backlight detected on this device."
+        return "Check the top-right menu for brightness on supported displays."
+
+    def _destination_button(self, item: settings_model.Destination) -> Gtk.Button:
+        button = Gtk.Button()
+        button.add_css_class("card")
+        button.add_css_class("control-card")
+        button.set_hexpand(True)
+        button.set_halign(Gtk.Align.FILL)
+        self._set_accessible_label(button, item.title)
+        button.set_tooltip_text(f"Open {item.title}")
+
+        card = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        card.set_halign(Gtk.Align.FILL)
+        icon = Gtk.Image.new_from_icon_name(item.icon_name)
+        icon.set_pixel_size(23)
+        icon.set_valign(Gtk.Align.CENTER)
+        icon.add_css_class("control-icon")
+        card.append(icon)
+        copy = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        copy.set_hexpand(True)
+        copy.set_valign(Gtk.Align.CENTER)
+        copy.append(_label(item.title, "control-title"))
+        copy.append(_label(item.summary, "control-summary", wrap=True, max_width_chars=38))
+        card.append(copy)
+        chevron = Gtk.Image.new_from_icon_name("go-next-symbolic")
+        chevron.set_pixel_size(16)
+        chevron.set_valign(Gtk.Align.CENTER)
+        chevron.add_css_class("control-chevron")
+        card.append(chevron)
+        button.set_child(card)
+        button.connect("clicked", self._on_destination_clicked, item)
+        return button
+
+    def _on_destination_clicked(self, _button: Gtk.Button, item: settings_model.Destination):
+        if item.panel_ids:
+            self._open_panel(item)
+            return
+        self._open_local(item)
+
+    def _launch_context(self):
+        try:
+            display = self.get_display()
+            if display is not None:
+                return display.get_app_launch_context()
+        except (AttributeError, RuntimeError, TypeError):
+            pass
+        return None
+
+    def _launch_desktop_app(self, desktop_id: str, label: str) -> bool:
+        """Launch one fixed desktop ID without a shell or query expansion."""
+
+        try:
+            desktop = Gio.DesktopAppInfo.new(desktop_id)
+        except (GLib.Error, OSError, TypeError, ValueError):
+            desktop = None
+        if desktop is None:
+            return False
+        try:
+            result = desktop.launch([], self._launch_context())
+            if result is False:
+                return False
+        except (GLib.Error, OSError, TypeError, ValueError) as error:
+            self._show_toast(f"Could not open {label}: {error}")
+            return False
+        return True
+
+    def _spawn_fixed(self, arguments: tuple[str, ...], label: str):
+        """Start one fixed argv asynchronously; never invoke a shell."""
+
+        try:
+            return Gio.Subprocess.new(list(arguments), Gio.SubprocessFlags.NONE)
+        except (GLib.Error, OSError, TypeError, ValueError) as error:
+            self._show_toast(f"Could not open {label}: {error}")
+            return None
+
+    def _open_panel(self, item: settings_model.Destination):
+        self._try_panel_desktop(item, 0, settings_model.panel_attempt_order(item, self._hardware))
+
+    def _try_panel_desktop(
+        self,
+        item: settings_model.Destination,
+        index: int,
+        order: tuple[int, ...] | None = None,
+    ):
+        if self._closed:
+            return
+        if order is None:
+            order = settings_model.panel_attempt_order(item, getattr(self, "_hardware", None))
+        if index >= len(order):
+            self._try_panel_command(item, 0, order)
+            return
+        panel_index = order[index]
+        desktop_ids = item.panel_desktop_ids
+        if panel_index < len(desktop_ids):
+            if self._launch_desktop_app(desktop_ids[panel_index], item.title):
+                return
+            self._try_panel_desktop(item, index + 1, order)
+            return
+        self._try_panel_desktop(item, index + 1, order)
+
+    def _try_panel_command(
+        self,
+        item: settings_model.Destination,
+        index: int,
+        order: tuple[int, ...] | None = None,
+    ):
+        if self._closed:
+            return
+        if order is None:
+            order = settings_model.panel_attempt_order(item, getattr(self, "_hardware", None))
+        if index >= len(order):
+            self._open_native_settings()
+            return
+        panel_index = order[index]
+        try:
+            arguments = settings_model.panel_argv(item, panel_index)
+        except ValueError:
+            self._try_panel_command(item, index + 1, order)
+            return
+        process = self._spawn_fixed(arguments, item.title)
+        if process is None:
+            self._try_panel_command(item, index + 1, order)
+            return
+        wait_async = getattr(process, "wait_check_async", None)
+        if wait_async is None:
+            return
+        try:
+            wait_async(
+                GLib.PRIORITY_DEFAULT,
+                None,
+                self._on_panel_command_finished,
+                (item, index, order),
+            )
+        except (GLib.Error, OSError, TypeError, ValueError):
+            # The process has been handed off already.  Do not synchronously
+            # wait in the GTK loop; All Settings remains available in the
+            # header if an older Gio binding cannot report completion.
+            return
+
+    def _on_panel_command_finished(self, process, result, context):
+        if self._closed:
+            return
+        item, index, order = context
+        try:
+            succeeded = bool(process.wait_check_finish(result))
+        except (GLib.Error, OSError, TypeError, ValueError):
+            succeeded = False
+        if not succeeded:
+            self._try_panel_command(item, index + 1, order)
+
+    def _open_native_settings(self, _button: Gtk.Button | None = None):
+        if self._closed:
+            return
+        if self._launch_desktop_app(NATIVE_SETTINGS_DESKTOP_ID, "GNOME Settings"):
+            return
+        self._spawn_fixed((GNOME_CONTROL_CENTER_COMMAND,), "GNOME Settings")
+
+    def _open_local(self, item: settings_model.Destination):
+        if self._closed:
+            return
+        if item.desktop_id and self._launch_desktop_app(f"{item.desktop_id}.desktop", item.title):
+            return
+        try:
+            arguments = settings_model.local_command(item)
+        except ValueError:
+            self._show_toast(f"{item.title} is not available in this preview.")
+            return
+        self._spawn_fixed(arguments, item.title)
+
+    def _show_toast(self, message: str):
+        try:
+            self._toast_overlay.add_toast(Adw.Toast.new(message))
+        except (AttributeError, RuntimeError, TypeError):
+            pass
+
+    def shutdown(self):
+        self._closed = True
+
+
+class SettingsApplication(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id=APPLICATION_ID)
+        self._window: SettingsWindow | None = None
+
+    def do_activate(self):
+        if self._window is None:
+            self._window = SettingsWindow(self)
+            self._window.connect("close-request", self._on_window_close)
+        self._window.present()
+
+    def _on_window_close(self, window: SettingsWindow) -> bool:
+        window.shutdown()
+        self._window = None
+        return False
+
+    def do_shutdown(self):
+        if self._window is not None:
+            self._window.shutdown()
+        Adw.Application.do_shutdown(self)
+
+
+def main() -> int:
+    return SettingsApplication().run(sys.argv)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
