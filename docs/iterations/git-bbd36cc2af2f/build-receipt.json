@@ -1,0 +1,44 @@
+{
+  "version": "0.1.0-preview.2",
+  "build_id": "git-bbd36cc2af2f",
+  "source_commit": "bbd36cc2af2f0cbf095688f970eaf97141eab1c7",
+  "booted_manifest_digest": "sha256:778e3bcc6b1e7f024ddfd6a54cc74abe9cfb6f9afc2fd5dc26fe0e09a99e10bd",
+  "image_config_digest": "sha256:27c722950a8c9b1570338d95f77a03429bf47202daae14a164a390092236b9f6",
+  "artifacts": {
+    "zeusos-0.1.0-preview.2-git-bbd36cc2af2f.oci": {
+      "sha256": "c0d5e99818bea75abc4f3b94576d6692f882dd9a80beafd3fb7ce2fe2dea5334",
+      "bytes": 1808392192
+    }
+  },
+  "validation": {
+    "python_tests": 33,
+    "installed_runtime_fixtures": {
+      "boot_once": true,
+      "nested_cleanup": true,
+      "legacy_preserved": true,
+      "keep_conflict_safe": true,
+      "active_fd_preserved": true,
+      "partial_companion_preserved": true,
+      "symlink_target_preserved": true,
+      "status_fd_stable": true
+    },
+    "preserved_file_hashes": 6,
+    "firefox_download_to_temp": true,
+    "native_keep_to_documents": true,
+    "saved_file_survives_upgrade_reboot": true,
+    "same_boot_service_restart_preserves_download": true,
+    "gtk3_gtk4_parser": "passed",
+    "gtk_target_geometry": "24px logical width at scale1 and XWayland scale2",
+    "native_policy_hourly_custom": "passed",
+    "clear_confirmation_cancel": "passed",
+    "backup_zstd": "passed",
+    "backup_vma": "passed",
+    "backup_restore": "not run",
+    "rollback_this_iteration": "not run",
+    "secure_boot": true,
+    "selinux": "Enforcing",
+    "failed_system_units": 0,
+    "github_archive_digest_matches": true
+  },
+  "rollback_manifest": "sha256:c61149d9482a9b3d606ea0e9a77eb7f820e82da450230eaca88a4c456474ceef"
+}

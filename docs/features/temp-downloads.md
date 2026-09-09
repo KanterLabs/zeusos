@@ -1,6 +1,7 @@
 # Temp downloads and compact window controls
 
-Status: implemented; image and persistent-VM qualification in progress. Owner request: September 9, 2026.
+Status: implemented and deployed on VM 115 in build git-bbd36cc2af2f, version 0.1.0-preview.2.
+Verification and remaining qualification limits: [iteration notes](../iterations/git-bbd36cc2af2f/README.md).
 
 ## Product behavior
 

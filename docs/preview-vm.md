@@ -277,7 +277,17 @@ The declared comparison and budgets are in
 [`preview-1-budgets.md`](releases/preview-1-budgets.md). Record actual values
 and variability; the 4-vCPU/8-GiB VM allocation is not performance evidence.
 
-## Current Preview 2 deployment
+## Current Temp iteration
+
+VM 115 now runs build `git-bbd36cc2af2f`, still version `0.1.0-preview.2`, with
+manifest `sha256:778e3bcc6b1e7f024ddfd6a54cc74abe9cfb6f9afc2fd5dc26fe0e09a99e10bd`.
+The [iteration notes](iterations/git-bbd36cc2af2f/README.md) and receipt record
+Temp, compact controls, signatures and six preserved permanent-file hashes.
+The root-owned update archive is under `/var/lib/zeus/updates/git-bbd36cc2af2f/`.
+The rollback slot contains the preceding Temp build, `git-e7f47e75218d`, with
+the same policy schema; no rollback cycle was performed in this iteration.
+
+## Previous Preview 2 visual deployment (historical)
 
 VM 115 runs source `c11e57b8569b2332bbd570b6aef51d79b5c38cec`, booted
 manifest `sha256:c35a6a8a2a42a42b508c74bf55e0ae5022d4848d0cfaff11816d56295aec22e5`.

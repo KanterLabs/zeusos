@@ -4,7 +4,9 @@ A focused Fedora bootc laptop desktop with a macOS-inspired layout, original Zeu
 
 The current version is **0.1.0-preview.2**. It includes a translucent top bar and floating dock, original icons, traffic-light window controls, compact application search (Super+Space), coordinated light/dark artwork, and a branded native login screen. GNOME/Wayland runs Files, Firefox, Ptyxis, Settings, and Welcome. The Rust `zeus` helper provides diagnostics, safe desktop fallback, read-only update status, and validated SSH launch.
 
-![Zeus OS desktop preview](docs/releases/preview-2/desktop.png)
+The latest build adds **Temp downloads**, configurable automatic cleanup and **Keep…** permanent saves. [Latest iteration and verification](docs/iterations/git-bbd36cc2af2f/README.md).
+
+![Zeus OS desktop preview](docs/iterations/git-bbd36cc2af2f/desktop.png)
 
 Deployment and measured results are recorded in the [preview VM runbook](docs/preview-vm.md) and [release notes](docs/releases/preview-2.md). An image build alone is not a graphical or performance test.
 

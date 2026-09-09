@@ -239,6 +239,119 @@ class TempFixture(unittest.TestCase):
             with self.assertRaises(UnsupportedStateError):
                 manager.set_policy("never")
 
+    def test_file_created_after_snapshot_survives_that_sweep(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            clock = FakeClock()
+            manager = self.manager(home, clock=clock, proc_root=None)
+            manager.setup()
+            old_file = home / "Temp" / "old.txt"
+            new_file = home / "Temp" / "created-after-snapshot.txt"
+            old_file.write_text("old")
+
+            original_scan = manager._scan_active
+
+            def create_after_snapshot(candidates):
+                # _scan_active runs after _snapshot, so this entry cannot be
+                # present in the candidate list used by the sweep.
+                new_file.write_text("new")
+                return original_scan(candidates)
+
+            manager._scan_active = create_after_snapshot
+            result = manager.sweep()
+
+            self.assertTrue(result["ok"], result)
+            self.assertEqual(result["deleted"], 1)
+            self.assertFalse(old_file.exists())
+            self.assertEqual(new_file.read_text(), "new")
+
+    def test_replaced_source_path_is_preserved_during_sweep(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            clock = FakeClock()
+            manager = self.manager(home, clock=clock, proc_root=None)
+            manager.setup()
+            target = home / "Temp" / "target.txt"
+            target.write_text("original")
+            original_inode = target.stat().st_ino
+
+            original_remove = manager._remove_candidate
+
+            def replace_before_remove(root, candidate):
+                if candidate.rel == "target.txt":
+                    replacement = home / "Temp" / ".replacement"
+                    replacement.write_text("replacement")
+                    os.replace(replacement, target)
+                    self.assertNotEqual(target.stat().st_ino, original_inode)
+                return original_remove(root, candidate)
+
+            manager._remove_candidate = replace_before_remove
+            result = manager.sweep()
+
+            self.assertTrue(result["ok"], result)
+            self.assertEqual(result["deleted"], 0)
+            self.assertIn(
+                {"name": "target.txt", "reason": "changed"},
+                result["skipped"],
+            )
+            self.assertEqual(target.read_text(), "replacement")
+
+    def test_nested_mount_boundary_is_skipped_and_keep_rejects_it(self):
+        with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as proc_directory:
+            home = Path(directory)
+            proc = Path(proc_directory)
+            (proc / "self").mkdir()
+            (proc / "self" / "mountinfo").write_text("")
+            manager = self.manager(home, clock=FakeClock(), proc_root=proc)
+            manager.setup()
+            mounted = home / "Temp" / "mounted"
+            mounted.mkdir(parents=True)
+            (mounted / "inside.txt").write_text("mounted")
+            safe = home / "Temp" / "safe.txt"
+            safe.write_text("safe")
+            (proc / "self" / "mountinfo").write_text(
+                f"42 1 0:1 / {mounted} rw,relatime - tmpfs tmpfs rw\n"
+            )
+
+            result = manager.sweep()
+
+            self.assertTrue(result["ok"], result)
+            self.assertFalse(safe.exists())
+            self.assertTrue((mounted / "inside.txt").exists())
+            self.assertIn(
+                {"name": "mounted", "reason": "mount"},
+                result["skipped"],
+            )
+            with self.assertRaises(DestinationError):
+                manager.keep(["mounted/inside.txt"])
+
+    def test_interrupted_boot_attempt_does_not_retry_new_files_same_boot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            clock = FakeClock()
+            manager = self.manager(home, clock=clock, proc_root=None)
+            manager.setup()
+            old_file = home / "Temp" / "old.txt"
+            new_file = home / "Temp" / "created-after-interruption.txt"
+            old_file.write_text("old")
+
+            def interrupt(root, candidate):
+                raise RuntimeError("simulated interruption")
+
+            manager._remove_candidate = interrupt
+            with self.assertRaisesRegex(RuntimeError, "simulated interruption"):
+                manager.sweep()
+            self.assertTrue(old_file.exists())
+            new_file.write_text("new")
+
+            retry = manager.sweep()
+
+            self.assertTrue(retry["ok"], retry)
+            self.assertFalse(retry["swept"])
+            self.assertEqual(retry["reason"], "boot-complete")
+            self.assertTrue(old_file.exists())
+            self.assertTrue(new_file.exists())
+
 
 if __name__ == "__main__":
     unittest.main()
