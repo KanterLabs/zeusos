@@ -45,7 +45,7 @@ checks when the address is current.
 - Keep the review guest's owner files and settings across candidates. A
   Proxmox snapshot is a convenience point and is not a backup. Verify the
   backup gate below before any update or state migration.
-- Native Updates is qualified on VM 115 for signed build `git-17d205103f3a`
+- Native Updates is qualified on VM 115 for signed build `git-fd2125f63159`
   after a native Updates installation and explicit reboot. The post-reboot
   status reported `The selected update is installed.` There is no unattended
   update or automatic reboot.
@@ -189,7 +189,7 @@ not authenticate a new artifact. The separate feed publication and
 Complete the source, image, signature, and release-asset gates before updating
 the feed; record native installation and explicit-restart qualification before
 handing the preview to users. The current final record is in the [signed
-Updates iteration receipt](iterations/git-17d205103f3a/README.md).
+Settings iteration receipt](iterations/git-fd2125f63159/README.md).
 
 ## Bootstrap and manual update path
 
@@ -320,23 +320,27 @@ The declared comparison and budgets are in
 [`preview-1-budgets.md`](releases/preview-1-budgets.md). Record actual values
 and variability; the 4-vCPU/8-GiB VM allocation is not performance evidence.
 
-## Current signed Updates iteration
+## Current signed Settings iteration
 
-VM 115 now runs signed build `git-17d205103f3a`, still version
+VM 115 now runs signed build `git-fd2125f63159`, still version
 `0.1.0-preview.2`, with booted manifest
-`sha256:4da2b1c5bdba3d5e0451e5f36389d3238bdf739a976951bca11b925f5e9d133d`.
-The [final iteration receipt](iterations/git-17d205103f3a/README.md) records
+`sha256:ae59a68dbfc9eb6f5f22fe7000f1073b266d578b49cb2c7d490ab38975dd023f`.
+Open **Zeus → Settings** or **Welcome → Open Settings** for everyday controls.
+The [final iteration receipt](iterations/git-fd2125f63159/README.md) records
 the source, image, signature and release-asset gates, the native installation
-through **Open Updates**, explicit reboot, and the post-reboot status. It also
-records that closing the window did not interrupt the service and canceling
-authentication did not report a successful installation.
+through **Open Updates**, explicit reboot, and the post-reboot status. The
+[earlier updater qualification](iterations/git-17d205103f3a/README.md) separately
+records the background-install and authentication-cancellation tests.
 The booted image is
-`/var/lib/zeus/updater/downloads/zeusos-0.1.0-preview.2-git-17d205103f3a.oci`.
-The previous build `git-1a34bbfe8509` remains in the rollback slot; no rollback
+`/var/lib/zeus/updater/downloads/zeusos-0.1.0-preview.2-git-fd2125f63159.oci`.
+The previous build `git-17d205103f3a` remains in the rollback slot; no rollback
 cycle was run. See the [timestamped metrics history](metrics.md) for runtime
 observations; physical battery remains unmeasured on this VM.
 
-The current verified pre-updater backup is
+The current verified pre-Settings backup is
+`/mnt/pve/sata-ssd/zeusos/backups/settings-20260909/vzdump-qemu-115-2026_09_09-03_53_43.vma.zst`.
+Its zstd and full decompressed VMA checks passed. The previous verified
+pre-updater backup remains at
 `/mnt/pve/sata-ssd/zeusos/backups/updater-20260909/vzdump-qemu-115-2026_09_09-01_16_44.vma.zst`.
 Its zstd and decompressed VMA checks passed. The archive name follows the
 Proxmox host clock; do not infer an event time from it. The earlier populated

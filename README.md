@@ -4,9 +4,9 @@ A focused Fedora bootc laptop desktop with a macOS-inspired layout, original Zeu
 
 The current version is **0.1.0-preview.2**. It includes a translucent top bar and floating dock, original icons, traffic-light window controls, compact application search (Super+Space), coordinated light/dark artwork, and a branded native login screen. GNOME/Wayland runs Files, Firefox, Ptyxis, Settings, and Welcome. The Rust `zeus` helper provides diagnostics, safe desktop fallback, signed updates, and validated SSH launch.
 
-The latest build adds signed native **Updates** for owner-triggered preview upgrades while retaining clearer **Temp downloads**, permanent saves, Files shortcuts, event-driven desktop updates and laptop power defaults. It removes periodic Temp cleanup checks when using On boot or Never. [Latest iteration and verification](docs/iterations/git-17d205103f3a/README.md) records the native installation, explicit restart, and timestamped measurements. Physical battery remains unmeasured on the review VM; see the [timestamped metrics history](docs/metrics.md) for runtime observations.
+The latest build adds compact **Zeus Settings** for network, Bluetooth, displays, power, sound, appearance, Temp and Updates. Open it from the Zeus menu, Welcome or application search. It uses the existing native controls and adds no packages or background services. [Latest iteration and verification](docs/iterations/git-fd2125f63159/README.md) records the signed update, preservation checks and timestamped measurements. Physical battery remains unmeasured on the review VM; see the [metrics history](docs/metrics.md).
 
-![Zeus OS desktop preview](docs/iterations/git-17d205103f3a/desktop.png)
+![Zeus Settings on the desktop](docs/iterations/git-fd2125f63159/settings-light.png)
 
 Deployment and measured results are recorded in the [preview VM runbook](docs/preview-vm.md) and [release notes](docs/releases/preview-2.md). An image build alone is not a graphical or performance test.
 
@@ -63,8 +63,9 @@ GitHub Actions uses `homelab` for image policy checks and `homelab-heavy` for Ru
 
 ## Roadmap
 
-The [next proposed iteration](docs/next-iteration.md) breaks Settings, better
-search and optional app installation into implementation and testing checklists.
+The [additions plan](docs/next-iteration.md) tracks the delivered Settings work
+and separate implementation/testing checklists for better search and optional
+app installation.
 
 The review VM now has a qualified signed preview updater for owner-triggered Updates. Production release channels, release promotion, signing-key rotation and recovery policy, the full remote T3/Codex workflow, personal profile recovery, encrypted interactive installer, and physical laptop qualification remain separate implementation work. Preview qualification does not define production release or key-rotation policy.
 

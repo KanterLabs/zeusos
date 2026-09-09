@@ -1,0 +1,184 @@
+5.218s sys-devices-pci0000:00-0000:00:1e.0-0000:05:01.0-0000:06:08.0-virtio1-virtio\x2dports-vport1p1.device
+5.218s dev-virtio\x2dports-org.qemu.guest_agent.0.device
+5.218s dev-vport1p1.device
+5.191s sys-devices-pci0000:00-0000:00:1e.0-0000:05:01.0-0000:06:09.0-virtio2-virtio\x2dports-vport2p1.device
+5.191s dev-virtio\x2dports-com.redhat.spice.0.device
+5.191s dev-vport2p1.device
+5.051s dev-sr0.device
+5.051s dev-cdrom.device
+5.051s sys-devices-pci0000:00-0000:00:1f.2-ata2-host1-target1:0:0-1:0:0:0-block-sr0.device
+5.051s dev-disk-by\x2dpath-pci\x2d0000:00:1f.2\x2data\x2d2.device
+5.051s dev-disk-by\x2ddiskseq-2.device
+5.051s dev-disk-by\x2did-ata\x2dQEMU_DVD\x2dROM_QM00003.device
+5.051s dev-disk-by\x2dpath-pci\x2d0000:00:1f.2\x2data\x2d2.0.device
+5.043s sys-devices-platform-serial8250-serial8250:0-serial8250:0.2-tty-ttyS2.device
+5.043s dev-ttyS2.device
+5.029s dev-ttyS1.device
+5.029s sys-devices-platform-serial8250-serial8250:0-serial8250:0.1-tty-ttyS1.device
+5.026s dev-ttyS3.device
+5.026s sys-devices-platform-serial8250-serial8250:0-serial8250:0.3-tty-ttyS3.device
+5.008s sys-module-fuse.device
+5.006s sys-module-configfs.device
+4.976s dev-ttyS0.device
+4.976s sys-devices-pnp0-00:00-00:00:0-00:00:0.0-tty-ttyS0.device
+4.898s dev-disk-by\x2dpartuuid-7648137e\x2deeeb\x2d4c7b\x2d906d\x2d47149e06101e.device
+4.898s dev-disk-by\x2dpath-pci\x2d0000:09:01.0\x2dscsi\x2d0:0:0:0\x2dpart3.device
+4.898s dev-disk-by\x2dpath-pci\x2d0000:09:01.0\x2dscsi\x2d0:0:0:0\x2dpart-by\x2dlabel-boot.device
+4.898s dev-disk-by\x2did-scsi\x2d0QEMU_QEMU_HARDDISK_drive\x2dscsi0\x2dpart3.device
+4.898s dev-disk-by\x2dpath-pci\x2d0000:09:01.0\x2dscsi\x2d0:0:0:0\x2dpart-by\x2duuid-aaefa0b5\x2df8df\x2d43f5\x2db3ec\x2daf2de60ef74b.device
+4.898s dev-disk-by\x2ddiskseq-3\x2dpart3.device
+4.897s dev-disk-by\x2duuid-aaefa0b5\x2df8df\x2d43f5\x2db3ec\x2daf2de60ef74b.device
+4.897s dev-disk-by\x2dpath-pci\x2d0000:09:01.0\x2dscsi\x2d0:0:0:0\x2dpart-by\x2dpartuuid-7648137e\x2deeeb\x2d4c7b\x2d906d\x2d47149e06101e.device
+4.897s dev-disk-by\x2dpath-pci\x2d0000:09:01.0\x2dscsi\x2d0:0:0:0\x2dpart-by\x2dpartnum-3.device
+4.897s dev-disk-by\x2dlabel-boot.device
+4.897s dev-disk-by\x2ddesignator-xbootldr.device
+4.897s dev-sda3.device
+4.897s sys-devices-pci0000:00-0000:00:1e.0-0000:05:04.0-0000:09:01.0-virtio4-host6-target6:0:0-6:0:0:0-block-sda-sda3.device
+4.850s dev-disk-by\x2dpath-pci\x2d0000:09:01.0\x2dscsi\x2d0:0:0:0\x2dpart-by\x2duuid-53d6e0d5\x2d221c\x2d427f\x2d8c54\x2d338c52f4a135.device
+4.850s dev-disk-by\x2dpath-pci\x2d0000:09:01.0\x2dscsi\x2d0:0:0:0\x2dpart-by\x2dlabel-root.device
+4.850s dev-disk-by\x2duuid-53d6e0d5\x2d221c\x2d427f\x2d8c54\x2d338c52f4a135.device
+4.850s dev-disk-by\x2dlabel-root.device
+4.850s dev-disk-by\x2dpath-pci\x2d0000:09:01.0\x2dscsi\x2d0:0:0:0\x2dpart-by\x2dpartuuid-026a6629\x2d3924\x2d4613\x2d86e4\x2d895ce44f5a01.device
+4.850s dev-disk-by\x2did-scsi\x2d0QEMU_QEMU_HARDDISK_drive\x2dscsi0\x2dpart4.device
+4.850s sys-devices-pci0000:00-0000:00:1e.0-0000:05:04.0-0000:09:01.0-virtio4-host6-target6:0:0-6:0:0:0-block-sda-sda4.device
+4.849s dev-disk-by\x2ddiskseq-3\x2dpart4.device
+4.849s dev-disk-by\x2dpath-pci\x2d0000:09:01.0\x2dscsi\x2d0:0:0:0\x2dpart-by\x2dpartnum-4.device
+4.849s dev-disk-by\x2dpartuuid-026a6629\x2d3924\x2d4613\x2d86e4\x2d895ce44f5a01.device
+4.849s dev-disk-by\x2dpath-pci\x2d0000:09:01.0\x2dscsi\x2d0:0:0:0\x2dpart4.device
+4.849s dev-sda4.device
+4.840s dev-disk-by\x2dpath-pci\x2d0000:09:01.0\x2dscsi\x2d0:0:0:0\x2dpart2.device
+4.840s dev-disk-by\x2ddiskseq-3\x2dpart2.device
+4.840s dev-disk-by\x2dpath-pci\x2d0000:09:01.0\x2dscsi\x2d0:0:0:0\x2dpart-by\x2duuid-BE48\x2dEE4B.device
+4.840s dev-sda2.device
+4.840s dev-disk-by\x2dpartuuid-d5083390\x2da9ae\x2d49b8\x2d8bac\x2d7ba3bfa5ccb6.device
+4.840s dev-disk-by\x2ddesignator-esp.device
+4.840s dev-disk-by\x2dpath-pci\x2d0000:09:01.0\x2dscsi\x2d0:0:0:0\x2dpart-by\x2dpartnum-2.device
+4.840s dev-disk-by\x2duuid-BE48\x2dEE4B.device
+4.840s sys-devices-pci0000:00-0000:00:1e.0-0000:05:04.0-0000:09:01.0-virtio4-host6-target6:0:0-6:0:0:0-block-sda-sda2.device
+4.840s dev-disk-by\x2dlabel-EFI\x2dSYSTEM.device
+4.840s dev-disk-by\x2dpath-pci\x2d0000:09:01.0\x2dscsi\x2d0:0:0:0\x2dpart-by\x2dlabel-EFI\x2dSYSTEM.device
+4.840s dev-disk-by\x2did-scsi\x2d0QEMU_QEMU_HARDDISK_drive\x2dscsi0\x2dpart2.device
+4.840s dev-disk-by\x2dpath-pci\x2d0000:09:01.0\x2dscsi\x2d0:0:0:0\x2dpart-by\x2dpartuuid-d5083390\x2da9ae\x2d49b8\x2d8bac\x2d7ba3bfa5ccb6.device
+4.836s dev-disk-by\x2ddiskseq-3\x2dpart1.device
+4.836s dev-disk-by\x2dpath-pci\x2d0000:09:01.0\x2dscsi\x2d0:0:0:0\x2dpart1.device
+4.836s sys-devices-pci0000:00-0000:00:1e.0-0000:05:04.0-0000:09:01.0-virtio4-host6-target6:0:0-6:0:0:0-block-sda-sda1.device
+4.836s dev-disk-by\x2dpath-pci\x2d0000:09:01.0\x2dscsi\x2d0:0:0:0\x2dpart-by\x2dpartuuid-e66c4395\x2d2161\x2d4849\x2d9877\x2d4cc9eb58dcd6.device
+4.836s dev-disk-by\x2dpartuuid-e66c4395\x2d2161\x2d4849\x2d9877\x2d4cc9eb58dcd6.device
+4.836s dev-disk-by\x2dpath-pci\x2d0000:09:01.0\x2dscsi\x2d0:0:0:0\x2dpart-by\x2dpartnum-1.device
+4.836s dev-disk-by\x2did-scsi\x2d0QEMU_QEMU_HARDDISK_drive\x2dscsi0\x2dpart1.device
+4.836s dev-sda1.device
+4.799s dev-disk-by\x2dpath-pci\x2d0000:09:01.0\x2dscsi\x2d0:0:0:0.device
+4.799s dev-sda.device
+4.799s dev-disk-by\x2did-scsi\x2d0QEMU_QEMU_HARDDISK_drive\x2dscsi0.device
+4.799s sys-devices-pci0000:00-0000:00:1e.0-0000:05:04.0-0000:09:01.0-virtio4-host6-target6:0:0-6:0:0:0-block-sda.device
+4.799s dev-disk-by\x2ddiskseq-3.device
+4.711s sys-devices-pci0000:00-0000:00:1e.0-0000:05:01.0-0000:06:12.0-virtio3-net-ens18.device
+4.711s sys-subsystem-net-devices-ens18.device
+2.304s initrd-switch-root.service
+ 675ms dbus-broker.service
+ 563ms NetworkManager.service
+ 538ms dracut-initqueue.service
+ 472ms systemd-journald.service
+ 436ms bootloader-update.service
+ 431ms polkit.service
+ 389ms systemd-tmpfiles-setup.service
+ 376ms avahi-daemon.service
+ 337ms authselect-apply-changes.service
+ 320ms rtkit-daemon.service
+ 319ms dracut-shutdown.service
+ 317ms chronyd.service
+ 315ms systemd-udev-trigger.service
+ 310ms user@60578.service
+ 307ms systemd-journal-flush.service
+ 304ms lvm-devices-import.service
+ 294ms qemu-guest-agent.service
+ 268ms udisks2.service
+ 268ms upower.service
+ 245ms systemd-tmpfiles-setup-dev-early.service
+ 244ms systemd-vconsole-setup.service
+ 168ms lvm2-monitor.service
+ 161ms systemd-udevd.service
+ 145ms user@1000.service
+ 134ms dracut-pre-udev.service
+ 121ms accounts-daemon.service
+ 121ms dracut-cmdline.service
+ 118ms geoclue.service
+ 116ms ModemManager.service
+ 114ms sys-kernel-tracing.mount
+ 114ms sys-kernel-debug.mount
+ 113ms kmod-static-nodes.service
+ 112ms systemd-fsck-root.service
+ 112ms dev-mqueue.mount
+ 111ms dev-hugepages.mount
+ 110ms boot-efi.mount
+ 105ms sshd-vsock.socket
+ 103ms systemd-random-seed.service
+  96ms bootc-sysusers-shadow-sync.service
+  90ms sys-fs-fuse-connections.mount
+  80ms systemd-udev-load-credentials.service
+  78ms systemd-logind.service
+  78ms systemd-resolved.service
+  75ms dracut-pre-pivot.service
+  70ms systemd-oomd.service
+  70ms systemd-hostnamed.service
+  69ms systemd-update-utmp.service
+  67ms systemd-localed.service
+  67ms initrd-cleanup.service
+  62ms switcheroo-control.service
+  61ms systemd-modules-load.service
+  60ms systemd-network-generator.service
+  60ms systemd-homed.service
+  59ms zeus-temp-inspector.socket
+  58ms systemd-remount-fs.service
+  57ms zeus-tmpfiles.service
+  55ms malcontent-timerd.service
+  53ms boot.mount
+  51ms systemd-userdbd.service
+  46ms power-profiles-daemon.service
+  46ms dev-zram0.swap
+  42ms gdm.service
+  42ms colord.service
+  40ms systemd-userdb-load-credentials.service
+  40ms dracut-pre-trigger.service
+  37ms avahi-daemon.socket
+  37ms systemd-tmpfiles-setup-dev.service
+  36ms sshd.service
+  35ms systemd-user-sessions.service
+  33ms systemd-sysctl.service
+  32ms systemd-oomd.socket
+  29ms ostree-remount.service
+  28ms lvm2-lvmpolld.socket
+  27ms systemd-zram-setup@zram0.service
+  24ms systemd-factory-reset.socket
+  23ms initrd-parse-etc.service
+  21ms systemd-mute-console.socket
+  20ms wpa_supplicant.service
+  19ms initrd-udevadm-cleanup-db.service
+  18ms systemd-creds.socket
+  16ms user-runtime-dir@1000.service
+  16ms user-runtime-dir@60578.service
+  15ms dracut-pre-mount.service
+  15ms tmp.mount
+  15ms systemd-bootctl.socket
+  15ms sshd-unix-local.socket
+  15ms systemd-udevd-control.socket
+  14ms var.mount
+  14ms systemd-sysext.socket
+  11ms systemd-repart.socket
+   1ms systemd-coredump.socket
+   1ms systemd-ask-password.socket
+ 718us dbus.socket
+ 434us systemd-resolved-monitor.socket
+ 383us dm-event.socket
+ 374us systemd-userdbd.socket
+ 249us systemd-udevd-varlink.socket
+ 234us systemd-journald-audit.socket
+ 191us systemd-hostnamed.socket
+ 181us spice-vdagentd.socket
+ 177us systemd-logind-varlink.socket
+ 125us systemd-resolved-varlink.socket
+  93us systemd-journald-dev-log.socket
+  72us systemd-rfkill.socket
+  70us systemd-journald.socket
+  36us systemd-homed-activate.service
+  20us systemd-udevd-kernel.socket

@@ -1,0 +1,42 @@
+{
+  "verified_at_utc": "2026-09-09T13:46:56.235659+00:00",
+  "method": "Local file size/SHA256 compared with uploaded GitHub release asset size/digest",
+  "assets": [
+    {
+      "name": "SHA256SUMS-git-fd2125f63159",
+      "size": 110,
+      "sha256": "982538c6c3a9ecd6bcb061d8895cb0480bb93f77ab42c506dc8ed23a30c05c44",
+      "github_digest_matches": true
+    },
+    {
+      "name": "SHA256SUMS-git-fd2125f63159.sig",
+      "size": 310,
+      "sha256": "6a4735357bf26a5c87c9e6c324219cf638288482bf6ee01b1f80f3e3e3e8eabf",
+      "github_digest_matches": true
+    },
+    {
+      "name": "build-info-git-fd2125f63159.json",
+      "size": 165,
+      "sha256": "632d94473494ee1e47f76cc363d3426f489021e5b68cec70ee15ab9fadf67cb5",
+      "github_digest_matches": true
+    },
+    {
+      "name": "update-git-fd2125f63159.json",
+      "size": 1032,
+      "sha256": "f7ee583aff1367bd2c98d8be1e0a8ddf72684c558cfd3c0db1faddc2c8fe23a0",
+      "github_digest_matches": true
+    },
+    {
+      "name": "update-git-fd2125f63159.json.sig",
+      "size": 306,
+      "sha256": "830c0bccc314e6864d78ea2bcecee1bf8f690cbe890f8d22391699f8884a9f3b",
+      "github_digest_matches": true
+    },
+    {
+      "name": "zeusos-0.1.0-preview.2-git-fd2125f63159.oci",
+      "size": 1829006336,
+      "sha256": "e10d740d98186dc4eb26266b700eb81bbe22a6067feee79c5444beb4021c319e",
+      "github_digest_matches": true
+    }
+  ]
+}

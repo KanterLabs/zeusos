@@ -42,3 +42,8 @@ VM 115 provides Ethernet, display configuration and native power profiles. It ha
 no physical Wi-Fi/Bluetooth adapter, backlight or battery. Successful VM navigation
 does not qualify radio pairing, brightness adjustment, battery runtime or physical
 laptop suspend/resume; those checks remain in hardware qualification.
+
+The deployed **git-fd2125f63159** [receipt and screenshots](../iterations/git-fd2125f63159/README.md)
+record completed VM qualification, all 136 source tests, unchanged dependencies,
+matched metrics and preservation checks. The product version remains
+**0.1.0-preview.2**.

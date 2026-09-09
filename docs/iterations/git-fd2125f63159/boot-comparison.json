@@ -1,0 +1,42 @@
+{
+  "baseline": {
+    "raw_files": [
+      "baseline-cold-1.json",
+      "baseline-cold-2.json",
+      "baseline-cold-3.json"
+    ],
+    "os_samples_s": [
+      7.537,
+      7.343,
+      6.964
+    ],
+    "host_samples_s": [
+      19.004,
+      18.708,
+      18.68
+    ],
+    "os_median_s": 7.343,
+    "host_median_s": 18.708
+  },
+  "current": {
+    "raw_files": [
+      "cold-1.json",
+      "cold-2.json",
+      "cold-3.json"
+    ],
+    "os_samples_s": [
+      7.686,
+      7.901,
+      10.818
+    ],
+    "host_samples_s": [
+      18.755,
+      20.276,
+      27.868
+    ],
+    "os_median_s": 7.901,
+    "host_median_s": 20.276
+  },
+  "os_median_delta_s": 0.558,
+  "host_median_delta_s": 1.568
+}

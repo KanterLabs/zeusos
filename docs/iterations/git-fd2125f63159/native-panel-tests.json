@@ -1,0 +1,38 @@
+[
+  {
+    "destination": "network",
+    "started_at_utc": "2026-09-09T13:18:19.333743+00:00",
+    "native_last_panel": "'network'",
+    "screenshot": "panel-network.png"
+  },
+  {
+    "destination": "bluetooth",
+    "started_at_utc": "2026-09-09T13:18:22.360136+00:00",
+    "native_last_panel": "'bluetooth'",
+    "screenshot": "panel-bluetooth.png"
+  },
+  {
+    "destination": "display",
+    "started_at_utc": "2026-09-09T13:18:25.418512+00:00",
+    "native_last_panel": "'display'",
+    "screenshot": "panel-display.png"
+  },
+  {
+    "destination": "power",
+    "started_at_utc": "2026-09-09T13:18:28.451129+00:00",
+    "native_last_panel": "'power'",
+    "screenshot": "panel-power.png"
+  },
+  {
+    "destination": "sound",
+    "started_at_utc": "2026-09-09T13:18:31.457371+00:00",
+    "native_last_panel": "'sound'",
+    "screenshot": "panel-sound.png"
+  },
+  {
+    "destination": "background",
+    "started_at_utc": "2026-09-09T13:18:34.484150+00:00",
+    "native_last_panel": "'background'",
+    "screenshot": "panel-background.png"
+  }
+]

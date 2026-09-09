@@ -317,6 +317,90 @@ power behavior; no rollback cycle was run in this iteration.
 Raw evidence: [final README](iterations/git-17d205103f3a/README.md), [build
 info](iterations/git-17d205103f3a/build-info.json), [update manifest](iterations/git-17d205103f3a/update-git-17d205103f3a.json), [payload CI](iterations/git-17d205103f3a/payload-ci.json), [cold boot 1](iterations/git-17d205103f3a/cold-boot-1.json), [cold boot 2](iterations/git-17d205103f3a/cold-boot-2.json), [cold boot 3](iterations/git-17d205103f3a/cold-boot-3.json), [closed idle](iterations/git-17d205103f3a/idle-closed.json), [Updates-open idle](iterations/git-17d205103f3a/idle-updates-open.json), [native install timing](iterations/git-17d205103f3a/native-install-timing.json), [native update boot](iterations/git-17d205103f3a/native-update-boot.json), [status before check](iterations/git-17d205103f3a/installed-status-before-check.json), [checked status](iterations/git-17d205103f3a/checked-status.json), [staged bootc identity](iterations/git-17d205103f3a/staged-bootc.json), [booted bootc identity](iterations/git-17d205103f3a/booted-bootc.json), and [the earlier de0 outlier](iterations/git-de0d8baae5de/boot-final-3.json).
 
+### 2026-09-09 — laptop Settings, matched preview comparison
+
+- Recorded at (UTC): `2026-09-09T14:11:01.144645+00:00` (entry transcription)
+- Measurement date: `2026-09-09`; actual UTC bounds are retained in every raw JSON
+- Version: **0.1.0-preview.2** on both sides
+- Baseline: `git-17d205103f3a`, source `17d205103f3aa885fe682d06a724f37e805a15a2`
+- Candidate: `git-fd2125f63159`, source `fd2125f6315947d97292c4f3a250c3b91d742280`
+- Environment: VM 115, 4 vCPUs, 8 GiB RAM, 64 GiB disk, same Proxmox host and
+  software-rendered 1280x800 console. Builder VM 116 was stopped for both sets;
+  backup validation had finished before baseline collection. The shared host
+  was otherwise unisolated.
+- Protocol: three cold starts after graceful shutdown, followed by a fresh login
+  for closed-desktop idle. Idle used 20 seconds settling, 120 seconds sampling,
+  five-second intervals, awake display, Temp held at Never and no concurrent
+  guest tests or idle inhibitor. Candidate Settings-open idle followed closed
+  idle in the same session. Temp was restored to On boot after all test boots.
+
+| Cold start | Baseline OS (s) | Candidate OS (s) | Baseline host probe (s) | Candidate host probe (s) |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 7.537 | 7.686 | 19.004 | 18.755 |
+| 2 | 7.343 | 7.901 | 18.708 | 20.276 |
+| 3 | 6.964 | **10.818** | 18.680 | **27.868** |
+| Median | **7.343** | **7.901** | **18.708** | **20.276** |
+| Candidate minus baseline | — | **+0.558 s (+7.6%)** | — | **+1.568 s (+8.4%)** |
+
+OS startup is the systemd kernel/initrd/userspace total. The host probe measures
+`qm start` to an active GDM greeter using 0.5-second SSH polling; it includes
+firmware and probe overhead, not exact first-pixel presentation. Baseline cold
+measurements span `2026-09-09T13:01:26.285074190Z` through
+`2026-09-09T13:02:36.075113571Z`; candidate cold measurements span
+`2026-09-09T13:57:15.088313482Z` through `2026-09-09T13:58:33.798359405Z`.
+Consult the raw files for each trial's complete timestamps.
+
+The slower third candidate run is retained. Its
+[critical chain](iterations/git-fd2125f63159/cold-3-critical-chain.txt) and
+[unit timings](iterations/git-fd2125f63159/cold-3-blame.txt) show time in existing
+filesystem, D-Bus and NetworkManager startup. Settings adds no startup unit, but
+these traces do not isolate the cause of the slower run. No speedup is claimed.
+
+| Idle state | Measurement UTC bounds | CPU median | Memory median | Context switches | Processes started | Temp starts |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Baseline closed | `2026-09-09T13:04:16.336849753Z` → `2026-09-09T13:06:16.347699765Z` | 0.125% | 957.1 MiB | 123.9 /s | 4 | 0 |
+| Candidate closed | `2026-09-09T13:59:57.166298170Z` → `2026-09-09T14:01:57.178210446Z` | 0.150% | 954.2 MiB | 125.3 /s | 3 | 0 |
+| Candidate Settings open | `2026-09-09T14:03:10.289495250Z` → `2026-09-09T14:05:10.299693047Z` | 0.125% | 1021.3 MiB | 126.9 /s | 8 | 0 |
+
+Closed idle changed by **+0.025 CPU percentage points / -2.9 MiB**. Settings open
+used **67.1 MiB** more whole-guest memory than closed in this pair of windows;
+CPU variation is too small to assign a causal improvement. The planned review
+thresholds (+0.25 CPU percentage points, +64 MiB closed memory, +1 s median OS
+startup) were not exceeded. Three boot trials and one idle window per state do
+not establish a statistically robust performance result. All samples are kept.
+
+The RPM inventory remained byte-identical at **1,011 packages**. The full OCI
+archive grew from **1,828,931,072** to **1,829,006,336 bytes**, a **75,264-byte
+(73.5 KiB)** increase. No new package, background service, timer or recurring
+status refresh was introduced. Closing Settings ends its process.
+
+Native installation ran from `2026-09-09T13:53:38Z` to `2026-09-09T13:54:58Z`
+and took **79.701 s**, including authentication entry,
+metadata fetch, download, staging and up to three seconds of status-probe
+overhead. The explicit warm update reboot ran from
+`2026-09-09T13:55:57.124166+00:00` to `2026-09-09T13:56:24.815048+00:00`,
+taking **27.691 s** to changed boot ID and SSH/GDM readiness;
+OS startup was **10.410 s**. These are separate one-sample update observations.
+
+No physical battery, energy, suspend-drain or radio measurement was possible on
+this VM. No new installer or VM rollback cycle was tested. The populated backup,
+owner-file hashes, original preferences and restored Temp policy are recorded in
+the [iteration receipt](iterations/git-fd2125f63159/README.md).
+
+Raw evidence: [baseline boot 1](iterations/git-fd2125f63159/baseline-cold-1.json),
+[baseline boot 2](iterations/git-fd2125f63159/baseline-cold-2.json),
+[baseline boot 3](iterations/git-fd2125f63159/baseline-cold-3.json),
+[candidate boot 1](iterations/git-fd2125f63159/cold-1.json),
+[candidate boot 2](iterations/git-fd2125f63159/cold-2.json),
+[candidate boot 3](iterations/git-fd2125f63159/cold-3.json),
+[baseline idle](iterations/git-fd2125f63159/baseline-idle-closed.json),
+[candidate idle](iterations/git-fd2125f63159/idle-closed.json),
+[Settings-open idle](iterations/git-fd2125f63159/idle-settings-open.json),
+[comparison](iterations/git-fd2125f63159/performance-comparison.json),
+[image cost](iterations/git-fd2125f63159/image-cost.json),
+[install timing](iterations/git-fd2125f63159/native-install-timing.json), and
+[update reboot](iterations/git-fd2125f63159/native-update-boot.json).
+
 ## Entry template
 
 Insert this compact block immediately above the Entry template section for every

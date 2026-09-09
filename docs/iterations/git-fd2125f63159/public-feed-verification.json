@@ -1,0 +1,12 @@
+[
+  {
+    "file": "preview.json",
+    "sha256": "f7ee583aff1367bd2c98d8be1e0a8ddf72684c558cfd3c0db1faddc2c8fe23a0",
+    "public_bytes_match": true
+  },
+  {
+    "file": "preview.json.sig",
+    "sha256": "830c0bccc314e6864d78ea2bcecee1bf8f690cbe890f8d22391699f8884a9f3b",
+    "public_bytes_match": true
+  }
+]

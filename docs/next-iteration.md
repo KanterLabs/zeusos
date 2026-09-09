@@ -1,9 +1,10 @@
 # Next Zeus OS additions
 
 Planned on **2026-09-09 UTC**, after the deployed `git-17d205103f3a` build.
-Shane selected **everyday laptop controls** for the next implementation. Settings
-is the active next slice; search and Apps remain unclaimed Backlog work.
-This planning document does not report new implementation or VM deployment.
+Shane selected **everyday laptop controls**. Zeus Settings is now implemented
+and deployed to VM 115 as **git-fd2125f63159**; search and Apps remain unclaimed
+Backlog work. The [Settings receipt](iterations/git-fd2125f63159/README.md) records
+the native checks, signed update, screenshots and measured results.
 Continue using **0.1.0-preview.2** with a separate Git build ID for each payload.
 
 The next goal is easier everyday use while preserving the attractive desktop,
@@ -13,7 +14,7 @@ and actual VM screenshots.
 
 | Order | Feature | What Shane will be able to do | Helm |
 | --- | --- | --- | --- |
-| 1 | Zeus Settings | Reach laptop controls, appearance, Temp and Updates from one compact window. | ZOS-67 |
+| Delivered | Zeus Settings | Reach laptop controls, appearance, Temp and Updates from one compact window. | ZOS-67 |
 | 2 | Better search | Press Super+Space and find a setting or useful shortcut as well as an app. | ZOS-68 |
 | 3 | Apps | Browse a small app catalog and explicitly install, update or remove optional apps. | ZOS-69 |
 
@@ -37,30 +38,34 @@ from the [package list](../image/packages.txt),
 
 **Implementation checklist**
 
-- [ ] Add a small native window matching the existing light/dark style, spacing,
+- [x] Add a small native window matching the existing light/dark style, spacing,
   icons and compact window controls.
-- [ ] Provide Appearance, Network/Wi-Fi, Bluetooth, Sound, Displays and Power
+- [x] Provide Appearance, Network/Wi-Fi, Bluetooth, Sound, Displays and Power
   destinations that open the corresponding installed GNOME panels. Determine
   supported panel IDs from the built image; retain a native Settings fallback.
-- [ ] Link to the existing Temp and Updates apps and show local version/build
+- [x] Link to the existing Temp and Updates apps and show local version/build
   information. Opening Settings must not check the network or install updates.
-- [ ] Expose the window through Welcome, the Zeus menu and application search.
+- [x] Expose the window through Welcome, the Zeus menu and application search.
   Keep a clear route to all native GNOME settings.
-- [ ] Handle missing hardware/panels honestly. Use native controls for changing
+- [x] Handle missing hardware/panels honestly. Use native controls for changing
   preferences; avoid new hardware daemons or recurring status polling.
 
 **Testing checklist**
 
-- [ ] Open every destination from the actual GNOME session; verify repeated
+- [x] Open every destination from the actual GNOME session; verify repeated
   activation, focus, keyboard navigation and missing-panel fallback.
-- [ ] Review screenshots in light/dark at 100% and 200% scale. Check readable
+- [x] Review screenshots in light/dark at 100% and 200% scale. Check readable
   labels, accessible names and comfortable click targets.
-- [ ] Compare owner preferences, Temp policy, permanent-file hashes and staged
+- [x] Compare owner preferences, Temp policy, permanent-file hashes and staged
   update state before/after opening and closing the window: all must be unchanged.
-- [ ] Complete the shared performance and deployment checks below. Mark physical
+- [x] Complete the shared performance and deployment checks below. Mark physical
   Wi-Fi, Bluetooth and battery behavior as pending hardware qualification.
 
-Likely code scope: a native app and desktop entry under `desktop/rootfs`,
+Missing-panel fallback is covered by source fixtures; all native destinations
+are present in the installed image. Physical radios, brightness adjustment,
+battery life and laptop suspend/resume remain **pending hardware qualification**.
+
+Implemented code scope: a native app and desktop entry under `desktop/rootfs`,
 Welcome's launchers, and the Zeus menu in the existing shell extension.
 
 ## 2. Better Super+Space search — ZOS-68
@@ -132,31 +137,32 @@ Likely code scope: image packages, a native Apps app and backend adapter under
 
 ## Shared performance and preview checks
 
-These are acceptance checks for future builds, not new measured results.
+The checks below are complete for **Settings / git-fd2125f63159**. Repeat them
+for each future search or Apps build; these marks do not qualify those features.
 
-- [ ] Keep the current version and build only on dedicated builder VM 116.
-- [ ] Run relevant source checks and native UI tests for the changed feature.
+- [x] Keep the current version and build only on dedicated builder VM 116.
+- [x] Run relevant source checks and native UI tests for the changed feature.
   Check that safe desktop mode, native login and existing shortcuts still work.
-- [ ] Measure three cold boots and a closed-app idle run on the same 4-vCPU/8-GiB
+- [x] Measure three cold boots and a closed-app idle run on the same 4-vCPU/8-GiB
   VM, with the builder stopped and matched login, workload and collection settings.
   Use 20 seconds settling and 120 seconds sampling for idle, as in recent entries.
-- [ ] Record UTC timestamps, source/build, conditions, raw evidence, dependencies,
+- [x] Record UTC timestamps, source/build, conditions, raw evidence, dependencies,
   image size, boot medians, CPU, memory and process activity in the append-only
   [metrics history](metrics.md). Separate OS boot time from host-start-to-ready time.
-- [ ] Investigate persistent regressions greater than **0.25 CPU percentage
+- [x] Investigate persistent regressions greater than **0.25 CPU percentage
   points**, **64 MiB closed-app idle memory**, or **1 second median OS boot time**
   before promotion. These are new review thresholds, not measured improvements.
   Remeasure under matched conditions; document a fix or an explicit tradeoff.
-- [ ] Require no new recurring Zeus background work for Settings or closed search,
+- [x] Require no new recurring Zeus background work for Settings or closed search,
   and no scheduled Apps catalog/update work. Preserve existing user power choices.
-- [ ] Before each preview deployment, verify a fresh backup and record owner-file,
+- [x] Before each preview deployment, verify a fresh backup and record owner-file,
   preference and Temp-policy preservation checkpoints. Update the existing VM 115
   through the signed updater; never reseed or replace the owner's VM.
-- [ ] Verify the booted build and native UI, attach real screenshots, and report
+- [x] Verify the booted build and native UI, attach real screenshots, and report
   remaining limits. The VM does not establish physical battery life, radio behavior
   or laptop suspend/resume reliability.
 
 The current observations are recorded in the
-[deployed iteration receipt](iterations/git-17d205103f3a/README.md).
+[deployed iteration receipt](iterations/git-fd2125f63159/README.md).
 Production release policy, the encrypted installer, remote development workflow
 and physical laptop qualification retain their separate backlog scope.

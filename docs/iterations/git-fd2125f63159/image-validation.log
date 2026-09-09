@@ -1,0 +1,8 @@
+/validation/validate-desktop.py:25: PyGIDeprecationWarning: Gio.DesktopAppInfo is deprecated; use GioUnix.DesktopAppInfo instead
+  assert Gio.DesktopAppInfo.new(desktop_id), f'Missing favorite launcher: {desktop_id}'
+Validated 82 desktop settings against installed GNOME schemas.
+GTK 3.0 theme parsed without CSS errors.
+GTK 4.0 theme parsed without CSS errors.
+<stdin>:11: PyGIDeprecationWarning: Gio.DesktopAppInfo is deprecated; use GioUnix.DesktopAppInfo instead
+<stdin>:18: PyGIDeprecationWarning: Gio.DesktopAppInfo is deprecated; use GioUnix.DesktopAppInfo instead
+Native Settings imports, CSS, executable, icon, panel launchers and build identity verified.

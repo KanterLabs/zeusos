@@ -1,0 +1,8 @@
+{
+  "measurement_started_at_utc": "2026-09-09T13:57:15.088313482Z",
+  "measurement_ended_at_utc": "2026-09-09T13:57:34.033320035Z",
+  "cold_start_to_active_greeter_s": 18.755,
+  "first_ssh_s": 18.755,
+  "systemd_analyze": "Startup finished in 1.570s (kernel) + 2.499s (initrd) + 3.616s (userspace) = 7.686s \ngraphical.target reached after 3.614s in userspace.",
+  "measurement": "Host qm start command to active GDM greeter; SSH polling interval0.5s; includes firmware and probe overhead"
+}

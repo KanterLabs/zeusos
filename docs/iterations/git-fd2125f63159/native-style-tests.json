@@ -1,0 +1,10 @@
+{
+  "tested": [
+    "dark 1280x800 at 100%",
+    "dark 1920x1440 at 200%",
+    "light 1920x1440 at 200%"
+  ],
+  "display_change": "temporary Mutter configuration",
+  "restored_original_display": true,
+  "restored_original_color_scheme": true
+}

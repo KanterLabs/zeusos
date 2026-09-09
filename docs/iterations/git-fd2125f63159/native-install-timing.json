@@ -1,0 +1,7 @@
+{
+  "start_utc": "2026-09-09T13:53:38Z",
+  "start_epoch_ns": 1788962018457252537,
+  "definition": "Immediately before clicking native Install Update, includes authentication, fetch, download, staging and three-second status probe overhead.",
+  "end_utc": "2026-09-09T13:54:58Z",
+  "duration_seconds": 79.701
+}

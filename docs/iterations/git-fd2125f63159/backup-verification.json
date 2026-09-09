@@ -1,0 +1,11 @@
+{
+  "recorded_at_utc": "2026-09-09T13:01:42.222278+00:00",
+  "backup_path": "/mnt/pve/sata-ssd/zeusos/backups/settings-20260909/vzdump-qemu-115-2026_09_09-03_53_43.vma.zst",
+  "vmid": 115,
+  "method": "New snapshot-mode vzdump in a dedicated keep-all directory; zstd test, decompression to dedicated scratch file, vma verify, scratch cleanup",
+  "zstd_exit_code": 0,
+  "vma_exit_code": 0,
+  "verification_sequence_exit_code": 0,
+  "restore_performed": false,
+  "limits": "Archive integrity verification, not an isolated restore; archive filename uses the Proxmox host clock."
+}

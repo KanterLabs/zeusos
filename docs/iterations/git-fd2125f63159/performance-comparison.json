@@ -1,0 +1,55 @@
+{
+  "recorded_at_utc": "2026-09-09T14:11:01.144645+00:00",
+  "boot": {
+    "baseline": {
+      "raw_files": [
+        "baseline-cold-1.json",
+        "baseline-cold-2.json",
+        "baseline-cold-3.json"
+      ],
+      "os_samples_s": [
+        7.537,
+        7.343,
+        6.964
+      ],
+      "host_samples_s": [
+        19.004,
+        18.708,
+        18.68
+      ],
+      "os_median_s": 7.343,
+      "host_median_s": 18.708
+    },
+    "current": {
+      "raw_files": [
+        "cold-1.json",
+        "cold-2.json",
+        "cold-3.json"
+      ],
+      "os_samples_s": [
+        7.686,
+        7.901,
+        10.818
+      ],
+      "host_samples_s": [
+        18.755,
+        20.276,
+        27.868
+      ],
+      "os_median_s": 7.901,
+      "host_median_s": 20.276
+    },
+    "os_median_delta_s": 0.558,
+    "host_median_delta_s": 1.568
+  },
+  "closed_idle_cpu_delta_percentage_points": 0.025,
+  "closed_idle_memory_delta_mib": -2.9,
+  "settings_open_minus_closed_memory_mib": 67.1,
+  "review_thresholds": {
+    "max_cpu_delta_percentage_points": 0.25,
+    "max_closed_idle_memory_delta_mib": 64,
+    "max_os_boot_median_delta_s": 1
+  },
+  "thresholds_exceeded": false,
+  "limits": "Matched VM settings and collection protocol, shared host otherwise unisolated; three cold starts per image and one idle window per state. Slower third candidate boot retained and traced. No statistical speedup or physical battery claim."
+}

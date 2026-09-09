@@ -1,0 +1,5 @@
+{
+  "changed_keys": [],
+  "native_panel_key_restored": "settings-daemon/plugins/color/night-light-schedule-automatic",
+  "note": "Native panel testing changed an unset scheduling preference to false; exact unset state was restored. Original display mode, color scheme, native panel navigation state and Zeus styling were also restored."
+}

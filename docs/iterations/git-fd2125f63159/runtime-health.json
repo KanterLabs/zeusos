@@ -1,0 +1,66 @@
+{
+  "checked_at_utc": "2026-09-09T14:08:41.618651+00:00",
+  "build_id": "git-fd2125f63159",
+  "selinux": "Enforcing",
+  "secure_boot": "SecureBoot enabled",
+  "failed_system_units": [],
+  "failed_user_units": [],
+  "install_service": "ActiveState=inactive\nUnitFileState=static\nExecMainStatus=0",
+  "temp_timer": "ActiveState=inactive",
+  "installed_updater_status": {
+    "schema_version": 1,
+    "ok": true,
+    "state": "up_to_date",
+    "current": {
+      "version": "0.1.0-preview.2",
+      "build_id": "git-fd2125f63159",
+      "source_commit": "fd2125f6315947d97292c4f3a250c3b91d742280",
+      "sequence": 1788960729
+    },
+    "candidate": {
+      "version": "0.1.0-preview.2",
+      "build_id": "git-fd2125f63159",
+      "source_commit": "fd2125f6315947d97292c4f3a250c3b91d742280",
+      "sequence": 1788960729,
+      "published_at": "2026-09-09T13:40:18Z",
+      "notes": "Open Zeus Settings from Welcome, the Zeus menu, or application search for quick access to network, Bluetooth, displays, power, sound and appearance. Temp and Updates are together in the same compact window. Hardware availability and brightness guidance reflect your device. This iteration adds no packages, background services or scheduled work. The preview version remains unchanged.\n",
+      "archive_size": 1829006336,
+      "archive_sha256": "e10d740d98186dc4eb26266b700eb81bbe22a6067feee79c5444beb4021c319e",
+      "image_digest": "sha256:ae59a68dbfc9eb6f5f22fe7000f1073b266d578b49cb2c7d490ab38975dd023f"
+    },
+    "progress": null,
+    "message": "The selected update is installed.",
+    "error": null,
+    "checked_at": "2026-09-09T13:47:57Z"
+  },
+  "power_profile": "balanced",
+  "installed_files": [
+    {
+      "path": "/usr/libexec/zeus-settings-window",
+      "sha256": "e6643f9fa59f53be2c2fb11ba1ceb7af9fa2e89f63bbb0c01392efbf5aa077da",
+      "matches_payload_source": true
+    },
+    {
+      "path": "/usr/lib/zeus/settings_model.py",
+      "sha256": "6227d1e8325fc08217bfa1dddfc0a76890294c19fc727005c6386844f406d5ab",
+      "matches_payload_source": true
+    },
+    {
+      "path": "/usr/share/applications/org.zeus.Settings.desktop",
+      "sha256": "66cbb84b87a78504ab8016edf1aa5fe807481e6a16f3014d34232cdb57db9dd7",
+      "matches_payload_source": true
+    },
+    {
+      "path": "/usr/share/icons/hicolor/scalable/apps/org.zeus.Settings.svg",
+      "sha256": "8c72c8368cf14e46b59c61cf66e8d10ee9f7bd291ecc7369fdbab7550c4ebf44",
+      "matches_payload_source": true
+    },
+    {
+      "path": "/usr/share/gnome-shell/extensions/zeus-shell@kanterlabs/extension.js",
+      "sha256": "935b35e630bb84b78601a9285cd79dbf2ba61748346917757272f11c626b22ae",
+      "matches_payload_source": true
+    }
+  ],
+  "settings_launcher_mode": "755",
+  "test_idle_inhibitor_units": []
+}

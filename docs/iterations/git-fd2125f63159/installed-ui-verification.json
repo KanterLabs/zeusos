@@ -1,0 +1,19 @@
+{
+  "checked_at_utc": "2026-09-09T14:11:01.144645+00:00",
+  "build_id": "git-fd2125f63159",
+  "zeus_menu_launch": true,
+  "search_launch": true,
+  "welcome_reuses_existing_settings_pid": true,
+  "welcome_focus_visually_verified": true,
+  "power_destination": "'power'",
+  "styles_verified": [
+    "light 1280x800 at 100%",
+    "dark 1280x800 at 100%",
+    "dark 1920x1440 at 200%",
+    "light 1920x1440 at 200%, scrolled tools and build footer visible"
+  ],
+  "window_exit_after_close": true,
+  "original_display_and_color_scheme_restored": true,
+  "final_owner_preferences_changed": [],
+  "native_source_qualification": "Six GNOME destinations, Temp, Updates, keyboard navigation, repeat activation and safe desktop tested from temporary candidate source before image deployment; final installed file hashes match the validated payload source. Missing-panel fallback uses source fixtures; all panels are installed in the built image."
+}

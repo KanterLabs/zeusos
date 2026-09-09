@@ -45,18 +45,29 @@ existing preview installation. A new Preview 2 QCOW2/installer was not built;
 updates were manually verified and applied, with no unattended registry
 channel configured.
 
-## Latest signed Updates iteration
+## Signed Updates iteration
 
 The same-version build `git-17d205103f3a` was subsequently installed through
 native Welcome → **Open Updates** on VM 115 and applied after an explicit
 reboot. The booted manifest is
 `sha256:4da2b1c5bdba3d5e0451e5f36389d3238bdf739a976951bca11b925f5e9d133d`,
 and the previous build `git-1a34bbfe8509` remains available for rollback. The
-post-reboot status reported `The selected update is installed.` The [latest
+post-reboot status reported `The selected update is installed.` The [Updates
 iteration receipt](../iterations/git-17d205103f3a/README.md) records the signed
 asset gates and native evidence. CI run `34343529224` passed 123 Python tests;
 no rollback cycle was run. See the [timestamped metrics history](../metrics.md)
 for runtime observations; physical battery remains unmeasured on this VM.
+
+## Latest laptop Settings iteration
+
+Build **git-fd2125f63159** now runs on VM 115, still **0.1.0-preview.2**. It adds
+the compact native **Zeus Settings** home, with network, Bluetooth, display,
+power, sound, appearance, Temp and Updates destinations and local hardware
+availability. Welcome, the Zeus menu and application search can open it. It adds
+no packages or persistent background work. The [Settings receipt and
+screenshots](../iterations/git-fd2125f63159/README.md) record the signed native
+installation, retained `git-17d205103f3a` rollback image, preservation checks and
+matched measurements. Physical laptop controls remain pending hardware testing.
 
 ## Idle measurement
 
