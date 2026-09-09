@@ -668,7 +668,7 @@ class UpdatesWindow(Adw.ApplicationWindow):
         hero.append(self._label("Keep Zeus OS up to date", "hero-title"))
         hero.append(
             self._label(
-                "Review signed updates here. Installing stages the verified image for a restart you choose.",
+                "Get the latest improvements. Install now and restart when you are ready.",
                 "hero-copy",
                 wrap=True,
             )
@@ -696,7 +696,7 @@ class UpdatesWindow(Adw.ApplicationWindow):
         self._status_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self._status_card.add_css_class("status-card")
         status_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        self._status_icon = Gtk.Image.new_from_icon_name("system-software-update-symbolic")
+        self._status_icon = Gtk.Image.new_from_icon_name("view-refresh-symbolic")
         self._status_icon.set_pixel_size(28)
         self._status_icon.add_css_class("status-icon")
         status_row.append(self._status_icon)
@@ -1202,6 +1202,13 @@ class UpdatesWindow(Adw.ApplicationWindow):
             description = self._operation_notice
         self._status_heading.set_text(heading)
         self._status_description.set_text(description)
+        if state in {"up_to_date", "ready"}:
+            status_icon_name = "emblem-ok-symbolic"
+        elif state in {"error", "interrupted"}:
+            status_icon_name = "dialog-warning-symbolic"
+        else:
+            status_icon_name = "view-refresh-symbolic"
+        self._status_icon.set_from_icon_name(status_icon_name)
         checked_at = _text(status.get("checked_at"))
         self._status_meta.set_text(f"Last checked {_format_timestamp(checked_at)}" if checked_at else "")
 

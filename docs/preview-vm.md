@@ -24,10 +24,11 @@ preview candidates.
 | Security observed | Secure Boot enabled and SELinux enforcing |
 | Build guest | VM **116**, builder address `10.0.0.56` |
 
-The Proxmox host and the guest are private-network resources. No public SSH,
-registry, or update endpoint is part of this preview. Use the Proxmox console
-for the native GDM path and `ssh shane@10.0.0.95` for non-GUI checks when the
-address is current.
+The Proxmox host and the guest are private-network resources. The owner-triggered
+updater reads a public, signed preview feed and immutable release assets, but
+that publication path does not expose SSH, Proxmox, VM, or guest access. Use the
+Proxmox console for the native GDM path and `ssh shane@10.0.0.95` for non-GUI
+checks when the address is current.
 
 ## Safety boundaries
 
@@ -44,11 +45,16 @@ address is current.
 - Keep the review guest's owner files and settings across candidates. A
   Proxmox snapshot is a convenience point and is not a backup. Verify the
   backup gate below before any update or state migration.
-- The image has no qualified registry or unattended signed update channel.
-  Candidate changes are manually verified, manually staged, and explicitly
-  rebooted. `sudo zeus update status` and `sudo bootc status` are read-only.
-  Bootc status requires root in this preview; an unprivileged doctor report
-  reports that limitation without elevating itself.
+- Native Updates end-to-end qualification is still pending for the current
+  updater-capable candidate `git-21a465760f53`. Until that qualification is
+  recorded, candidate changes use the manual bootstrap path below. There is no
+  unattended update or automatic reboot.
+- The first updater-capable image is a bootstrap transition for this populated
+  guest. After it is installed and qualified, normal future owner-triggered
+  updates use Welcome → Software Updates or the `zeus update` commands. Keep the
+  manual bootc and rollback procedure as the recovery fallback.
+- Bootc status on an older bootstrap image requires root; an unprivileged doctor
+  report records that limitation without elevating itself.
 
 ## One-time owner provisioning
 
@@ -102,13 +108,39 @@ The current local desktop actions are also reversible and narrow:
 ```sh
 zeus desktop safe       # disable Zeus shell/dock and managed GTK imports
 zeus desktop restore    # restore the Zeus presentation
-sudo zeus update status  # read-only bootc status; no reboot
+zeus update status --json  # local updater state; read-only and no reboot
+zeus update check --json   # fetch signed metadata only; no image download
 /usr/libexec/zeus-welcome
 ```
 
 The safe action checks for a usable `ptyxis`/GNOME terminal before changing the
 dock and leaves credentials, personal files, wallpaper, and user preferences
 in place. The stock GNOME shell and native authentication remain available.
+
+## Normal future Updates path
+
+Use this path after the first updater-capable image has been installed and the
+native flow has been qualified. Open Welcome → **Software Updates** (or launch
+the **Updates** application from GNOME search), or use the equivalent CLI:
+
+```sh
+zeus update status --json   # read local state
+zeus update check --json    # fetch and verify the small signed feed metadata
+zeus update install --json  # request owner authentication and start the job
+```
+
+`install` invokes `pkexec` for Polkit authentication, then starts the
+background root systemd service. The verified image is downloaded and staged
+for the next restart; closing the window does not cancel that service. It never
+reboots on its own. When the Updates window reports **Ready**, save work and use its
+**Restart to Apply** action, which goes through the native GNOME confirmation.
+If Temp is set to **On boot**, its eligible-file cleanup also runs for that
+update reboot.
+
+The implementation and command contract are recorded in the
+[updater feature notes](features/os-updater.md). Use the manual procedure below
+for bootstrap, recovery, or any image where the Updates app is not yet
+qualified.
 
 ## Building a candidate
 
@@ -151,12 +183,18 @@ repo_dir=/path/to/zeusos
 Run the signature check from an independently obtained checkout or verification
 host and retain the command output. A checksum file must be updated for the
 candidate before this gate is considered complete; an old valid signature does
-not authenticate a new artifact.
+not authenticate a new artifact. The separate feed publication and
+`zeusos-update` signature procedure is documented in the
+[iteration build policy](iteration-builds.md#signed-preview-update-publication).
+Complete the source, image, signature, and release-asset gates before updating
+the feed; native qualification is a separate handoff gate.
 
-## Updating the populated guest
+## Bootstrap and manual update path
 
-Do the following in order. Stop and keep the current deployment if any gate
-fails.
+This is the historical manual path for the first updater-capable image and for
+recovery. Use a verified root-owned OCI archive with bootc for bootstrap, and
+retain this path as the fallback after normal Updates use is available. Do the
+following in order. Stop and keep the current deployment if any gate fails.
 
 1. Confirm the guest is VM 115 and capture the current `zeus doctor --json`,
    `bootc status`, owner-file inventory, and candidate identifier. Do not run a
@@ -208,6 +246,9 @@ fails.
    ```sh
    sudo systemctl reboot
    ```
+
+   This restart is explicit. If Temp uses the **On boot** policy, its eligible
+   cleanup also applies to this update reboot.
 
 6. After GDM returns, run `zeus doctor --json`, verify owner files and the
    desktop smoke matrix, and retain the previous deployment until the candidate

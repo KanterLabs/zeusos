@@ -220,7 +220,7 @@ class UpdateWindowLogic(unittest.TestCase):
         desktop = DESKTOP.read_text(encoding="utf-8")
         self.assertIn("Name=Updates", desktop)
         self.assertIn("Exec=/usr/libexec/zeus-update-window", desktop)
-        self.assertIn("Icon=system-software-update", desktop)
+        self.assertIn("Icon=org.zeus.Updates", desktop)
         self.assertIn("Categories=GTK;GNOME;Settings;System;", desktop)
         self.assertNotIn("Terminal=true", desktop)
 

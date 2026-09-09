@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title description">
+  <title id="title">Zeus Updates</title>
+  <desc id="description">A rounded indigo tile with a luminous upward update arrow surrounded by a circular progress arc.</desc>
+  <defs>
+    <linearGradient id="tile" x1="28" y1="16" x2="228" y2="240" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6888EE"/>
+      <stop offset="0.48" stop-color="#3C51B0"/>
+      <stop offset="1" stop-color="#30266D"/>
+    </linearGradient>
+    <linearGradient id="arc" x1="65" y1="64" x2="194" y2="205" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F0F7FF"/>
+      <stop offset="0.42" stop-color="#B5D5FF"/>
+      <stop offset="1" stop-color="#D7A4F5"/>
+    </linearGradient>
+    <linearGradient id="arrow" x1="106" y1="89" x2="161" y2="188" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.58" stop-color="#D9ECFF"/>
+      <stop offset="1" stop-color="#9AB8FF"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="38%" r="68%">
+      <stop offset="0" stop-color="#AFC7FF" stop-opacity="0.24"/>
+      <stop offset="1" stop-color="#8194EB" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-25%" y="-25%" width="150%" height="155%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8" result="blur"/>
+      <feOffset dy="8" result="offset"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.28"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="10" y="10" width="236" height="236" rx="58" fill="url(#tile)"/>
+  <rect x="10" y="10" width="236" height="236" rx="58" fill="url(#glow)"/>
+  <path d="M33 75C59 35 101 19 148 26C197 33 227 62 239 105V170C225 214 186 237 130 240C76 240 37 218 20 180V116C22 100 26 86 33 75Z" fill="#FFFFFF" fill-opacity="0.06"/>
+  <g filter="url(#shadow)">
+    <circle cx="128" cy="132" r="77" fill="#111F55" fill-opacity="0.38" stroke="#D4E6FF" stroke-opacity="0.15" stroke-width="3"/>
+    <path d="M184 103A61 61 0 1 0 190 145" fill="none" stroke="url(#arc)" stroke-width="15" stroke-linecap="round"/>
+    <path d="M173 75H205V107" fill="none" stroke="url(#arc)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M128 183V101M96 133L128 101L160 133" fill="none" stroke="url(#arrow)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M94 190H162" stroke="#E9F4FF" stroke-opacity="0.72" stroke-width="9" stroke-linecap="round"/>
+  </g>
+  <circle cx="57" cy="57" r="3" fill="#D8ECFF" fill-opacity="0.76"/>
+  <circle cx="202" cy="204" r="3" fill="#D6B9FF" fill-opacity="0.64"/>
+</svg>

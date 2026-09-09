@@ -455,6 +455,15 @@ class WelcomeWindow(Adw.ApplicationWindow):
         self._launch_command(["gnome-control-center"], "Settings")
 
     def _open_updates(self, _button):
+        desktop = Gio.DesktopAppInfo.new(f"{UPDATES_APPLICATION_ID}.desktop")
+        if desktop is not None:
+            try:
+                # Give GNOME the user activation context so an existing Updates
+                # window can come forward on Wayland after this button click.
+                desktop.launch([], self.get_display().get_app_launch_context())
+            except GLib.Error as error:
+                self._show_toast(f"Could not open Software Updates: {error.message}")
+            return
         self._launch_command(["/usr/libexec/zeus-update-window"], "Software Updates")
 
     def _open_terminal(self, _button):
