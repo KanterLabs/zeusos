@@ -1,6 +1,8 @@
 # AirPods support
 
-Status: **ZOS-70 is in progress**. AirPods are a priority device for Zeus OS.
+Status: **ZOS-70 is awaiting the target model and Bluetooth-equipped test
+hardware**. The software readiness gate is implemented and verified; the broader
+AirPods support outcome remains incomplete.
 The currently deployed image is `git-fd2125f63159`; this document is an
 implementation and qualification contract, not a claim of a tested AirPods pair.
 Continue iterating **0.1.0-preview.2** with separate build IDs.
@@ -31,7 +33,7 @@ Continue iterating **0.1.0-preview.2** with separate build IDs.
   assess ordinary listening and calls across models without promising parity.
 - [x] Review native-stack gaps and current upstream control implementations;
   retain native audio and scope the optional control adapter separately.
-- [ ] Gate image builds on the existing audio executables and loadable AAC,
+- [x] Gate image builds on the existing audio executables and loadable AAC,
   SBC, CVSD and mSBC plugins, with regression coverage for failures.
 - [ ] Implement supported controls with clear missing-adapter, disconnected,
   busy, unavailable-profile and unsupported-model states.
@@ -44,7 +46,7 @@ Continue iterating **0.1.0-preview.2** with separate build IDs.
 - [ ] Exercise native UI and backend success/failure transitions with bounded
   fixtures, including disappearing devices and repeated actions.
 - [x] Verify actual installed dependencies and native audio policy values.
-- [ ] Validate the new readiness gate against the installed VM and an image build.
+- [x] Validate the new readiness gate against the installed VM and an image build.
 - [ ] Compare owner settings, audio/pairing state and populated-file hashes before
   and after the change; preserve a verified pre-update backup and retained rollback.
 - [ ] Measure dependency/image cost and closed/active idle activity. Record dated
@@ -140,9 +142,25 @@ inventory and WirePlumber settings. The focused suite covers missing AAC, missin
 headset codecs, missing audio programs, Fedora's PipeWire symlink, a real loader
 subprocess, loader failure/timeout, and forbidden fixture execution.
 
+The [dedicated-builder result](airpods/builder-check.json) confirms the actual
+Containerfile gate passed for `git-9b2977112916`, still version
+`0.1.0-preview.2`. Its package inventory matches the deployed image exactly at
+1,011 packages, and the checker is absent from the final filesystem. Bootc lint
+reported 10 checks passed, one skipped and three warnings concerning runtime
+directories, package-manager logs and `/var` content; see the retained
+[lint excerpt](airpods/builder-lint.txt).
+[Source CI](https://github.com/KanterLabs/zeusos/actions/runs/34390942069)
+passed both `image-policy` and `cli` jobs. The dated inventory and limits are also
+recorded in [metrics.md](../metrics.md).
+
 No new runtime feature has been deployed for this work. The owner VM remains on
 `git-fd2125f63159`, with no reboot or changed audio preferences. Physical pairing,
 audio, microphone, battery and noise-control results remain pending.
+
+To resume hardware qualification, record the AirPods model/firmware and use a
+Bluetooth-equipped laptop or attach an available Bluetooth controller to VM 115.
+Neither VM 115 nor the current Proxmox host exposed a controller during this
+inspection. ZOS-71 remains unclaimed until the advanced-control work is started.
 
 ## Upstream references
 

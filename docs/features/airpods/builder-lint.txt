@@ -1,0 +1,26 @@
+Lint warning: nonempty-run-tmp: Found content in runtime-only directories (/run, /tmp):
+  /run/cloud-init
+  /run/dnf
+
+Lint warning: var-log: Found non-empty logfiles:
+  /var/log/dnf5.log
+  /var/log/dnf5.log.1
+
+Lint warning: var-tmpfiles: Found content in /var missing systemd tmpfiles.d entries:
+  d /var/cache/libX11 0755 root root - -
+  d /var/cache/libX11/compose 0755 root root - -
+  d /var/cache/libdnf5 0755 root root - -
+  d /var/cache/swcatalog 0755 root root - -
+  d /var/cache/swcatalog/cache 0755 root root - -
+  ...and 12 more
+Found non-directory/non-symlink files in /var:
+  var/lib/dnf/repos/updates-3cc07c89a20302f2/countme
+  var/lib/dnf/repos/fedora-cff72538bc9825a4/countme
+  var/cache/swcatalog/cache/C-os-catalog.xb
+  var/cache/swcatalog/cache/C-local-metainfo.xb
+  var/cache/ldconfig/aux-cache
+  ...and 2 more
+
+Checks passed: 10
+Checks skipped: 1
+Warnings: 3

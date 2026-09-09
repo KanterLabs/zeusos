@@ -401,6 +401,39 @@ Raw evidence: [baseline boot 1](iterations/git-fd2125f63159/baseline-cold-1.json
 [install timing](iterations/git-fd2125f63159/native-install-timing.json), and
 [update reboot](iterations/git-fd2125f63159/native-update-boot.json).
 
+### 2026-09-09 — AirPods software prerequisites and build gate
+
+- Recorded at (UTC): `2026-09-09T18:48:32Z`
+- Inventory timestamp: `2026-09-09T18:25:40.955453+00:00`; builder verification:
+  `2026-09-09T18:46:47.288265+00:00`.
+- Version: `0.1.0-preview.2`. Deployed image: `git-fd2125f63159`;
+  build-gate candidate: `git-9b2977112916`, built on dedicated VM 116.
+- Environment: Proxmox review VM 115, 4 vCPU / 8 GiB RAM; no exposed Bluetooth
+  controller, microphone or physical battery. Host also exposed no Bluetooth controller.
+- Protocol: read-only installed program/plugin inventory, isolated plugin loads,
+  actual image build, before/after audio-policy comparison and package-lock hash comparison.
+
+| Check | Result |
+| --- | --- |
+| Required Bluetooth/audio programs | 6 of 6 present |
+| BlueZ backend and AAC/SBC/CVSD/mSBC plugins | 5 of 5 dynamically loadable on VM and builder image |
+| Python source tests | 148 passed, including 12 Bluetooth validator tests |
+| Installed RPM inventory | 1,011 packages; candidate and deployed inventory byte-identical |
+| WirePlumber settings after read-only VM check | Unchanged, ignoring one trailing output newline |
+| Physical AirPods qualification | Not tested; model and controller/device pair unavailable |
+
+The gate adds no runtime package, service, timer or discovery loop. It was removed
+from the candidate's final filesystem. The owner VM was not updated or rebooted.
+No new boot, idle, archive-size, audio-dropout, radio or physical battery measurements
+were collected. These checks establish installed software prerequisites only;
+ANC, battery reporting, ear detection, audible quality and reconnect remain unqualified.
+
+Evidence: [installed-image check](features/airpods/installed-image-check.json),
+[builder result](features/airpods/builder-check.json),
+[package and policy preservation](features/airpods/validation-summary.json),
+[source CI](https://github.com/KanterLabs/zeusos/actions/runs/34390942069),
+and [AirPods implementation/testing contract](features/airpods.md).
+
 ## Entry template
 
 Insert this compact block immediately above the Entry template section for every

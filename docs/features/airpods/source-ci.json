@@ -1,0 +1,16 @@
+{
+  "headSha": "9b2977112916366f09ac96ffe688c6525ffac524",
+  "status": "completed",
+  "conclusion": "success",
+  "url": "https://github.com/KanterLabs/zeusos/actions/runs/34390942069",
+  "jobs": [
+    {
+      "name": "image-policy",
+      "conclusion": "success"
+    },
+    {
+      "name": "cli",
+      "conclusion": "success"
+    }
+  ]
+}

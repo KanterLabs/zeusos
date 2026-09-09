@@ -64,8 +64,9 @@ GitHub Actions uses `homelab` for image policy checks and `homelab-heavy` for Ru
 ## Roadmap
 
 The [additions plan](docs/next-iteration.md) tracks the delivered Settings work
-and separate implementation/testing checklists for better search and optional
-app installation.
+and separate implementation/testing checklists for [AirPods support](docs/features/airpods.md),
+better search and optional app installation. AirPods software prerequisites are
+verified; real-device qualification and optional battery/noise controls remain open.
 
 The review VM now has a qualified signed preview updater for owner-triggered Updates. Production release channels, release promotion, signing-key rotation and recovery policy, the full remote T3/Codex workflow, personal profile recovery, encrypted interactive installer, and physical laptop qualification remain separate implementation work. Preview qualification does not define production release or key-rotation policy.
 
