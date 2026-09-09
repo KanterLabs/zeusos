@@ -277,19 +277,30 @@ The declared comparison and budgets are in
 [`preview-1-budgets.md`](releases/preview-1-budgets.md). Record actual values
 and variability; the 4-vCPU/8-GiB VM allocation is not performance evidence.
 
-## Current Temp iteration
+## Current desktop and power iteration
 
-VM 115 now runs build `git-bbd36cc2af2f`, still version `0.1.0-preview.2`, with
-manifest `sha256:778e3bcc6b1e7f024ddfd6a54cc74abe9cfb6f9afc2fd5dc26fe0e09a99e10bd`.
-The [iteration notes](iterations/git-bbd36cc2af2f/README.md) and receipt record
-Temp, compact controls, signatures and six preserved permanent-file hashes.
-The root-owned update archive is under `/var/lib/zeus/updates/git-bbd36cc2af2f/`.
-The rollback slot contains the preceding Temp build, `git-e7f47e75218d`, with
-the same policy schema; no rollback cycle was performed in this iteration.
+VM 115 now runs build `git-de0d8baae5de`, still version `0.1.0-preview.2`, with
+manifest `sha256:51d1201060abec1070cf30f730afbbd7faa13ad28892e3b3d597fa40793707ce`.
+The [iteration notes](iterations/git-de0d8baae5de/README.md) and receipt record
+Temp first use, desktop shortcuts, reduced background work, laptop power defaults,
+signed artifacts and matched boot/idle measurements. Physical battery life remains
+unmeasured on this VM.
+The root-owned update archive is under `/var/lib/zeus/updates/git-de0d8baae5de/`.
+The rollback slot contains the intermediate `git-08c7e89dd3b9` image with the same
+Temp backend and state schema. Populated compatibility with the older
+`git-bbd36cc2af2f` binary also passed; this iteration did not perform a VM rollback
+or backup restore.
+
+The populated pre-upgrade backup is retained separately at
+`/mnt/pve/sata-ssd/zeusos/backups/boot-power-20260909/vzdump-qemu-115-2026_09_08-17_06_26.vma.zst`.
+Both zstd and decompressed VMA verification passed. Proxmox's clock is behind UTC;
+the archive name is the actual host-created name. No previous backup or global
+retention policy was changed. Temp was held at Never during repeated test boots
+and restored through its normal policy API for handoff.
 
 ## Previous Preview 2 visual deployment (historical)
 
-VM 115 runs source `c11e57b8569b2332bbd570b6aef51d79b5c38cec`, booted
+This historical deployment ran source `c11e57b8569b2332bbd570b6aef51d79b5c38cec`, booted
 manifest `sha256:c35a6a8a2a42a42b508c74bf55e0ae5022d4848d0cfaff11816d56295aec22e5`.
 The [Preview 2 notes](releases/preview-2.md) and
 [receipt](releases/preview-2/build-receipt.json) record the six visual changes,
@@ -303,7 +314,7 @@ files survived, including one created after that backup. No restore or disk
 replacement was performed. The previous backup was pruned by the existing
 keep-last-one policy; historical Preview 1 backup paths are not current targets.
 
-The bootc rollback slot currently contains the initial Preview 2 candidate,
+At that deployment, the bootc rollback slot contained the initial Preview 2 candidate,
 which predates the shell startup fixes. This revision did not repeat a
 rollback/re-forward cycle; use the safe-desktop command for a presentation
 fallback. The separately retained Preview 1 release archive is still available

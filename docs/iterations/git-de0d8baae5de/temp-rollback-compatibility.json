@@ -1,0 +1,10 @@
+{
+  "old_source": "bbd36cc2af2f",
+  "new_source": "08c7e89dd3b93a9f0a1002de04be36fbed1941a8",
+  "schema": 1,
+  "old_reads_new_state": true,
+  "new_reads_old_writes": true,
+  "populated_file_preserved": true,
+  "new_boot_policy_deferral_respected_by_old_binary": true,
+  "vm_rollback_performed": false
+}

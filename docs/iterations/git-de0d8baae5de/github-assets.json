@@ -1,0 +1,35 @@
+{
+  "verified": true,
+  "assets": [
+    {
+      "name": "SHA256SUMS-git-de0d8baae5de",
+      "digest": "sha256:18e884531e7c06d9f611020d53e660e5129ac968d31e511df0918728350319d3",
+      "bytes": 110,
+      "url": "https://github.com/KanterLabs/zeusos/releases/download/v0.1.0-preview.2/SHA256SUMS-git-de0d8baae5de"
+    },
+    {
+      "name": "packages-git-de0d8baae5de.lock",
+      "digest": "sha256:4ea9ac5047b4565c3c4c415c04c3cfc4e589fd4a5136d40eda3f4046bc5e0127",
+      "bytes": 35575,
+      "url": "https://github.com/KanterLabs/zeusos/releases/download/v0.1.0-preview.2/packages-git-de0d8baae5de.lock"
+    },
+    {
+      "name": "build-info-git-de0d8baae5de.json",
+      "digest": "sha256:10b7da83d617b34c0b216b2ced57bf0e954af484aca99903cfa4f7198a164b56",
+      "bytes": 132,
+      "url": "https://github.com/KanterLabs/zeusos/releases/download/v0.1.0-preview.2/build-info-git-de0d8baae5de.json"
+    },
+    {
+      "name": "SHA256SUMS-git-de0d8baae5de.sig",
+      "digest": "sha256:0cfe73098a257bf42de380ee8561401982dbbe17355735cedb9b016bea18f54c",
+      "bytes": 310,
+      "url": "https://github.com/KanterLabs/zeusos/releases/download/v0.1.0-preview.2/SHA256SUMS-git-de0d8baae5de.sig"
+    },
+    {
+      "name": "zeusos-0.1.0-preview.2-git-de0d8baae5de.oci",
+      "digest": "sha256:da02d84042ab82daa131e5c12bbbcd418f08ae810016690f1e3679b99e2d3331",
+      "bytes": 1828931584,
+      "url": "https://github.com/KanterLabs/zeusos/releases/download/v0.1.0-preview.2/zeusos-0.1.0-preview.2-git-de0d8baae5de.oci"
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "version": "0.1.0-preview.2",
+  "source_commit": "de0d8baae5de8533c97e7287f997235c7a10d43d",
+  "build_id": "git-de0d8baae5de",
+  "booted_manifest_digest": "sha256:51d1201060abec1070cf30f730afbbd7faa13ad28892e3b3d597fa40793707ce",
+  "image_config_digest": "sha256:1e8a973af3b13686499c0a3d8a4b65568df63697ffdaf46b851038b54617b4a5",
+  "rollback_manifest": "sha256:810ac57f9830671b0bcb39a8f9bfe7765497e496ec19a6bbbda6eb4287b01336",
+  "artifacts": {
+    "zeusos-0.1.0-preview.2-git-de0d8baae5de.oci": {
+      "sha256": "da02d84042ab82daa131e5c12bbbcd418f08ae810016690f1e3679b99e2d3331",
+      "bytes": 1828931584
+    }
+  },
+  "validation": {
+    "python_tests": 73,
+    "installed_schema_settings": 82,
+    "gtk3_gtk4_parser": "passed",
+    "payload_ci": "passed",
+    "installed_runtime_fixtures": {
+      "boot_once": true,
+      "nested_cleanup": true,
+      "legacy_preserved": true,
+      "keep_conflict_safe": true,
+      "active_fd_preserved": true,
+      "partial_companion_preserved": true,
+      "symlink_target_preserved": true,
+      "status_fd_stable": true
+    },
+    "real_systemd_scheduler_fixture_cases": {
+      "boot_never": true,
+      "failure_no_loop": true,
+      "future_rearm": true,
+      "never_cancels": true,
+      "overdue_catchup": true
+    },
+    "scheduler_fixture_cleanup": true,
+    "scheduler_fixture_persistent_replay": "not tested: fixture Persistent=false, explicit overdue catch-up tested",
+    "native_files_shortcut": true,
+    "native_temp_shortcut": true,
+    "native_open_temp_in_files": true,
+    "native_search_and_enter_launch": true,
+    "reduced_motion_search_smoke": true,
+    "personal_animation_preference_restored": true,
+    "native_power_profile_switch": "power-saver then original balanced",
+    "power_profile_driver": "placeholder (VM)",
+    "zram": "active, approximately 7.7 GiB logical capacity",
+    "safe_desktop_and_restore": true,
+    "shell_extensions_restored_active": true,
+    "preserved_permanent_file_hashes": 6,
+    "existing_temp_sample_bytes": 48,
+    "temp_policy_restored": "boot",
+    "same_boot_service_restart_preserves_temp_sample": true,
+    "cleanup_timer_after_restoration": "inactive",
+    "schema1_old_new_populated_compatibility": true,
+    "backup_zstd": "passed",
+    "backup_vma": "passed",
+    "backup_restore": "not run",
+    "vm_rollback": "not run",
+    "secure_boot": true,
+    "selinux": "Enforcing",
+    "failed_system_units": 0,
+    "failed_user_units": 0,
+    "github_asset_digests_match": true,
+    "physical_battery_runtime": "not measured: VM has no battery",
+    "full_fractional_scaling_accessibility": "not qualified",
+    "native_first_use_disclosure_and_acknowledgement": true
+  },
+  "performance": {
+    "os_startup_median_before_s": 7.683,
+    "os_startup_median_final_s": 6.993,
+    "host_greeter_probe_median_before_s": 18.696,
+    "host_greeter_probe_median_final_s": 18.945,
+    "host_greeter_probe_final_outlier_s": 46.328,
+    "closed_idle_cpu_before_percent": 0.3,
+    "closed_idle_cpu_final_percent": 0.15,
+    "temp_visible_idle_cpu_before_percent": 0.325,
+    "temp_visible_idle_cpu_final_percent": 0.15,
+    "temp_service_starts_per_120s_before": 2,
+    "temp_service_starts_per_120s_final": 0
+  },
+  "notes": "Payload source remains de0d8baae5de. Later documentation and verification-only commits do not change the installed image."
+}

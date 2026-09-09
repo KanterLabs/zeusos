@@ -1,0 +1,109 @@
+{
+  "label": "before-desktop-idle",
+  "seconds": 120.01,
+  "settle_seconds": 10,
+  "samples": [
+    {
+      "cpu_percent": 0.35,
+      "memory_used_mib": 1053.7
+    },
+    {
+      "cpu_percent": 0.1,
+      "memory_used_mib": 1053.7
+    },
+    {
+      "cpu_percent": 1.15,
+      "memory_used_mib": 1056.3
+    },
+    {
+      "cpu_percent": 0.25,
+      "memory_used_mib": 1054.0
+    },
+    {
+      "cpu_percent": 0.25,
+      "memory_used_mib": 1054.0
+    },
+    {
+      "cpu_percent": 0.3,
+      "memory_used_mib": 1054.0
+    },
+    {
+      "cpu_percent": 0.3,
+      "memory_used_mib": 1054.0
+    },
+    {
+      "cpu_percent": 0.3,
+      "memory_used_mib": 1054.0
+    },
+    {
+      "cpu_percent": 0.3,
+      "memory_used_mib": 1054.0
+    },
+    {
+      "cpu_percent": 0.3,
+      "memory_used_mib": 1054.0
+    },
+    {
+      "cpu_percent": 0.2,
+      "memory_used_mib": 1054.0
+    },
+    {
+      "cpu_percent": 0.3,
+      "memory_used_mib": 1054.0
+    },
+    {
+      "cpu_percent": 0.3,
+      "memory_used_mib": 1054.0
+    },
+    {
+      "cpu_percent": 0.25,
+      "memory_used_mib": 1054.0
+    },
+    {
+      "cpu_percent": 0.4,
+      "memory_used_mib": 1054.0
+    },
+    {
+      "cpu_percent": 0.25,
+      "memory_used_mib": 1054.0
+    },
+    {
+      "cpu_percent": 0.85,
+      "memory_used_mib": 1069.2
+    },
+    {
+      "cpu_percent": 0.25,
+      "memory_used_mib": 1061.0
+    },
+    {
+      "cpu_percent": 0.35,
+      "memory_used_mib": 1061.0
+    },
+    {
+      "cpu_percent": 0.2,
+      "memory_used_mib": 1061.0
+    },
+    {
+      "cpu_percent": 0.25,
+      "memory_used_mib": 1061.0
+    },
+    {
+      "cpu_percent": 0.25,
+      "memory_used_mib": 1061.0
+    },
+    {
+      "cpu_percent": 0.25,
+      "memory_used_mib": 1061.0
+    },
+    {
+      "cpu_percent": 0.35,
+      "memory_used_mib": 1061.0
+    }
+  ],
+  "median_cpu_percent": 0.3,
+  "median_memory_used_mib": 1054.0,
+  "context_switches_per_second": 173.2,
+  "processes_started": 6,
+  "temp_cleanup_activations": 2,
+  "limits": "VM idle activity; no physical battery, energy or hardware-wakeup measurement"
+}

@@ -1,0 +1,265 @@
+{
+  "backend": {
+    "manager": "zeus_temp.HomeManager",
+    "proc_root": null,
+    "schedule_api": "HomeManager.schedule",
+    "schedule_deadlines": {
+      "boot_never": "actual HomeManager.schedule() result",
+      "service_rearm": "controlled short deadline after actual HomeManager.schedule() read",
+      "timed_arm": "controlled shortened fixture deadline validated against actual backend plan"
+    },
+    "sweep_api": "HomeManager.sweep(force=True, include_usage=False)",
+    "sweep_execution": "actual HomeManager.sweep() against disposable fixture home",
+    "systemd_persistence": "Persistent=false fixture avoids an owner data-home timestamp; explicit overdue catch-up is covered"
+  },
+  "cases": {
+    "boot_never": {
+      "assertions": {
+        "boot_backend_schedule_used": true,
+        "boot_has_no_armed_timer": true,
+        "never_backend_schedule_used": true,
+        "never_has_no_armed_timer": true
+      },
+      "duration_seconds": 0.053,
+      "observations": {
+        "boot": {
+          "active": false,
+          "dropin": false,
+          "marker": false,
+          "state": "inactive"
+        },
+        "never": {
+          "active": false,
+          "dropin": false,
+          "marker": false,
+          "state": "inactive"
+        }
+      },
+      "ok": true,
+      "phase": "boot_never"
+    },
+    "failure_no_loop": {
+      "assertions": {
+        "failure_did_not_rapid_loop": true,
+        "failure_disarmed_timer": true,
+        "fixture_payload_survived_failure": true,
+        "injected_failure_reported": true
+      },
+      "duration_seconds": 4.413,
+      "observations": {
+        "event": {
+          "backend_calls": {
+            "home_manager_schedule": false,
+            "home_manager_sweep": true
+          },
+          "backend_schedule": null,
+          "duration_seconds": 0.168,
+          "finished_at": 671.875411373,
+          "phase": "failure",
+          "result": {
+            "ok": false,
+            "schedule": {
+              "ok": false,
+              "reason": "sweep-error",
+              "timer_armed": false
+            },
+            "sweep": {
+              "deleted": 0,
+              "deleted_bytes": 0,
+              "error_count": 0,
+              "error_type": "RuntimeError",
+              "ok": false,
+              "reason": null,
+              "skipped_count": 0,
+              "swept": false
+            }
+          },
+          "started_at": 671.70740844
+        },
+        "failure_deadline": 1788924214.815162,
+        "state": {
+          "active": false,
+          "dropin": false,
+          "marker": false,
+          "state": "inactive"
+        }
+      },
+      "ok": true,
+      "phase": "failure_no_loop"
+    },
+    "future_rearm": {
+      "assertions": {
+        "absolute_future_deadline_fired": true,
+        "actual_home_manager_sweep_deleted_fixture": true,
+        "fired_exactly_once_before_rearm": true,
+        "next_systemd_elapse_present": true,
+        "rearm_deadline_is_future": true,
+        "scheduler_rearmed_timer": true
+      },
+      "duration_seconds": 4.181,
+      "observations": {
+        "event": {
+          "backend_calls": {
+            "home_manager_schedule": true,
+            "home_manager_sweep": true
+          },
+          "backend_schedule": {
+            "due": false,
+            "due_reason": "not-due",
+            "enabled": true,
+            "enrolled": true,
+            "interval_seconds": 900,
+            "mode": "custom",
+            "next_cleanup_at": 1788925137.7000282,
+            "ok": true,
+            "scheduled": true
+          },
+          "duration_seconds": 0.179,
+          "finished_at": 662.556328551,
+          "phase": "future-rearm",
+          "result": {
+            "ok": true,
+            "schedule": {
+              "due": false,
+              "due_reason": "not-due",
+              "enabled": true,
+              "enrolled": true,
+              "interval_seconds": 900,
+              "mode": "custom",
+              "next_cleanup_at": 1788924245.7005332,
+              "ok": true,
+              "scheduled": true,
+              "timer_armed": true,
+              "timer_unit": "zeus-temp-fixture-c4afae0f17f244b4a75b1da6e511e176.timer"
+            },
+            "sweep": {
+              "deleted": 1,
+              "deleted_bytes": 28,
+              "error_count": 0,
+              "ok": true,
+              "reason": "forced",
+              "skipped_count": 0,
+              "swept": true
+            }
+          },
+          "started_at": 662.377628158
+        },
+        "initial_deadline": 1788924237.3951006,
+        "initial_timer_state": "active",
+        "next_elapse": "Wed 2026-09-09 03:24:05 UTC",
+        "post_rearm_timer_state": "active",
+        "rearm_deadline": 1788924245.7005332
+      },
+      "ok": true,
+      "phase": "future_rearm"
+    },
+    "never_cancels": {
+      "assertions": {
+        "cancel_removed_marker_and_dropin": true,
+        "cancelled_deadline_did_not_fire": true,
+        "changing_to_never_cancelled_timer": true,
+        "timed_timer_was_armed": true
+      },
+      "duration_seconds": 3.376,
+      "observations": {
+        "cancelled_deadline": 1788924243.439874,
+        "state": {
+          "active": false,
+          "dropin": false,
+          "marker": false,
+          "state": "inactive"
+        }
+      },
+      "ok": true,
+      "phase": "never_cancels"
+    },
+    "overdue_catchup": {
+      "assertions": {
+        "actual_home_manager_sweep_deleted_fixture": true,
+        "overdue_plan_used_one_second_catchup": true,
+        "overdue_timer_fired_once": true,
+        "scheduler_rearmed_after_catchup": true
+      },
+      "duration_seconds": 2.364,
+      "observations": {
+        "catchup_dropin": "[Timer]\n# Catch up the persisted deadline after manager restart.\nOnCalendar=\nOnActiveSec=\nOnActiveSec=1s\n",
+        "event": {
+          "backend_calls": {
+            "home_manager_schedule": true,
+            "home_manager_sweep": true
+          },
+          "backend_schedule": {
+            "due": false,
+            "due_reason": "not-due",
+            "enabled": true,
+            "enrolled": true,
+            "interval_seconds": 900,
+            "mode": "custom",
+            "next_cleanup_at": 1788925141.0279317,
+            "ok": true,
+            "scheduled": true
+          },
+          "duration_seconds": 0.177,
+          "finished_at": 665.882729982,
+          "phase": "overdue",
+          "result": {
+            "ok": true,
+            "schedule": {
+              "due": false,
+              "due_reason": "not-due",
+              "enabled": true,
+              "enrolled": true,
+              "interval_seconds": 900,
+              "mode": "custom",
+              "next_cleanup_at": 1788924249.0284986,
+              "ok": true,
+              "scheduled": true,
+              "timer_armed": true,
+              "timer_unit": "zeus-temp-fixture-c4afae0f17f244b4a75b1da6e511e176.timer"
+            },
+            "sweep": {
+              "deleted": 1,
+              "deleted_bytes": 26,
+              "error_count": 0,
+              "ok": true,
+              "reason": "forced",
+              "skipped_count": 0,
+              "swept": true
+            }
+          },
+          "started_at": 665.705562581
+        },
+        "overdue_deadline": 1788924209.0761
+      },
+      "ok": true,
+      "phase": "overdue_catchup"
+    }
+  },
+  "cleanup": {
+    "errors": [],
+    "ok": true
+  },
+  "duration_seconds": 14.794,
+  "finished_at": "2026-09-09T03:24:09.404312+00:00",
+  "fixture": {
+    "all_backend_state_under_fixture": true,
+    "home_root": "/tmp/zeus-temp-scheduler-runtime-ntu0dl8c"
+  },
+  "ok": true,
+  "schema": "zeus-temp-scheduler-runtime-v1",
+  "scope": {
+    "fixture_home": "TemporaryDirectory",
+    "owner_home_touched": false,
+    "owner_preferences_touched": false,
+    "production_units_touched": false,
+    "real_user_systemd": true
+  },
+  "started_at": "2026-09-09T03:23:54.610216+00:00",
+  "systemd": {
+    "dropin_path": "/run/user/1000/systemd/user/zeus-temp-fixture-c4afae0f17f244b4a75b1da6e511e176.timer.d/10-zeus-deadline.conf",
+    "marker_path": "/tmp/zeus-temp-scheduler-runtime-ntu0dl8c/runtime/zeus-temp-fixture-c4afae0f17f244b4a75b1da6e511e176.armed",
+    "runtime_unit_dir": "/run/user/1000/systemd/user",
+    "service_unit": "zeus-temp-fixture-c4afae0f17f244b4a75b1da6e511e176.service",
+    "timer_unit": "zeus-temp-fixture-c4afae0f17f244b4a75b1da6e511e176.timer"
+  }
+}

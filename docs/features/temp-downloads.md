@@ -1,7 +1,7 @@
 # Temp downloads and compact window controls
 
-Status: implemented and deployed on VM 115 in build git-bbd36cc2af2f, version 0.1.0-preview.2.
-Verification and remaining qualification limits: [iteration notes](../iterations/git-bbd36cc2af2f/README.md).
+Status: implemented and deployed on VM 115 in build git-de0d8baae5de, version 0.1.0-preview.2.
+Verification and remaining qualification limits: [iteration notes](../iterations/git-de0d8baae5de/README.md).
 
 ## Product behavior
 
@@ -133,5 +133,5 @@ changes deep inside an existing subdirectory may require the Refresh button.
 - ZOS-57: Controls shipped; full cross-scale console action/focus matrix remains Backlog.
 - ZOS-58: Temp destination and preservation — completed.
 - ZOS-59: Scoped Temp cleanup and schedules — completed.
-- ZOS-60: Settings and Keep shipped; explicit first-setup update-reboot explanation remains Backlog.
+- ZOS-60: Settings, Keep and explicit first-use permanent-deletion/update-reboot explanation implemented.
 - ZOS-61: Preview deletion and populated upgrade qualification — completed, with limits recorded in iteration notes.

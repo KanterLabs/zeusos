@@ -1,0 +1,5 @@
+{
+  "measurement": "first post-update reboot, SSH and systemd readiness only",
+  "elapsed_s": 24.484,
+  "systemd_analyze": "Startup finished in 1.515s (kernel) + 2.416s (initrd) + 3.876s (userspace) = 7.807s \ngraphical.target reached after 3.873s in userspace."
+}

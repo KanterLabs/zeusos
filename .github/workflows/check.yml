@@ -27,7 +27,7 @@ jobs:
       - name: Check build script syntax
         run: bash -n scripts/build.sh scripts/build-disk.sh scripts/export-iteration.sh
       - name: Check welcome application syntax
-        run: python3 -m py_compile zeus/assets/welcome.py scripts/build-greeter-theme.py scripts/measure-*.py
+        run: python3 -m py_compile zeus/assets/welcome.py scripts/build-greeter-theme.py scripts/measure-*.py scripts/validate-*.py
   cli:
     runs-on: homelab-heavy
     timeout-minutes: 10

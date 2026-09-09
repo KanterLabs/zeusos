@@ -1,0 +1,41 @@
+{
+  "definition": "Separate Python process start to first GTK map; not compositor presentation; cache state not controlled",
+  "samples": {
+    "before": {
+      "temp": {
+        "first_map_ms": [
+          414.9,
+          476.7,
+          404.3
+        ],
+        "median_ms": 414.9
+      },
+      "welcome": {
+        "first_map_ms": [
+          367.1,
+          392.8,
+          390.1
+        ],
+        "median_ms": 390.1
+      }
+    },
+    "final": {
+      "temp": {
+        "first_map_ms": [
+          435.8,
+          421.8,
+          420.8
+        ],
+        "median_ms": 421.8
+      },
+      "welcome": {
+        "first_map_ms": [
+          469.1,
+          366.4,
+          365.0
+        ],
+        "median_ms": 366.4
+      }
+    }
+  }
+}
