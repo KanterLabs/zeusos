@@ -1,0 +1,8 @@
+{
+  "uuid": "zeus-lock-background@kanterlabs",
+  "name": "Zeus Lock Background",
+  "description": "Keeps the native GNOME lock wallpaper recognizable while preserving the native lock dialog.",
+  "shell-version": ["50"],
+  "session-modes": ["user", "unlock-dialog"],
+  "version": 1
+}

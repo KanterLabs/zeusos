@@ -44,6 +44,8 @@ COPY scripts/validate-bluetooth-audio.py /tmp/zeus-validate-bluetooth-audio.py
 RUN dnf remove -y --disable-repo='*' 'qemu-user-static*' && \
     python3 /tmp/zeus-validate-bluetooth-audio.py --load-plugins --json && \
     rm /tmp/zeus-validate-bluetooth-audio.py && \
+    chmod 0644 /usr/share/backgrounds/zeus/zeus-city-new-york-dusk.png /usr/share/gnome-background-properties/zeus.xml && \
+    chmod 0644 /usr/share/gnome-shell/extensions/zeus-lock-background@kanterlabs/extension.js /usr/share/gnome-shell/extensions/zeus-lock-background@kanterlabs/metadata.json && \
     chmod 0755 /usr/libexec/zeus-welcome /usr/libexec/zeus-settings-window && \
     chmod 0644 /usr/lib/zeus/settings_model.py /usr/share/applications/org.zeus.Settings.desktop /usr/share/icons/hicolor/scalable/apps/org.zeus.Settings.svg && \
     glib-compile-schemas /usr/share/gnome-shell/extensions/zeus-shell@kanterlabs/schemas && \

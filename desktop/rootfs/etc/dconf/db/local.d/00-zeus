@@ -5,8 +5,8 @@
 # input, and accessibility choices remain user-controlled.
 
 [org/gnome/desktop/background]
-picture-uri='file:///usr/share/backgrounds/zeus/zeus-wallpaper-light.svg'
-picture-uri-dark='file:///usr/share/backgrounds/zeus/zeus-wallpaper-dark.svg'
+picture-uri='file:///usr/share/backgrounds/zeus/zeus-city-new-york-dusk.png'
+picture-uri-dark='file:///usr/share/backgrounds/zeus/zeus-city-new-york-dusk.png'
 picture-options='zoom'
 color-shading-type='solid'
 primary-color='#0B1534'
@@ -38,7 +38,7 @@ switch-input-source=['<Super><Alt>space', 'XF86Keyboard']
 switch-input-source-backward=['<Shift><Super><Alt>space', '<Shift>XF86Keyboard']
 
 [org/gnome/shell]
-enabled-extensions=['dash-to-dock@micxgx.gmail.com', 'zeus-shell@kanterlabs']
+enabled-extensions=['dash-to-dock@micxgx.gmail.com', 'zeus-shell@kanterlabs', 'zeus-lock-background@kanterlabs']
 favorite-apps=['org.gnome.Nautilus.desktop', 'org.gnome.Ptyxis.desktop', 'org.mozilla.firefox.desktop', 'org.gnome.Settings.desktop', 'org.zeus.Temp.desktop', 'org.zeus.Welcome.desktop']
 
 [org/gnome/shell/extensions/dash-to-dock]
@@ -110,7 +110,7 @@ show-full-name-in-top-bar=false
 lock-enabled=true
 lock-delay=0
 show-full-name-in-top-bar=false
-picture-uri='file:///usr/share/backgrounds/zeus/zeus-wallpaper-dark.svg'
+picture-uri='file:///usr/share/backgrounds/zeus/zeus-city-new-york-dusk.png'
 picture-options='zoom'
 color-shading-type='solid'
 primary-color='#081127'

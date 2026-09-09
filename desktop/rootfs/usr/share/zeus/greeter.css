@@ -1,21 +1,140 @@
 /* Native GDM presentation only. No authentication logic or high-contrast changes. */
+
+/* GNOME Shell paints this group edge to edge in the GDM session. */
 #lockDialogGroup {
-  background-color: #12152e;
-  background-image: url("file:///usr/share/backgrounds/zeus/zeus-wallpaper-dark.svg");
+  background-color: #10182f;
+  background-image: url("file:///usr/share/backgrounds/zeus/zeus-city-new-york-dusk.png");
+  background-position: center;
+  background-repeat: no-repeat;
   background-size: cover;
 }
-.login-dialog .login-dialog-user-list-item {
-  border-radius: 22px;
-  background-color: rgba(25, 28, 48, 0.60);
+
+/* GNOME 50's LoginDialog::UserListItem selector. */
+.login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item {
+  min-height: 3.5em;
+  padding: 10px 14px;
   border: 1px solid rgba(255, 255, 255, 0.22);
-}
-.login-dialog .login-dialog-user-list-item:selected {
-  background-color: rgba(60, 69, 105, 0.76);
-}
-.login-dialog StEntry {
   border-radius: 14px;
-  background-color: rgba(30, 34, 54, 0.78);
+  background-color: rgba(10, 20, 44, 0.48);
   color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.24);
 }
-.login-dialog-logo-bin { margin-bottom: 32px; }
+.login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:hover {
+  background-color: rgba(31, 52, 96, 0.58);
+}
+.login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:selected,
+.login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:focus {
+  background-color: rgba(41, 69, 126, 0.68);
+  border-color: rgba(255, 255, 255, 0.52);
+}
+.login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:selected:hover,
+.login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:focus:hover {
+  background-color: rgba(55, 88, 153, 0.74);
+}
+.login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:active {
+  background-color: rgba(55, 88, 153, 0.78);
+}
+.login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:insensitive {
+  background-color: rgba(10, 20, 44, 0.30);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* The native password and username entries remain StEntry widgets. */
+.login-dialog .login-dialog-prompt-entry,
+.unlock-dialog .login-dialog-prompt-entry {
+  min-height: 2.875em;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  border-radius: 12px;
+  background-color: rgba(8, 17, 36, 0.52);
+  color: #ffffff;
+}
+.login-dialog .login-dialog-prompt-entry:hover,
+.unlock-dialog .login-dialog-prompt-entry:hover {
+  background-color: rgba(14, 28, 58, 0.60);
+}
+.login-dialog .login-dialog-prompt-entry:focus,
+.unlock-dialog .login-dialog-prompt-entry:focus {
+  background-color: rgba(18, 37, 76, 0.66);
+  border-color: rgba(255, 255, 255, 0.64);
+}
+.login-dialog .login-dialog-prompt-entry:insensitive,
+.unlock-dialog .login-dialog-prompt-entry:insensitive {
+  background-color: rgba(8, 17, 36, 0.30);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* Keep the native accessibility/session controls light and touchable. */
+.login-dialog .login-dialog-button.a11y-button,
+.login-dialog .login-dialog-button.cancel-button,
+.login-dialog .login-dialog-button.switch-user-button,
+.login-dialog .login-dialog-button.login-dialog-session-list-button {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 12px;
+  background-color: rgba(10, 20, 44, 0.38);
+}
+.login-dialog .login-dialog-button.a11y-button:hover,
+.login-dialog .login-dialog-button.cancel-button:hover,
+.login-dialog .login-dialog-button.switch-user-button:hover,
+.login-dialog .login-dialog-button.login-dialog-session-list-button:hover {
+  background-color: rgba(31, 52, 96, 0.54);
+}
+.login-dialog .login-dialog-button.a11y-button:focus,
+.login-dialog .login-dialog-button.cancel-button:focus,
+.login-dialog .login-dialog-button.switch-user-button:focus,
+.login-dialog .login-dialog-button.login-dialog-session-list-button:focus {
+  background-color: rgba(41, 69, 126, 0.64);
+}
+.login-dialog .login-dialog-button.a11y-button:active,
+.login-dialog .login-dialog-button.cancel-button:active,
+.login-dialog .login-dialog-button.switch-user-button:active,
+.login-dialog .login-dialog-button.login-dialog-session-list-button:active {
+  background-color: rgba(55, 88, 153, 0.72);
+}
+.login-dialog .login-dialog-button.a11y-button:insensitive,
+.login-dialog .login-dialog-button.cancel-button:insensitive,
+.login-dialog .login-dialog-button.switch-user-button:insensitive,
+.login-dialog .login-dialog-button.login-dialog-session-list-button:insensitive {
+  background-color: rgba(10, 20, 44, 0.24);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Give the fallback username action the same comfortable target. */
+.login-dialog .login-dialog-not-listed-button {
+  min-height: 2.5em;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 10px;
+  background-color: rgba(10, 20, 44, 0.34);
+}
+.login-dialog .login-dialog-not-listed-button:hover {
+  background-color: rgba(31, 52, 96, 0.50);
+}
+.login-dialog .login-dialog-not-listed-button:focus {
+  background-color: rgba(41, 69, 126, 0.60);
+}
+
+/* Balance the native login spacing around the wordmark and user list. */
+.login-dialog .login-dialog-user-selection-box {
+  padding-top: 2em;
+  padding-bottom: 4em;
+}
+.login-dialog-logo-bin {
+  margin: 2em 0 1.5em;
+}
+
+/* GNOME 50's native lock clock; keep its focus and auth behavior untouched. */
+.unlock-dialog-clock {
+  spacing: 1em;
+}
+.unlock-dialog-clock .unlock-dialog-clock-time {
+  font-size: 7.5em;
+  font-weight: 300;
+  text-shadow: 0px 2px 12px rgba(0, 0, 0, 0.55);
+}
+.unlock-dialog-clock .unlock-dialog-clock-date {
+  font-size: 1.25em;
+  font-weight: 400;
+  text-shadow: 0px 2px 10px rgba(0, 0, 0, 0.50);
+}

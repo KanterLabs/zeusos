@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE wallpapers SYSTEM "gnome-wp-list.dtd">
+<wallpapers>
+  <wallpaper deleted="false">
+    <name>Zeus — New York at Dusk</name>
+    <filename>/usr/share/backgrounds/zeus/zeus-city-new-york-dusk.png</filename>
+    <options>zoom</options>
+    <pcolor>#101A36</pcolor>
+    <scolor>#101A36</scolor>
+    <shade_type>solid</shade_type>
+  </wallpaper>
+  <wallpaper deleted="false">
+    <name>Zeus — Light</name>
+    <filename>/usr/share/backgrounds/zeus/zeus-wallpaper-light.svg</filename>
+    <options>zoom</options>
+    <pcolor>#0B1534</pcolor>
+    <scolor>#233D86</scolor>
+    <shade_type>solid</shade_type>
+  </wallpaper>
+  <wallpaper deleted="false">
+    <name>Zeus — Dark</name>
+    <filename>/usr/share/backgrounds/zeus/zeus-wallpaper-dark.svg</filename>
+    <options>zoom</options>
+    <pcolor>#081127</pcolor>
+    <scolor>#1C2D70</scolor>
+    <shade_type>solid</shade_type>
+  </wallpaper>
+</wallpapers>
