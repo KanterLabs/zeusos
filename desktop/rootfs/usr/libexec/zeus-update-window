@@ -1203,7 +1203,7 @@ class UpdatesWindow(Adw.ApplicationWindow):
         self._status_heading.set_text(heading)
         self._status_description.set_text(description)
         if state in {"up_to_date", "ready"}:
-            status_icon_name = "emblem-ok-symbolic"
+            status_icon_name = "object-select-symbolic"
         elif state in {"error", "interrupted"}:
             status_icon_name = "dialog-warning-symbolic"
         else:
