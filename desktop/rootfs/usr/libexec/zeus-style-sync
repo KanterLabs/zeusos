@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""Manage only Zeus CSS imports, preserving any existing owner stylesheet."""
+import os
+import shutil
+from pathlib import Path
+import sys
+
+BEGIN = '/* Zeus desktop integration: begin */'
+END = '/* Zeus desktop integration: end */'
+config = Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home() / '.config')))
+flag = config / 'zeus/style-disabled'
+mode = sys.argv[1] if len(sys.argv) > 1 else ('--disable' if flag.exists() else '--enable')
+if mode not in ('--enable', '--disable'):
+    raise SystemExit('Usage: zeus-style-sync [--enable|--disable]')
+if mode == '--disable':
+    flag.parent.mkdir(parents=True, exist_ok=True)
+    flag.touch()
+else:
+    flag.unlink(missing_ok=True)
+# Keep style assets in mutable owner state so a retained OS can still read them.
+theme = Path(os.environ.get('ZEUS_THEME_SOURCE', '/usr/share/themes/Zeus'))
+installed = config / 'zeus/theme'
+if mode == '--enable':
+    if not theme.is_dir():
+        raise SystemExit('Zeus theme assets are missing; no stylesheet imports changed')
+    if installed.is_symlink():
+        raise SystemExit('Preserved owner-managed theme link')
+    shutil.copytree(theme, installed, dirs_exist_ok=True)
+for version in ('3.0', '4.0'):
+    path = config / f'gtk-{version}' / 'gtk.css'
+    if path.is_symlink():
+        print(f'Preserved owner-managed stylesheet link: {path}')
+        continue
+    original = path.read_text() if path.exists() else ''
+    if original.count(BEGIN) != original.count(END) or original.count(BEGIN) > 1:
+        raise SystemExit(f'Unrecognized Zeus markers; preserved {path}')
+    content = original
+    if BEGIN in content:
+        start = content.index(BEGIN)
+        finish = content.index(END) + len(END)
+        if content[finish:finish + 1] == '\n':
+            finish += 1
+        content = content[:start] + content[finish:]
+    if mode == '--enable':
+        block = f'{BEGIN}\n@import url("{(installed / f"gtk-{version}" / "gtk.css").as_uri()}");\n{END}\n'
+        content = block + content
+    if content != original:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name('.gtk.css.zeus-new')
+        with temporary.open('x') as stream:
+            stream.write(content)
+        temporary.replace(path)
+print('Zeus styling ' + ('enabled' if mode == '--enable' else 'disabled') + '; reopen applications to apply.')

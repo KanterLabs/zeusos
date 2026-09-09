@@ -1,0 +1,283 @@
+/*
+ * Zeus GTK 4 overlay
+ *
+ * Import after the stock Adwaita/libadwaita stylesheet. The named libadwaita
+ * variables below follow the system light/dark color scheme and retain the
+ * user's accent, contrast, and text scaling choices.
+ */
+:root {
+  --zeus-window-bg: var(--window-bg-color, #F7F8FC);
+  --zeus-window-fg: var(--window-fg-color, #1A2236);
+  --zeus-view-bg: var(--view-bg-color, #FBFCFF);
+  --zeus-view-fg: var(--view-fg-color, #1A2236);
+  --zeus-header-bg: var(--headerbar-bg-color, #FFFFFF);
+  --zeus-header-fg: var(--headerbar-fg-color, #1A2236);
+  --zeus-card-bg: var(--card-bg-color, #FFFFFF);
+  --zeus-popover-bg: var(--popover-bg-color, #FFFFFF);
+  --zeus-border: var(--border-color, rgba(26, 34, 54, 0.14));
+  --zeus-control-bg: color-mix(in srgb, var(--zeus-view-bg) 84%, var(--zeus-window-fg));
+  --zeus-control-hover: color-mix(in srgb, var(--zeus-accent) 10%, var(--zeus-view-bg));
+  --zeus-accent: var(--accent-bg-color, #5969DE);
+  --zeus-accent-fg: var(--accent-fg-color, #FFFFFF);
+  --zeus-muted: color-mix(in srgb, var(--zeus-window-fg) 60%, transparent);
+}
+
+/* Keep a small explicit dark adjustment for older GTK 4 builds that expose
+ * only the base Adwaita variables to custom CSS. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --zeus-control-bg: color-mix(in srgb, var(--zeus-view-bg) 92%, white);
+    --zeus-control-hover: color-mix(in srgb, var(--zeus-accent) 16%, var(--zeus-view-bg));
+    --zeus-border: color-mix(in srgb, var(--zeus-window-fg) 18%, transparent);
+  }
+}
+
+* {
+  font-family: "Adwaita Sans";
+}
+
+window,
+.background {
+  background-color: var(--zeus-window-bg);
+  color: var(--zeus-window-fg);
+}
+
+decoration,
+.csd decoration {
+  border-radius: 16px;
+  box-shadow: 0 16px 42px 0 rgba(5, 10, 28, 0.26);
+}
+
+headerbar,
+headerbar.titlebar,
+.titlebar {
+  background-color: var(--zeus-header-bg);
+  background-image: none;
+  color: var(--zeus-header-fg);
+  border: 0;
+  box-shadow: 0 1px 0 0 var(--zeus-border);
+  min-height: 46px;
+  padding: 0 8px;
+}
+
+headerbar:backdrop,
+.titlebar:backdrop {
+  background-color: color-mix(in srgb, var(--zeus-header-bg) 88%, transparent);
+  color: color-mix(in srgb, var(--zeus-header-fg) 72%, transparent);
+}
+
+/*
+ * GtkWindowControls supplies the semantic native glyphs. The glyphs are
+ * subdued at rest and become visible on hover/focus, so all three traffic
+ * lights remain discoverable without replacing the titlebar buttons.
+ */
+windowcontrols.start,
+windowcontrols.end {
+  margin: 0 4px;
+}
+
+windowcontrols.start > button,
+windowcontrols.end > button {
+  min-width: 14px;
+  min-height: 14px;
+  margin: 0 3px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(27, 32, 52, 0.18);
+  background-image: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.36), 0 1px 2px rgba(9, 17, 43, 0.16);
+}
+
+windowcontrols.start > button.close,
+windowcontrols.end > button.close {
+  background-color: #FF5F57;
+}
+
+windowcontrols.start > button.minimize,
+windowcontrols.end > button.minimize {
+  background-color: #FEBC2E;
+}
+
+windowcontrols.start > button.maximize,
+windowcontrols.end > button.maximize,
+windowcontrols.start > button.restore,
+windowcontrols.end > button.restore {
+  background-color: #28C840;
+}
+
+windowcontrols.start > button.close:hover,
+windowcontrols.end > button.close:hover {
+  background-color: #FF3B30;
+}
+
+windowcontrols.start > button.minimize:hover,
+windowcontrols.end > button.minimize:hover {
+  background-color: #F2A900;
+}
+
+windowcontrols.start > button.maximize:hover,
+windowcontrols.end > button.maximize:hover,
+windowcontrols.start > button.restore:hover,
+windowcontrols.end > button.restore:hover {
+  background-color: #1FAE35;
+}
+
+windowcontrols.start > button.close:active,
+windowcontrols.end > button.close:active {
+  background-color: #D93229;
+}
+
+windowcontrols.start > button.minimize:active,
+windowcontrols.end > button.minimize:active {
+  background-color: #D18E00;
+}
+
+windowcontrols.start > button.maximize:active,
+windowcontrols.end > button.maximize:active,
+windowcontrols.start > button.restore:active,
+windowcontrols.end > button.restore:active {
+  background-color: #168B2A;
+}
+
+windowcontrols > button.close image,
+windowcontrols > button.minimize image,
+windowcontrols > button.maximize image,
+windowcontrols > button.restore image {
+  opacity: 0;
+  color: #2B2332;
+}
+
+windowcontrols > button.close:hover image,
+windowcontrols > button.close:focus-visible image,
+windowcontrols > button.minimize:hover image,
+windowcontrols > button.minimize:focus-visible image,
+windowcontrols > button.maximize:hover image,
+windowcontrols > button.maximize:focus-visible image,
+windowcontrols > button.restore:hover image,
+windowcontrols > button.restore:focus-visible image {
+  opacity: 1;
+  color: #2B2332;
+}
+
+windowcontrols > button.close:focus-visible,
+windowcontrols > button.minimize:focus-visible,
+windowcontrols > button.maximize:focus-visible,
+windowcontrols > button.restore:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--zeus-accent) 72%, transparent);
+  outline-offset: 2px;
+}
+
+button {
+  color: var(--zeus-window-fg);
+  background-color: var(--zeus-control-bg);
+  background-image: none;
+  border: 1px solid var(--zeus-border);
+  border-radius: 10px;
+  min-height: 18px;
+  padding: 7px 12px;
+}
+
+button:hover {
+  background-color: var(--zeus-control-hover);
+  border-color: color-mix(in srgb, var(--zeus-accent) 36%, transparent);
+}
+
+button:active,
+button:checked {
+  background-color: color-mix(in srgb, var(--zeus-accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--zeus-accent) 48%, transparent);
+}
+
+button.suggested-action,
+button.suggested-action:hover,
+button.suggested-action:active {
+  color: var(--zeus-accent-fg);
+  background-color: var(--zeus-accent);
+  border-color: var(--zeus-accent);
+}
+
+button.destructive-action,
+button.destructive-action:hover {
+  color: #FFFFFF;
+  background-color: #D54C5A;
+  border-color: #C6404E;
+}
+
+entry,
+spinbutton,
+dropdown,
+searchentry,
+.searchentry {
+  color: var(--zeus-view-fg);
+  background-color: var(--zeus-view-bg);
+  border: 1px solid var(--zeus-border);
+  border-radius: 10px;
+  min-height: 22px;
+  padding: 6px 10px;
+  box-shadow: inset 0 1px 2px 0 rgba(8, 19, 47, 0.05);
+}
+
+entry:focus,
+spinbutton:focus,
+dropdown:focus,
+searchentry:focus,
+.searchentry:focus {
+  border-color: color-mix(in srgb, var(--zeus-accent) 68%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--zeus-accent) 16%, transparent);
+}
+
+viewport,
+scrolledwindow,
+textview,
+textview.view {
+  background-color: var(--zeus-view-bg);
+  color: var(--zeus-view-fg);
+}
+
+frame,
+list,
+row,
+.card,
+.boxed-list {
+  border-color: var(--zeus-border);
+}
+
+.card,
+.boxed-list {
+  background-color: var(--zeus-card-bg);
+  border-radius: 14px;
+}
+
+popover,
+popover.background,
+menu {
+  background-color: var(--zeus-popover-bg);
+  color: var(--zeus-view-fg);
+  border: 1px solid var(--zeus-border);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px 0 rgba(5, 10, 28, 0.22);
+  padding: 5px;
+}
+
+popover modelbutton,
+menuitem {
+  border-radius: 9px;
+  padding: 7px 10px;
+}
+
+popover modelbutton:hover,
+menuitem:hover {
+  background-color: var(--zeus-control-hover);
+}
+
+scale trough,
+progressbar trough {
+  background-color: color-mix(in srgb, var(--zeus-window-fg) 12%, transparent);
+  border-radius: 999px;
+}
+
+scale highlight,
+progressbar progress {
+  background-color: var(--zeus-accent);
+  border-radius: 999px;
+}

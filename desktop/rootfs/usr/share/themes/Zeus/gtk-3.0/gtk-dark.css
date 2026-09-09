@@ -1,0 +1,2 @@
+/* GTK 3 uses gtk-dark.css when gtk-application-prefer-dark-theme is active. */
+@import url("gtk.css");

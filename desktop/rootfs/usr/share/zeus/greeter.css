@@ -1,0 +1,21 @@
+/* Native GDM presentation only. No authentication logic or high-contrast changes. */
+#lockDialogGroup {
+  background-color: #12152e;
+  background-image: url("file:///usr/share/backgrounds/zeus/zeus-wallpaper-dark.svg");
+  background-size: cover;
+}
+.login-dialog .login-dialog-user-list-item {
+  border-radius: 22px;
+  background-color: rgba(25, 28, 48, 0.60);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+.login-dialog .login-dialog-user-list-item:selected {
+  background-color: rgba(60, 69, 105, 0.76);
+}
+.login-dialog StEntry {
+  border-radius: 14px;
+  background-color: rgba(30, 34, 54, 0.78);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+}
+.login-dialog-logo-bin { margin-bottom: 32px; }

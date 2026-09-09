@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Zeus desktop styling
+Exec=/usr/libexec/zeus-style-sync
+NoDisplay=true
+OnlyShowIn=GNOME;
+X-GNOME-Autostart-Phase=Initialization

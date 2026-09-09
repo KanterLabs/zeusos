@@ -17,13 +17,13 @@ gi.require_version("Gtk", "4.0")
 from gi.repository import Adw, Gio, GLib, Gtk, Pango
 
 
-VERSION = "0.1.0-preview.1"
+VERSION = "0.1.0-preview.2"
 APPLICATION_ID = "org.zeus.Welcome"
 
 
 CSS = """
 .zeus-window {
-  background: #f7f8fc;
+  background: @window_bg_color;
 }
 
 .hero {
@@ -31,14 +31,14 @@ CSS = """
 }
 
 .eyebrow {
-  color: #5268b8;
+  color: @accent_color;
   font-size: 0.78em;
   font-weight: 700;
   letter-spacing: 0.12em;
 }
 
 .hero-title {
-  color: #17213c;
+  color: @window_fg_color;
   font-size: 2.25em;
   font-weight: 800;
   letter-spacing: -0.03em;
@@ -46,16 +46,16 @@ CSS = """
 }
 
 .hero-copy {
-  color: #4e5870;
+  color: alpha(@window_fg_color, 0.76);
   font-size: 1.08em;
   line-height: 1.4;
   margin-top: 10px;
 }
 
 .version-pill {
-  background: #e7ebff;
+  background: alpha(@accent_bg_color, 0.12);
   border-radius: 999px;
-  color: #4259ae;
+  color: @accent_color;
   font-size: 0.82em;
   font-weight: 700;
   margin-top: 17px;
@@ -63,7 +63,7 @@ CSS = """
 }
 
 .section-title {
-  color: #25304d;
+  color: @window_fg_color;
   font-size: 0.82em;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -75,28 +75,28 @@ CSS = """
 }
 
 .welcome-card {
-  background: rgba(255, 255, 255, 0.92);
+  background: @card_bg_color;
   border: 1px solid rgba(39, 54, 98, 0.10);
   border-radius: 18px;
   padding: 20px;
 }
 
 .card-icon {
-  background: #edf0ff;
+  background: alpha(@accent_bg_color, 0.12);
   border-radius: 13px;
-  color: #4b61bb;
+  color: @accent_color;
   padding: 11px;
 }
 
 .card-title {
-  color: #202a45;
+  color: @window_fg_color;
   font-size: 1.13em;
   font-weight: 750;
   margin-top: 16px;
 }
 
 .card-copy {
-  color: #667089;
+  color: alpha(@window_fg_color, 0.70);
   line-height: 1.35;
   margin-top: 7px;
 }
@@ -106,25 +106,25 @@ CSS = """
 }
 
 .journey {
-  background: #e9edff;
+  background: alpha(@accent_bg_color, 0.12);
   border-radius: 18px;
   margin: 0 40px 38px;
   padding: 21px 23px;
 }
 
 .journey-title {
-  color: #2f438e;
+  color: @accent_color;
   font-weight: 750;
 }
 
 .journey-copy {
-  color: #53638f;
+  color: alpha(@window_fg_color, 0.75);
   line-height: 1.4;
   margin-top: 6px;
 }
 
 .footer-copy {
-  color: #737c91;
+  color: alpha(@window_fg_color, 0.66);
   font-size: 0.86em;
   padding: 0 40px 30px;
 }
@@ -325,8 +325,6 @@ class WelcomeApplication(Adw.Application):
         super().__init__(application_id=APPLICATION_ID)
 
     def do_activate(self):
-        # The welcome artwork uses a light palette; keep native controls legible.
-        self.get_style_manager().set_color_scheme(Adw.ColorScheme.FORCE_LIGHT)
         window = self.props.active_window
         if window is None:
             window = WelcomeWindow(self)

@@ -1,0 +1,7 @@
+[org/gnome/login-screen]
+logo='/usr/share/zeus/zeus-wordmark.svg'
+banner-message-enable=false
+
+[org/gnome/desktop/interface]
+font-name='Adwaita Sans 11'
+color-scheme='prefer-dark'

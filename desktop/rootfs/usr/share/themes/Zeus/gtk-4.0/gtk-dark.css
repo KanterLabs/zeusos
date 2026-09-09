@@ -1,0 +1,2 @@
+/* GTK 4 explicit dark entry point; gtk.css also follows prefers-color-scheme. */
+@import url("gtk.css");

@@ -1,0 +1,12 @@
+[Icon Theme]
+Name=Zeus
+Comment=Original rounded-square application icons for Zeus OS
+Inherits=Adwaita,hicolor
+Directories=scalable/apps
+
+[scalable/apps]
+Context=Applications
+Type=Scalable
+Size=48
+MinSize=16
+MaxSize=512

@@ -306,8 +306,8 @@ fn desktop_safe(dry_run: bool) -> Result<(), CliError> {
         )));
     }
 
-    println!("Safe desktop enabled: Zeus dock disabled; stock GNOME behavior is available.");
-    println!("Zeus wallpaper and preferences were left unchanged.");
+    println!("Safe desktop enabled; native GNOME remains available. Reopen applications for window styling changes.");
+    println!("Owner wallpaper and preferences are preserved; only managed Zeus styling changes.");
     println!("Terminal remains available through {}.", terminal.name);
     println!("Credentials and personal data were left untouched.");
     Ok(())
@@ -343,7 +343,7 @@ fn desktop_restore(dry_run: bool) -> Result<(), CliError> {
             exit_code_text(result.status)
         )));
     }
-    println!("Zeus desktop restored: dock enabled.");
+    println!("Zeus desktop restored. Reopen applications to apply window styling.");
     println!("Credentials and personal data were left untouched.");
     Ok(())
 }

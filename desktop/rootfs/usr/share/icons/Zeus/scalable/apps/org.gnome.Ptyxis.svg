@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title description">
+  <title id="title">Zeus Terminal</title>
+  <desc id="description">A rounded terminal window with a mint command prompt.</desc>
+  <defs>
+    <linearGradient id="tile" x1="26" y1="20" x2="229" y2="240" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#293F83"/>
+      <stop offset="0.52" stop-color="#172650"/>
+      <stop offset="1" stop-color="#281D57"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="42" y1="52" x2="214" y2="205" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#19294D"/>
+      <stop offset="1" stop-color="#0C1730"/>
+    </linearGradient>
+    <linearGradient id="prompt" x1="72" y1="114" x2="186" y2="171" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A9F3D3"/>
+      <stop offset="1" stop-color="#6DCBEA"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8" result="blur"/>
+      <feOffset dy="8" result="offset"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.30"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="10" y="10" width="236" height="236" rx="58" fill="url(#tile)"/>
+  <path d="M33 80C56 38 99 23 148 29C195 35 225 62 238 105V174C222 217 184 239 126 240C73 240 35 220 20 181V120C21 105 25 91 33 80Z" fill="#FFFFFF" fill-opacity="0.06"/>
+  <g filter="url(#shadow)">
+    <rect x="38" y="48" width="180" height="163" rx="26" fill="url(#screen)" stroke="#B6CAFF" stroke-opacity="0.56" stroke-width="3"/>
+    <path d="M40 84H216" stroke="#B6CAFF" stroke-opacity="0.22" stroke-width="2"/>
+    <circle cx="62" cy="67" r="6" fill="#FF5F57"/>
+    <circle cx="82" cy="67" r="6" fill="#FEBC2E"/>
+    <circle cx="102" cy="67" r="6" fill="#28C840"/>
+    <path d="M70 116L98 140L70 164" fill="none" stroke="url(#prompt)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M117 164H181" stroke="#A9F3D3" stroke-width="10" stroke-linecap="round"/>
+    <path d="M117 183H157" stroke="#6DCBEA" stroke-opacity="0.58" stroke-width="5" stroke-linecap="round"/>
+  </g>
+  <circle cx="57" cy="204" r="3" fill="#A9D9FF" fill-opacity="0.60"/>
+  <circle cx="202" cy="42" r="3" fill="#D0C2FF" fill-opacity="0.64"/>
+</svg>

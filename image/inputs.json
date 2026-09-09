@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0-preview.1",
+  "version": "0.1.0-preview.2",
   "architecture": "x86_64",
   "base": "quay.io/fedora/fedora-bootc@sha256:498d7b7816044c3ef854a450c1b6873f48a870adc938c5cefa426a55a05a9bb3",
   "base_release": "44",

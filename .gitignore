@@ -12,3 +12,5 @@ __pycache__/
 *.credentials*
 *.private.*
 
+
+gschemas.compiled

@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "zeus" / "Cargo.toml"
 BINARY = ROOT / "zeus" / "target" / "debug" / "zeus"
-VERSION = "0.1.0-preview.1"
+VERSION = "0.1.0-preview.2"
 
 
 def make_executable(directory, name, contents):
@@ -81,7 +81,7 @@ class ZeusCliTests(unittest.TestCase):
             bootc = make_executable(
                 temporary,
                 "bootc",
-                f'#!/bin/sh\nprintf "%s\\n" "$@" > "{arguments_log}"\nprintf "Version: 0.1.0-preview.1\\nPending reboot: yes\\n"\n',
+                f'#!/bin/sh\nprintf "%s\\n" "$@" > "{arguments_log}"\nprintf "Version: 0.1.0-preview.2\\nPending reboot: yes\\n"\n',
             )
             result = self.run_cli("update", "status", env={"ZEUS_BOOTC_BIN": bootc})
             self.assertEqual(result.returncode, 0, result.stderr)

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.zeus-shell"
+          path="/org/gnome/shell/extensions/zeus-shell/">
+    <key name="spotlight-keybinding" type="as">
+      <default>["&lt;Super&gt;space"]</default>
+      <summary>Spotlight search shortcut</summary>
+      <description>Keyboard shortcut that opens the Zeus application search.</description>
+    </key>
+  </schema>
+</schemalist>

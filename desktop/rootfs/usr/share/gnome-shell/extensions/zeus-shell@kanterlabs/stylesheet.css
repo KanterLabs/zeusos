@@ -1,0 +1,326 @@
+/* Zeus Shell keeps the native GNOME panel actors and status menus intact while
+ * giving their shared chrome a compact, translucent macOS-inspired surface. */
+
+#panel.zeus-panel {
+  min-height: 30px;
+  padding-left: 12px;
+  padding-right: 12px;
+  background-color: rgba(246, 248, 255, 0.78);
+  border-bottom: 1px solid rgba(47, 58, 93, 0.16);
+  box-shadow: 0px 2px 18px rgba(28, 42, 75, 0.12);
+  color: #1c2742;
+}
+
+#panel.zeus-panel.zeus-dark {
+  background-color: rgba(15, 25, 54, 0.84);
+  border-bottom-color: rgba(202, 216, 255, 0.13);
+  box-shadow: 0px 2px 18px rgba(0, 0, 0, 0.28);
+  color: #f1f4ff;
+}
+
+#panel.zeus-panel.zeus-high-contrast {
+  background-color: #ffffff;
+  border-bottom: 2px solid #000000;
+  box-shadow: none;
+  color: #000000;
+}
+
+#panel.zeus-panel.zeus-dark.zeus-high-contrast {
+  background-color: #000000;
+  border-bottom-color: #ffffff;
+  color: #ffffff;
+}
+
+#panel.zeus-panel #panelLeft,
+#panel.zeus-panel #panelCenter,
+#panel.zeus-panel #panelRight {
+  spacing: 4px;
+}
+
+#panel.zeus-panel #panelRight {
+  spacing: 2px;
+}
+
+#panel.zeus-panel .panel-button,
+#panel.zeus-panel .zeus-menu-button {
+  min-height: 26px;
+  border-radius: 9px;
+  padding-left: 8px;
+  padding-right: 8px;
+  transition-duration: 160ms;
+}
+
+#panel.zeus-panel .panel-button:hover,
+#panel.zeus-panel .panel-button:focus,
+#panel.zeus-panel .zeus-menu-button:hover,
+#panel.zeus-panel .zeus-menu-button:focus {
+  background-color: rgba(42, 78, 168, 0.13);
+}
+
+#panel.zeus-panel.zeus-dark .panel-button:hover,
+#panel.zeus-panel.zeus-dark .panel-button:focus,
+#panel.zeus-panel.zeus-dark .zeus-menu-button:hover,
+#panel.zeus-panel.zeus-dark .zeus-menu-button:focus {
+  background-color: rgba(174, 195, 255, 0.14);
+}
+
+#panel.zeus-panel.zeus-high-contrast .panel-button,
+#panel.zeus-panel.zeus-high-contrast .zeus-menu-button {
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  box-shadow: none;
+}
+
+.zeus-menu-container {
+  margin-right: 2px;
+}
+
+.zeus-menu-content {
+  spacing: 7px;
+}
+
+.zeus-menu-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  background-color: #3d6fe8;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: bold;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.zeus-dark .zeus-menu-mark {
+  background-color: #9eb6ff;
+  color: #10204e;
+}
+
+.zeus-high-contrast .zeus-menu-mark {
+  border: 1px solid currentColor;
+  background-color: transparent;
+  color: inherit;
+}
+
+.zeus-menu-label {
+  font-weight: bold;
+}
+
+.zeus-panel-divider {
+  margin-left: 5px;
+  margin-right: 5px;
+  background-color: rgba(74, 91, 134, 0.30);
+}
+
+.zeus-dark .zeus-panel-divider {
+  background-color: rgba(209, 221, 255, 0.24);
+}
+
+.zeus-high-contrast .zeus-panel-divider {
+  background-color: currentColor;
+}
+
+.zeus-app-name {
+  max-width: 240px;
+  color: inherit;
+  font-weight: 500;
+  text-overflow: ellipsis;
+}
+
+#dashtodockContainer.bottom.zeus-dock #dash .dash-background {
+  margin-bottom: 7px;
+  border: 1px solid rgba(207, 220, 255, 0.26);
+  border-radius: 25px;
+  background-color: rgba(19, 31, 67, 0.82) !important;
+  box-shadow: 0px 8px 28px rgba(0, 0, 0, 0.25);
+}
+
+#dashtodockContainer.bottom.zeus-dock #dash #dashtodockDashContainer {
+  padding-left: 9px;
+  padding-right: 9px;
+}
+
+#dashtodockContainer.bottom.zeus-dock #dash .dash-item-container {
+  margin-left: 2px;
+  margin-right: 2px;
+}
+
+#dashtodockContainer.bottom.zeus-dock #dash .dash-item-container:hover .overview-icon,
+#dashtodockContainer.bottom.zeus-dock #dash .dash-item-container:focus .overview-icon {
+  background-color: rgba(200, 218, 255, 0.16);
+  border-radius: 13px;
+}
+
+#dashtodockContainer.bottom.zeus-dock.zeus-light #dash .dash-background {
+  border-color: rgba(63, 86, 151, 0.22);
+  background-color: rgba(245, 248, 255, 0.84) !important;
+  box-shadow: 0px 8px 28px rgba(44, 62, 105, 0.20);
+}
+
+#dashtodockContainer.bottom.zeus-dock.zeus-light #dash .dash-item-container:hover .overview-icon,
+#dashtodockContainer.bottom.zeus-dock.zeus-light #dash .dash-item-container:focus .overview-icon {
+  background-color: rgba(52, 86, 174, 0.12);
+}
+
+#dashtodockContainer.bottom.zeus-dock.zeus-high-contrast #dash .dash-background {
+  border: 2px solid currentColor;
+  border-radius: 4px;
+  background-color: #ffffff !important;
+  box-shadow: none;
+}
+
+#dashtodockContainer.bottom.zeus-dock.zeus-dark.zeus-high-contrast #dash .dash-background {
+  background-color: #000000 !important;
+}
+
+.zeus-spotlight-overlay {
+  background-color: rgba(6, 13, 32, 0.32);
+}
+
+.zeus-spotlight-dialog {
+  width: 620px;
+  min-height: 118px;
+  max-height: 560px;
+  padding: 15px;
+  border: 1px solid rgba(211, 224, 255, 0.34);
+  border-radius: 18px;
+  background-color: rgba(245, 248, 255, 0.94);
+  box-shadow: 0px 20px 70px rgba(9, 20, 51, 0.35);
+  color: #1c2742;
+  spacing: 10px;
+}
+
+.zeus-search-heading {
+  spacing: 8px;
+  padding-left: 3px;
+  padding-right: 3px;
+}
+
+.zeus-search-title {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.zeus-search-shortcut {
+  padding: 3px 7px;
+  border-radius: 6px;
+  background-color: rgba(68, 97, 165, 0.12);
+  color: #4a5f94;
+  font-size: 11px;
+}
+
+.zeus-search-entry {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid rgba(70, 95, 155, 0.26);
+  border-radius: 11px;
+  background-color: rgba(255, 255, 255, 0.76);
+  color: #162444;
+  caret-color: #3d6fe8;
+  font-size: 16px;
+}
+
+.zeus-search-entry:focus {
+  border-color: #4d79e8;
+  box-shadow: 0px 0px 0px 2px rgba(77, 121, 232, 0.19);
+}
+
+.zeus-search-entry-icon {
+  margin-right: 9px;
+  color: #5475c8;
+}
+
+.zeus-search-scroll {
+  min-height: 0;
+}
+
+.zeus-search-results {
+  spacing: 3px;
+}
+
+.zeus-search-result {
+  min-height: 48px;
+  padding: 3px 7px;
+  border-radius: 10px;
+  color: #1c2742;
+}
+
+.zeus-search-result:hover,
+.zeus-search-result:selected {
+  background-color: rgba(74, 112, 218, 0.13);
+}
+
+.zeus-search-result-row {
+  spacing: 12px;
+}
+
+.zeus-search-result-label {
+  font-size: 14px;
+}
+
+.zeus-search-empty {
+  padding: 18px;
+  color: #5d6b8c;
+}
+
+.zeus-dark .zeus-spotlight-dialog {
+  border-color: rgba(188, 208, 255, 0.24);
+  background-color: rgba(18, 30, 65, 0.96);
+  box-shadow: 0px 20px 70px rgba(0, 0, 0, 0.50);
+  color: #f1f4ff;
+}
+
+.zeus-dark .zeus-search-shortcut {
+  background-color: rgba(180, 201, 255, 0.14);
+  color: #bed0ff;
+}
+
+.zeus-dark .zeus-search-entry {
+  border-color: rgba(190, 210, 255, 0.26);
+  background-color: rgba(7, 16, 39, 0.72);
+  color: #f1f4ff;
+}
+
+.zeus-dark .zeus-search-result {
+  color: #eef2ff;
+}
+
+.zeus-dark .zeus-search-result:hover,
+.zeus-dark .zeus-search-result:selected {
+  background-color: rgba(174, 200, 255, 0.15);
+}
+
+.zeus-dark .zeus-search-empty {
+  color: #a8b9e4;
+}
+
+.zeus-spotlight-overlay.zeus-high-contrast {
+  background-color: rgba(0, 0, 0, 0.70);
+}
+
+.zeus-high-contrast .zeus-spotlight-dialog {
+  border: 2px solid currentColor;
+  border-radius: 4px;
+  background-color: #ffffff;
+  box-shadow: none;
+  color: #000000;
+}
+
+.zeus-spotlight-overlay.zeus-dark.zeus-high-contrast .zeus-spotlight-dialog {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+.zeus-high-contrast .zeus-search-entry {
+  border: 2px solid currentColor;
+  border-radius: 3px;
+  background-color: inherit;
+  color: inherit;
+  box-shadow: none;
+}
+
+.zeus-high-contrast .zeus-search-result:hover,
+.zeus-high-contrast .zeus-search-result:selected {
+  border: 2px solid currentColor;
+  background-color: transparent;
+}

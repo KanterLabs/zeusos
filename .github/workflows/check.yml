@@ -16,10 +16,12 @@ jobs:
       - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
       - name: Validate image inputs, assets and login policy
         run: python3 -m unittest discover -s tests -p test_image_contract.py -v
+      - name: Preserve owner styles through visual changes
+        run: python3 -m unittest discover -s tests -p test_style_preservation.py -v
       - name: Check build script syntax
         run: bash -n scripts/build.sh scripts/build-disk.sh
       - name: Check welcome application syntax
-        run: python3 -m py_compile zeus/assets/welcome.py
+        run: python3 -m py_compile zeus/assets/welcome.py scripts/build-greeter-theme.py
   cli:
     runs-on: homelab-heavy
     timeout-minutes: 10

@@ -1,0 +1,9 @@
+{
+  "uuid": "zeus-shell@kanterlabs",
+  "name": "Zeus Shell",
+  "description": "A macOS-inspired Zeus panel and native application search.",
+  "shell-version": ["50"],
+  "session-modes": ["user"],
+  "settings-schema": "org.gnome.shell.extensions.zeus-shell",
+  "version": 1
+}

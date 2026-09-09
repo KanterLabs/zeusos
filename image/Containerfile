@@ -12,8 +12,14 @@ COPY zeus/Cargo.toml zeus/Cargo.lock ./
 COPY zeus/src ./src
 RUN cargo test --locked --offline && cargo build --release --locked --offline
 
+FROM desktop-base AS branding-builder
+RUN dnf install -y --setopt=install_weak_deps=False glib2-devel && dnf clean all
+COPY desktop/rootfs/usr/share/zeus/ /usr/share/zeus/
+COPY scripts/build-greeter-theme.py /tmp/build-greeter-theme.py
+RUN python3 /tmp/build-greeter-theme.py
+
 FROM desktop-base
-ARG VERSION=0.1.0-preview.1
+ARG VERSION=0.1.0-preview.2
 ARG SOURCE_COMMIT=unknown
 LABEL org.opencontainers.image.title="Zeus OS" \
       org.opencontainers.image.description="A focused, beautiful laptop desktop. First preview." \
@@ -22,13 +28,16 @@ LABEL org.opencontainers.image.title="Zeus OS" \
       org.opencontainers.image.revision="${SOURCE_COMMIT}"
 COPY desktop/rootfs/ /
 COPY image/rootfs/ /
+COPY --from=branding-builder /usr/share/gnome-shell/gnome-shell-theme.gresource /usr/share/gnome-shell/gnome-shell-theme.gresource
 COPY --from=cli-builder /src/zeus/target/release/zeus /usr/bin/zeus
 COPY zeus/assets/welcome.py /usr/libexec/zeus-welcome
 COPY zeus/assets/org.zeus.Welcome.desktop /usr/share/applications/org.zeus.Welcome.desktop
 COPY image/inputs.json /usr/share/zeus/inputs.json
 RUN chmod 0755 /usr/libexec/zeus-welcome && \
+    glib-compile-schemas /usr/share/gnome-shell/extensions/zeus-shell@kanterlabs/schemas && \
     dconf update && \
     gtk-update-icon-cache --force --ignore-theme-index /usr/share/icons/hicolor && \
+    gtk-update-icon-cache --force --ignore-theme-index /usr/share/icons/Zeus && \
     systemctl set-default graphical.target && \
     systemctl enable gdm.service NetworkManager.service firewalld.service sshd.service && \
     systemctl enable cloud-init-local.service cloud-init-network.service cloud-init-main.service cloud-config.service cloud-final.service && \
