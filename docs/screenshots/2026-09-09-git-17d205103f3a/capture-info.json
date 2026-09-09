@@ -1,0 +1,38 @@
+{
+  "vmid": 115,
+  "version": "0.1.0-preview.2",
+  "build_id": "git-17d205103f3a",
+  "resolution": [
+    1280,
+    800
+  ],
+  "capture_method": "Native Proxmox console screenshot",
+  "files": [
+    {
+      "file": "desktop.png",
+      "file_written_at_utc": "2026-09-09T11:50:51.821896+00:00",
+      "sha256": "b4a08c137456296d9f631ebb639e49808ef0aa64d9d2db4269ecb7ab4073c85d"
+    },
+    {
+      "file": "updates.png",
+      "file_written_at_utc": "2026-09-09T11:52:32.732906+00:00",
+      "sha256": "c6d1f1ab423682481c2e96576b8e3f572235faead0db2db7cc089a2010abbaff"
+    },
+    {
+      "file": "welcome.png",
+      "file_written_at_utc": "2026-09-09T11:52:30.869766+00:00",
+      "sha256": "79eba96ff20c03c81fa35364bb7f8629424f11be22b6a9222ce3a0269cb01a38"
+    },
+    {
+      "file": "temp.png",
+      "file_written_at_utc": "2026-09-09T11:51:49.161854+00:00",
+      "sha256": "9a42e975264e625a79672e8aaac1d2a1881cd49235b09afbcdd867ad5ec8adea"
+    },
+    {
+      "file": "temp-options.png",
+      "file_written_at_utc": "2026-09-09T11:51:50.571368+00:00",
+      "sha256": "2e07f68e661c1be8e35ce43e8f4dbafbbf23140d736d99a32589297f664bd860"
+    }
+  ],
+  "owner_temp_policy_and_status_unchanged": true
+}
