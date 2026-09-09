@@ -1,11 +1,30 @@
 # AirPods support
 
-Status: **ZOS-70 is awaiting the target model and Bluetooth-equipped test
-hardware**. The software readiness gate is implemented and verified; the broader
+Status: **ZOS-70 is awaiting Bluetooth-equipped test hardware**. The target is
+confirmed as AirPods Pro 2 (Lightning family), model A2698, with reported firmware
+8B21. The software readiness gate is implemented and verified; the broader
 AirPods support outcome remains incomplete.
 The currently deployed image is `git-fd2125f63159`; this document is an
 implementation and qualification contract, not a claim of a tested AirPods pair.
 Continue iterating **0.1.0-preview.2** with separate build IDs.
+
+## Confirmed target — 2026-09-09 UTC
+
+The owner-provided Settings screenshot shows **A2698** and firmware **8B21**.
+[Apple's model identification](https://support.apple.com/en-ie/109525) lists
+A2698 under **AirPods Pro 2 with MagSafe Charging Case (Lightning)**, introduced
+in 2022. This is the first Zeus hardware-qualification target. The screenshot
+and serial number are not stored in this repository.
+
+Use music and calls as the initial qualification workload. First verify native
+pairing, AAC/SBC negotiation, playback, headset microphone routing, stereo
+restoration and reconnect/suspend behavior. Then qualify the optional left/right/
+case battery readings, ANC/Transparency and ear-detection integration on this
+model. Other listening modes need confirmed device support before being exposed.
+
+Firmware 8B21 is an observed target value, not a compatibility result or a claim
+that it is the latest firmware. Record the firmware again at the start of actual
+hardware testing; an update must not inherit results from an untested version.
 
 ## Experience to deliver
 
@@ -29,8 +48,8 @@ Continue iterating **0.1.0-preview.2** with separate build IDs.
 ## Implementation checklist
 
 - [x] Record actual deployed BlueZ, PipeWire, WirePlumber and codec capabilities.
-- [ ] Confirm the target AirPods model and music/call workflow; until answered,
-  assess ordinary listening and calls across models without promising parity.
+- [x] Confirm the target model and reported firmware: A2698, AirPods Pro 2
+  (Lightning family), 8B21. Start with both music and calls.
 - [x] Review native-stack gaps and current upstream control implementations;
   retain native audio and scope the optional control adapter separately.
 - [x] Gate image builds on the existing audio executables and loadable AAC,
@@ -78,7 +97,8 @@ There is no missing codec package to install for the basic playback/call path.
 The review VM has only a virtual audio sink and no microphone. Both VM 115 and
 the Proxmox host expose zero Bluetooth controllers. No radio was scanned, device
 paired, pairing key reset or audio preference changed during this inventory.
-The AirPods model and firmware remain unknown pending Shane's reply.
+The later owner screenshot identifies the target model and firmware above;
+this resolves identification only, without adding any physical test result.
 
 ## Integration decision
 
@@ -157,8 +177,9 @@ No new runtime feature has been deployed for this work. The owner VM remains on
 `git-fd2125f63159`, with no reboot or changed audio preferences. Physical pairing,
 audio, microphone, battery and noise-control results remain pending.
 
-To resume hardware qualification, record the AirPods model/firmware and use a
+To resume hardware qualification, use the confirmed AirPods Pro 2 pair with a
 Bluetooth-equipped laptop or attach an available Bluetooth controller to VM 115.
+Record the adapter/driver and recheck the reported 8B21 firmware before testing.
 Neither VM 115 nor the current Proxmox host exposed a controller during this
 inspection. ZOS-71 remains unclaimed until the advanced-control work is started.
 
