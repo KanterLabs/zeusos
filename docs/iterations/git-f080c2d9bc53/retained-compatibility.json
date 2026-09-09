@@ -1,0 +1,31 @@
+{
+  "rollback_build_id": "git-9c2cfbdcb703",
+  "retained_binary_comparison": [
+    {
+      "path": "usr/bin/zeus",
+      "same_sha256": true
+    },
+    {
+      "path": "usr/lib/zeus/zeus_temp.py",
+      "same_sha256": true
+    },
+    {
+      "path": "usr/lib/zeus/zeus_update.py",
+      "same_sha256": true
+    },
+    {
+      "path": "usr/libexec/zeus-browser-session",
+      "same_sha256": true
+    },
+    {
+      "path": "usr/share/zeus/packages.lock",
+      "same_sha256": true
+    }
+  ],
+  "retained_temp_module_read_actual_populated_state": true,
+  "temp_files": 2,
+  "temp_policy": "never",
+  "codex_absent_from_retained_usr": true,
+  "rollback_boot_cycle": "not_run",
+  "owner_data_restored_or_rewritten": false
+}

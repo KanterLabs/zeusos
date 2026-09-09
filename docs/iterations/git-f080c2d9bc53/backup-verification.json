@@ -1,0 +1,10 @@
+{
+  "started_at_utc": "2026-09-09T23:13:10.622852+00:00",
+  "archive": "/mnt/pve/sata-ssd/zeusos/backups/codex-20260909/vzdump-qemu-115-2026_09_09-14_10_57.vma.zst",
+  "size_bytes": 32711724318,
+  "completed_at_utc": "2026-09-09T23:18:02.777385+00:00",
+  "zstd_test": "passed",
+  "vma_verify": "passed",
+  "scratch_removed": true,
+  "restore_performed": false
+}

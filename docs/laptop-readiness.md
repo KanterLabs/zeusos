@@ -9,6 +9,10 @@ VM 115 is useful evidence but is not a laptop: it has 4 vCPUs, 8 GiB RAM, a 64 G
 The implementation and testing plans are proposals and explicitly leave their items unchecked ([implementation](implementation-plan.md), [testing](testing-plan.md)).
 The dated receipts provide the current evidence:
 
+VM115 currently runs `git-f080c2d9bc53`, still `0.1.0-preview.2`, with Chrome
+153.0.8010.36 and standalone Codex CLI 0.154.0. Earlier feature receipts below
+remain their original qualification records.
+
 | Area | Status | Evidence and limit |
 | --- | --- | --- |
 | Image and desktop | **VM verified** | Build `git-31f0851a9d07`, exact OCI digest, 1,011 packages, native GDM/Wayland, lock/login, scaling, accessibility and safe fallback are recorded ([receipt](iterations/git-31f0851a9d07/build-receipt.json), [UI checks](iterations/git-31f0851a9d07/installed-ui-verification.json)). |
@@ -19,6 +23,7 @@ The dated receipts provide the current evidence:
 | Bluetooth/AirPods | **Software only** | BlueZ/PipeWire/WirePlumber and codecs pass software checks, but no pair, audio, microphone, battery, ANC or reconnect result exists ([feature contract](features/airpods.md), [installed check](features/airpods/installed-image-check.json)). The current pair's exact model and firmware are unknown. |
 | Backup/recovery | **Partial / missing** | VM 115 has verified VMA archive integrity and preserved-file hashes, but `restore_performed: false`; profile restore, independent enrollment and replacement automation are later work ([backup](iterations/git-31f0851a9d07/backup-verification.json), [M2 plan](implementation-plan.md#m2-make-a-replacement-laptop-recoverable)). |
 | Browser | **VM verified** | Build `git-9c2cfbdcb703` deploys official Chrome `153.0.8010.36` in a 1,023-package image; native defaults, HTTPS, sandbox, recommended Temp download, active-download/Keep, process exit and dated boot/idle samples passed; physical qualification remains pending ([Chrome receipt](iterations/git-9c2cfbdcb703/README.md), [package diff](iterations/git-9c2cfbdcb703/package-diff.json), [tests](iterations/git-9c2cfbdcb703/browser-tests.txt), [Chrome contract](features/google-chrome.md)). |
+| Codex CLI | **VM verified; account use pending** | Standalone 0.154.0 is included without Node/npm or a boot service. Native Terminal sign-in choices, offline help, actual sandbox restrictions and clean exit passed. No model request or account sign-in was performed; the remote T3/Codex workflow remains separate ([Codex receipt](iterations/git-f080c2d9bc53/README.md)). |
 
 ## Migration decision (scoped)
 

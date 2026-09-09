@@ -1,0 +1,16 @@
+{
+  "native_terminal": "Ptyxis on GNOME Wayland",
+  "native_initial_sign_in_choices_visible": true,
+  "running": [
+    {
+      "pid": 3536,
+      "executable": "/usr/lib/codex/bin/codex"
+    }
+  ],
+  "exit_requested_at_utc": "2026-09-09T23:48:12.223404+00:00",
+  "processes_after_exit": [],
+  "exit_observed_seconds": 0.522,
+  "account_sign_in_performed": false,
+  "model_request_performed": false,
+  "background_daemon_started": false
+}

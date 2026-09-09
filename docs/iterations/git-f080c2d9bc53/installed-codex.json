@@ -1,0 +1,24 @@
+{
+  "ok": true,
+  "version": "codex-cli 0.154.0",
+  "target": "x86_64-unknown-linux-musl",
+  "archive_sha256": "fc6e3e3b85f2cf7d664520ee5c66a7fe4aa12bae7d46834f47e2f165fd0d6f78",
+  "verified_files": [
+    "bin/codex",
+    "bin/codex-code-mode-host",
+    "codex-package.json",
+    "codex-path/rg",
+    "codex-resources/bwrap",
+    "codex-resources/zsh/bin/zsh"
+  ],
+  "installed_package_bytes": 339126741,
+  "version_wall_seconds": 0.007,
+  "offline_help": [
+    "main",
+    "sandbox",
+    "login"
+  ],
+  "startup_update_checks_default": false,
+  "authentication_performed": false,
+  "model_request_performed": false
+}

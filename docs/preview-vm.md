@@ -320,9 +320,27 @@ The declared comparison and budgets are in
 [`preview-1-budgets.md`](releases/preview-1-budgets.md). Record actual values
 and variability; the 4-vCPU/8-GiB VM allocation is not performance evidence.
 
-## Current signed Chrome iteration
+## Current signed Codex CLI iteration
 
-VM 115 runs signed build `git-9c2cfbdcb703`, still version `0.1.0-preview.2`.
+VM115 runs **0.1.0-preview.2 / git-f080c2d9bc53** with official standalone
+Codex CLI 0.154.0. In Terminal, run `codex` and sign in with your own account.
+No Node/npm runtime or Codex boot service is added. The
+[Codex receipt and screenshots](iterations/git-f080c2d9bc53/README.md) record
+signed installation, native first launch, sandbox checks, preservation, retained
+binary compatibility and all boot/idle measurements. The previous Chrome build
+`git-9c2cfbdcb703` is retained for rollback; builder VM116 is stopped.
+
+The installed archive is
+`/var/lib/zeus/updater/downloads/zeusos-0.1.0-preview.2-git-f080c2d9bc53.oci`.
+The populated pre-update backup at
+`/mnt/pve/sata-ssd/zeusos/backups/codex-20260909/vzdump-qemu-115-2026_09_09-14_10_57.vma.zst`
+passed full zstd and VMA verification. No restore was performed. Twelve stable
+owner hashes match; the earlier Chrome Preferences hash change is recorded
+separately. Native Chrome/profile checks passed. Temp is restored to On boot.
+
+## Previous signed Chrome iteration (historical)
+
+This iteration deployed signed build `git-9c2cfbdcb703`, version `0.1.0-preview.2`.
 Official Chrome Stable replaces Firefox; the retained predecessor is the city
 build `git-31f0851a9d07`. New downloads use Temp and background apps default off.
 The [Chrome receipt](iterations/git-9c2cfbdcb703/README.md) records the native

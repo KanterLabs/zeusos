@@ -1,0 +1,7 @@
+{
+  "method": "zeus update install through administrator CLI; explicit systemctl reboot",
+  "restart_requested_at_utc": "2026-09-09T23:34:22.525104+00:00",
+  "build_id": "git-f080c2d9bc53",
+  "new_build_ssh_at_utc": "2026-09-09T23:34:45.940720+00:00",
+  "restart_to_new_build_ssh_seconds": 23.416
+}

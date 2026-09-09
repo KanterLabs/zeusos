@@ -566,6 +566,73 @@ unmeasured/unexecuted; no laptop backup was started.
 [package diff](iterations/git-9c2cfbdcb703/package-diff.json) and
 [qualification notes](iterations/git-9c2cfbdcb703/qualification-notes.json).
 
+### 2026-09-09 — Standalone Codex CLI on the preview
+
+- Recorded at (UTC): `2026-09-09T23:54:16.531505+00:00`
+- Version: `0.1.0-preview.2`; payload `git-f080c2d9bc53`.
+- Codex: official standalone `0.154.0`, with matching bundled helpers.
+- VM115: 4 vCPU / 8 GiB / 64 GiB / VirtIO / UEFI Secure Boot / 1280×800,
+  100% scale. VM116 stopped; populated backup verification finished.
+- Protocol: three cold boots to active GDM; fresh native login and a closed
+  desktop with 20 s settle, 120 s idle sample and 5 s intervals. Temp held Never
+  during qualification boots and restored On boot afterward. No model/API task.
+
+| Metric | Chrome reference | Codex build | Unit |
+| --- | ---: | ---: | --- |
+| OS startup samples | 7.033 / 7.030 / 7.108 | 7.769 / 7.141 / 7.515 | s |
+| OS startup median | 7.033 | 7.515 | s |
+| Host → active greeter samples | 46.938 / 17.681 / 17.606 | 20.264 / 18.305 / 17.778 | s |
+| Host → active greeter median | 17.681 | 18.305 | s |
+| Closed desktop CPU | 0.15 | 0.20 | % |
+| Closed desktop used memory | 911.3 | 919.6 | MiB |
+| RPM packages | 1,023 | 1,023, identical inventory | count |
+| Full OCI | 1,925,267,456 | 2,060,534,272 | bytes |
+| Standalone Codex package | absent | 339,126,741 | bytes |
+
+Cold boot windows (UTC):
+
+| Trial | Start | End |
+| --- | --- | --- |
+| 1 | `2026-09-09T23:37:37.837233535Z` | `2026-09-09T23:37:58.338033089Z` |
+| 2 | `2026-09-09T23:38:47.200308470Z` | `2026-09-09T23:39:05.699134083Z` |
+| 3 | `2026-09-09T23:41:04.029334275Z` | `2026-09-09T23:41:22.033437945Z` |
+
+Closed idle ran `2026-09-09T23:43:27.712352757Z` →
+`2026-09-09T23:45:27.723837933Z`: 154.7 context switches/s,
+2 process starts and 0 Temp cleanup activations.
+No Codex process started at login. Native first launch reached its sign-in
+choices; exit left zero Codex processes after the 0.522 s observation. The
+installed version check took 0.007 s after integrity hashing, a warm check rather
+than a cold interactive-launch benchmark.
+
+The image grows 129.000 MiB, without Node/npm or a Codex boot service. OS startup
+median is 0.482 s higher and host-to-greeter median is 0.624 s higher than the
+historical reference; closed memory is 8.3 MiB higher and CPU is 0.05 percentage
+points higher. Shared-host variability and three samples do not establish Codex
+as the cause. Every sample is retained; these VM counters do not measure battery
+energy, runtime or hardware wakeups.
+
+Between trials 2 and 3, graceful poweroff closed SSH with status 255. Proxmox
+confirmed the stopped state before the third measurement; no reset or discarded
+boot trial was used. The explicit update restart reached the new build over SSH
+in 23.416 s. All six release assets were verified before feed publication.
+
+165 Python tests, nine lock lifecycle tests and Rust/CLI checks passed; source
+and feed CI passed. Installed package, unprivileged sandbox, native Terminal,
+Chrome profile and retained Temp-binary checks passed. Twelve stable owner
+hashes matched after qualification. An early Chrome Preferences hash differed,
+with its current mtime preceding the image build; it is documented separately,
+not counted as an exact match. No data restore, reinstall or reseed occurred.
+No physical laptop install, AirPods/battery qualification, account sign-in or
+model request was performed.
+
+[Receipt and screenshots](iterations/git-f080c2d9bc53/README.md),
+[all samples](iterations/git-f080c2d9bc53/performance.json),
+[closed idle](iterations/git-f080c2d9bc53/idle-closed.json),
+[native CLI lifecycle](iterations/git-f080c2d9bc53/codex-lifecycle.json),
+[sandbox](iterations/git-f080c2d9bc53/sandbox-runtime.json), and
+[preservation assessment](iterations/git-f080c2d9bc53/preservation-assessment.json).
+
 ## Entry template
 
 Insert this compact block immediately above the Entry template section for every

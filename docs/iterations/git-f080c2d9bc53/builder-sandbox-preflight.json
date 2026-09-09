@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "started_at_utc": "2026-09-09T23:16:37.815559+00:00",
+  "completed_at_utc": "2026-09-09T23:16:38.099071+00:00",
+  "uid": 1000,
+  "checks": {
+    "workspace_write": true,
+    "outside_write_denied": true,
+    "host_network_denied": true,
+    "read_only_write_denied": true
+  },
+  "fixture_removed": true,
+  "authentication_performed": false,
+  "model_request_performed": false
+}

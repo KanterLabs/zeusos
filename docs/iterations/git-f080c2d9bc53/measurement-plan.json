@@ -1,0 +1,38 @@
+{
+  "recorded_at_utc": "2026-09-09T23:11:32.907940+00:00",
+  "reference_build": "git-9c2cfbdcb703",
+  "product_version": "0.1.0-preview.2",
+  "vm": {
+    "id": 115,
+    "vcpus": 4,
+    "ram_mib": 8192,
+    "display": "1280x800 scale1",
+    "shared_host": true
+  },
+  "before_measurement": [
+    "backup verification finished",
+    "builder VM116 stopped",
+    "Temp held Never",
+    "native fresh login"
+  ],
+  "cold_boot": {
+    "samples": 3,
+    "reference_median_os_seconds": 7.033,
+    "reference_median_host_to_greeter_seconds": 17.681
+  },
+  "closed_desktop_idle": {
+    "settle_seconds": 20,
+    "sample_seconds": 120,
+    "reference_cpu_percent": 0.15,
+    "reference_memory_used_mib": 911.3
+  },
+  "codex_checks": [
+    "pinned package identity and helper hashes",
+    "offline version and help",
+    "sandbox workspace write, outside-write denied, network denied",
+    "native initial login chooser without sign-in or paid requests",
+    "no Codex process at boot or after initial TUI exit",
+    "owner files, Chrome profile and keyring preserved"
+  ],
+  "interpretation": "Record package/image storage cost, every boot sample and any runtime failure. VM samples are regression observations; physical laptop battery remains unmeasured."
+}

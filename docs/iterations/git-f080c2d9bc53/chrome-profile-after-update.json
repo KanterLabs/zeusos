@@ -1,0 +1,12 @@
+{
+  "preferences_valid_json": true,
+  "preferences_size": 41456,
+  "mtime_utc": "2026-09-09T23:19:10.556738+00:00",
+  "profile_exit_type": "Normal",
+  "profile_exited_cleanly": null,
+  "profile_creation_time_present": true,
+  "download_directory_explicit": null,
+  "browser_background_mode_explicit": null,
+  "history_database_present": true,
+  "preferences_sha256": "4f648801c9f8fa4476f627ff3155d3f813d9dc441d884b66bc23834d15485608"
+}

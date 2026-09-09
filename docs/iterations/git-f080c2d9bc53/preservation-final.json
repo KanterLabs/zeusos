@@ -1,0 +1,50 @@
+[
+  {
+    "file": "Downloads/zeus-preservation-test.txt",
+    "preserved": true
+  },
+  {
+    "file": "Documents/zeus-temp-test.txt",
+    "preserved": true
+  },
+  {
+    "file": ".local/state/zeusos/after-backup.txt",
+    "preserved": true
+  },
+  {
+    "file": ".local/state/zeusos/after-update.txt",
+    "preserved": true
+  },
+  {
+    "file": ".local/state/zeusos/preservation.txt",
+    "preserved": true
+  },
+  {
+    "file": ".local/state/zeusos/visual-after-backup.txt",
+    "preserved": true
+  },
+  {
+    "file": "Temp/zeus-temp-test.txt",
+    "preserved": true
+  },
+  {
+    "file": ".local/state/zeusos/chrome-after-backup.txt",
+    "preserved": true
+  },
+  {
+    "file": "Temp/zeus-chrome-download.txt",
+    "preserved": true
+  },
+  {
+    "file": ".local/state/zeusos/keyring-preserved-20260909/login.keyring",
+    "preserved": true
+  },
+  {
+    "file": ".local/share/keyrings/login.keyring",
+    "preserved": true
+  },
+  {
+    "file": ".local/state/zeusos/codex-after-backup.txt",
+    "preserved": true
+  }
+]

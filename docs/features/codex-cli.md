@@ -39,6 +39,9 @@ history or sessions. Upstream sandbox and approval defaults remain in place.
 
 ## Qualification
 
+The [Codex preview iteration](../iterations/git-f080c2d9bc53/README.md) records
+the installed package, native screen, preservation checks and measured costs.
+
 Source checks exercise successful installation, corrupt downloads, unsafe
 archive entries and an existing destination. Runtime qualification checks the
 exact executable and helpers, offline help, a writable sandbox workspace with

@@ -4,7 +4,16 @@ A focused Fedora bootc laptop desktop with a macOS-inspired layout, original Zeu
 
 The current version is **0.1.0-preview.2**. It includes a translucent top bar and floating dock, original icons, traffic-light window controls, compact application search (Super+Space), a New York dusk wallpaper, and a branded native login screen. GNOME/Wayland runs Files, Google Chrome, Ptyxis, Settings, and Welcome. The Rust `zeus` helper provides diagnostics, safe desktop fallback, signed updates, and validated SSH launch.
 
-The latest build replaces Firefox with **official Google Chrome Stable**, makes Chrome the dock and web-link default, and sends new downloads to **Temp**. Chrome's background apps default off and browser updates arrive through signed Zeus Updates. [Screenshots and verification](docs/iterations/git-9c2cfbdcb703/README.md) record the deployment, preservation and performance checks. Product version remains **0.1.0-preview.2**.
+The latest build adds **Codex CLI 0.154.0** as an official standalone package.
+Run `codex` in Terminal and sign in with your own account. [Screenshots and
+verification](docs/iterations/git-f080c2d9bc53/README.md) record the deployed
+package, sandbox checks and measurements. Product version remains **0.1.0-preview.2**.
+
+**Official Google Chrome Stable** remains the dock and web-link default, with
+new downloads going to **Temp**. Background apps default off, and browser and
+Codex upgrades arrive through signed Zeus Updates. The
+[Chrome iteration](docs/iterations/git-9c2cfbdcb703/README.md) retains its earlier
+deployment and preservation evidence.
 
 **New York at dusk** remains the desktop, lock screen and native login background. City and gradient backgrounds stay selectable in **Settings → Appearance**. The [first-laptop checklist](docs/laptop-readiness.md) records the Nimo N154G target and the remaining hardware and migration checks.
 

@@ -1,0 +1,177 @@
+{
+  "recorded_at_utc": "2026-09-09T23:43:53.484477+00:00",
+  "build_id": "git-f080c2d9bc53",
+  "reference_build_id": "git-9c2cfbdcb703",
+  "cold_boots": [
+    {
+      "measurement_started_at_utc": "2026-09-09T23:37:37.837233535Z",
+      "measurement_ended_at_utc": "2026-09-09T23:37:58.338033089Z",
+      "cold_start_to_active_greeter_s": 20.264,
+      "first_ssh_s": 20.264,
+      "systemd_analyze": "Startup finished in 1.346s (kernel) + 2.425s (initrd) + 3.997s (userspace) = 7.769s \ngraphical.target reached after 3.996s in userspace.",
+      "measurement": "Host qm start command to active GDM greeter; SSH polling interval0.5s; includes firmware and probe overhead"
+    },
+    {
+      "measurement_started_at_utc": "2026-09-09T23:38:47.200308470Z",
+      "measurement_ended_at_utc": "2026-09-09T23:39:05.699134083Z",
+      "cold_start_to_active_greeter_s": 18.305,
+      "first_ssh_s": 18.305,
+      "systemd_analyze": "Startup finished in 1.338s (kernel) + 2.378s (initrd) + 3.425s (userspace) = 7.141s \ngraphical.target reached after 3.207s in userspace.",
+      "measurement": "Host qm start command to active GDM greeter; SSH polling interval0.5s; includes firmware and probe overhead"
+    },
+    {
+      "measurement_started_at_utc": "2026-09-09T23:41:04.029334275Z",
+      "measurement_ended_at_utc": "2026-09-09T23:41:22.033437945Z",
+      "cold_start_to_active_greeter_s": 17.778,
+      "first_ssh_s": 17.778,
+      "systemd_analyze": "Startup finished in 1.449s (kernel) + 2.379s (initrd) + 3.686s (userspace) = 7.515s \ngraphical.target reached after 3.300s in userspace.",
+      "measurement": "Host qm start command to active GDM greeter; SSH polling interval0.5s; includes firmware and probe overhead"
+    }
+  ],
+  "os_startup_seconds": {
+    "samples": [
+      7.769,
+      7.141,
+      7.515
+    ],
+    "median": 7.515,
+    "reference_median": 7.033
+  },
+  "host_to_active_greeter_seconds": {
+    "samples": [
+      20.264,
+      18.305,
+      17.778
+    ],
+    "median": 18.305,
+    "reference_median": 17.681
+  },
+  "measurement_note": "A graceful poweroff between trials 2 and 3 closed its SSH connection with status 255; Proxmox confirmed the VM was stopped before trial 3. No reset or extra boot trial was used.",
+  "limits": "Same VM allocation, builder stopped, backup verification complete, native login and Temp held Never. Shared host otherwise unisolated; three samples are regression observations and do not establish Codex as the cause of timing differences. No physical battery measurement.",
+  "closed_idle": {
+    "label": "codex-installed-closed-desktop",
+    "measurement_started_at_utc": "2026-09-09T23:43:27.712352757Z",
+    "measurement_ended_at_utc": "2026-09-09T23:45:27.723837933Z",
+    "seconds": 120.01,
+    "settle_seconds": 20,
+    "samples": [
+      {
+        "cpu_percent": 0.15,
+        "memory_used_mib": 919.7
+      },
+      {
+        "cpu_percent": 0.1,
+        "memory_used_mib": 919.7
+      },
+      {
+        "cpu_percent": 0.25,
+        "memory_used_mib": 919.7
+      },
+      {
+        "cpu_percent": 0.15,
+        "memory_used_mib": 919.7
+      },
+      {
+        "cpu_percent": 0.25,
+        "memory_used_mib": 919.7
+      },
+      {
+        "cpu_percent": 0.05,
+        "memory_used_mib": 919.7
+      },
+      {
+        "cpu_percent": 0.3,
+        "memory_used_mib": 919.7
+      },
+      {
+        "cpu_percent": 0.2,
+        "memory_used_mib": 919.7
+      },
+      {
+        "cpu_percent": 0.25,
+        "memory_used_mib": 919.7
+      },
+      {
+        "cpu_percent": 0.25,
+        "memory_used_mib": 919.6
+      },
+      {
+        "cpu_percent": 0.15,
+        "memory_used_mib": 919.6
+      },
+      {
+        "cpu_percent": 0.2,
+        "memory_used_mib": 919.6
+      },
+      {
+        "cpu_percent": 0.15,
+        "memory_used_mib": 919.6
+      },
+      {
+        "cpu_percent": 0.15,
+        "memory_used_mib": 919.6
+      },
+      {
+        "cpu_percent": 0.2,
+        "memory_used_mib": 919.6
+      },
+      {
+        "cpu_percent": 0.25,
+        "memory_used_mib": 919.6
+      },
+      {
+        "cpu_percent": 0.2,
+        "memory_used_mib": 916.5
+      },
+      {
+        "cpu_percent": 0.25,
+        "memory_used_mib": 916.5
+      },
+      {
+        "cpu_percent": 0.3,
+        "memory_used_mib": 916.5
+      },
+      {
+        "cpu_percent": 0.25,
+        "memory_used_mib": 916.5
+      },
+      {
+        "cpu_percent": 0.15,
+        "memory_used_mib": 916.5
+      },
+      {
+        "cpu_percent": 0.2,
+        "memory_used_mib": 916.5
+      },
+      {
+        "cpu_percent": 0.1,
+        "memory_used_mib": 916.5
+      },
+      {
+        "cpu_percent": 0.2,
+        "memory_used_mib": 916.5
+      }
+    ],
+    "median_cpu_percent": 0.2,
+    "median_memory_used_mib": 919.6,
+    "context_switches_per_second": 154.7,
+    "processes_started": 2,
+    "temp_cleanup_activations": 0,
+    "limits": "VM idle activity; no physical battery, energy or hardware-wakeup measurement"
+  },
+  "image_cost": {
+    "archive_bytes": 2060534272,
+    "previous_archive_bytes": 1925267456,
+    "rpm_package_count": 1023,
+    "rpm_inventory_identical_to_previous": true,
+    "codex_package_bytes": 339126741,
+    "archive_growth_bytes": 135266816,
+    "archive_growth_mib": 129.0
+  },
+  "observed_changes": {
+    "os_startup_seconds": 0.482,
+    "host_to_greeter_seconds": 0.624,
+    "closed_idle_cpu_percentage_points": 0.05,
+    "closed_idle_memory_mib": 8.3
+  }
+}

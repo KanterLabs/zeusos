@@ -1,0 +1,42 @@
+{
+  "completed_at_utc": "2026-09-09T23:31:04.119982+00:00",
+  "assets": [
+    {
+      "name": "zeusos-0.1.0-preview.2-git-f080c2d9bc53.oci",
+      "size": 2060534272,
+      "sha256": "5c6009b852caf7b2fa2285a7385f1819b98081502dc6e42636e582bfa493bcfd",
+      "github_digest_match": true
+    },
+    {
+      "name": "SHA256SUMS-git-f080c2d9bc53",
+      "size": 110,
+      "sha256": "96a77a803c0414ad0bc732fac9834567e9f6cc55040d09cdb819ef4dfa607ec8",
+      "github_digest_match": true
+    },
+    {
+      "name": "SHA256SUMS-git-f080c2d9bc53.sig",
+      "size": 310,
+      "sha256": "1c64ae4c40b0a5fc896db3c65432a79f04b00eca52f2770f658e63c13e207bd7",
+      "github_digest_match": true
+    },
+    {
+      "name": "build-info-git-f080c2d9bc53.json",
+      "size": 165,
+      "sha256": "ceed11fe341ea9070a0875a5f609ca83ddc115606cdedc4c8371de6ad372bce8",
+      "github_digest_match": true
+    },
+    {
+      "name": "update-git-f080c2d9bc53.json",
+      "size": 965,
+      "sha256": "f28621393f3ae448e183158aef26e447f787904a6b52b6cbeb884c7cbc8a9f89",
+      "github_digest_match": true
+    },
+    {
+      "name": "update-git-f080c2d9bc53.json.sig",
+      "size": 306,
+      "sha256": "d5465e8c1ef4290d3267c96b7f8bbfb4e66631a51744376e2db866e1048143e8",
+      "github_digest_match": true
+    }
+  ],
+  "feed_advanced": false
+}

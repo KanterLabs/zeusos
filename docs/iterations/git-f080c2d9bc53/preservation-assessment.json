@@ -1,0 +1,25 @@
+{
+  "recorded_at_utc": "2026-09-09T23:38:08.629245+00:00",
+  "files_tracked": 13,
+  "exact_hash_matches": 12,
+  "exact_hash_files": [
+    "Downloads/zeus-preservation-test.txt",
+    "Documents/zeus-temp-test.txt",
+    ".local/state/zeusos/after-backup.txt",
+    ".local/state/zeusos/after-update.txt",
+    ".local/state/zeusos/preservation.txt",
+    ".local/state/zeusos/visual-after-backup.txt",
+    "Temp/zeus-temp-test.txt",
+    ".local/state/zeusos/chrome-after-backup.txt",
+    "Temp/zeus-chrome-download.txt",
+    ".local/state/zeusos/keyring-preserved-20260909/login.keyring",
+    ".local/share/keyrings/login.keyring",
+    ".local/state/zeusos/codex-after-backup.txt"
+  ],
+  "volatile_file": ".config/google-chrome/Default/Preferences",
+  "volatile_file_initial_hash_matches": false,
+  "volatile_file_mtime_utc": "2026-09-09T23:19:10.556738+00:00",
+  "assessment": "The current Chrome Preferences modification time predates the source build and installation. Its early capture hash differs; do not count it as an exact preservation match. It remains valid populated JSON with the existing profile creation record and History database. No profile restoration or rewrite was performed by deployment. Native Chrome profile behavior is checked separately.",
+  "backup_integrity": "zstd and full VMA passed",
+  "restore_performed": false
+}
