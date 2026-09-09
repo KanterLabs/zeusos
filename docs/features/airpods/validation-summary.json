@@ -1,0 +1,16 @@
+{
+  "recorded_at_utc": "2026-09-09T18:44:01.569251+00:00",
+  "build_id": "git-fd2125f63159",
+  "wireplumber_settings_equal_ignoring_trailing_newline": true,
+  "installed_package_inventory": {
+    "packages": 1011,
+    "packages_lock_sha256": "4ea9ac5047b4565c3c4c415c04c3cfc4e589fd4a5136d40eda3f4046bc5e0127"
+  },
+  "installed_package_inventory_unchanged": true,
+  "source_python_tests": 148,
+  "bluetooth_validator_tests": 12,
+  "vm_update_performed": false,
+  "vm_reboot_performed": false,
+  "packages_or_audio_policy_changed": false,
+  "note": "Read-only checks ran over SSH stdin; no validator file or service was installed in the review VM. No physical device was available to test."
+}

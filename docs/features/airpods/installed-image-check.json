@@ -1,0 +1,192 @@
+{
+  "recorded_at_utc": "2026-09-09T18:43:09.199997+00:00",
+  "environment": "Proxmox VM 115; existing deployed image",
+  "build_id": "git-fd2125f63159",
+  "validator_sha256": "fac1dbc7ee818676d41ea9982f7de205eef840492c71876d301e6d9bdc08d42c",
+  "result": {
+    "capabilities": [
+      {
+        "description": "Bluetooth stereo playback",
+        "id": "a2dp_music",
+        "requires": [
+          "bluez_spa_backend",
+          "a2dp_aac",
+          "a2dp_sbc"
+        ],
+        "requires_executables": [
+          "bluez_bluetoothctl",
+          "bluez_daemon",
+          "pipewire",
+          "pipewire_pulse",
+          "wireplumber",
+          "wireplumber_wpctl"
+        ],
+        "status": "prerequisites_present"
+      },
+      {
+        "description": "Bluetooth headset microphone",
+        "id": "hfp_microphone",
+        "requires": [
+          "bluez_spa_backend",
+          "hfp_cvsd",
+          "hfp_msbc"
+        ],
+        "requires_executables": [
+          "bluez_bluetoothctl",
+          "bluez_daemon",
+          "pipewire",
+          "pipewire_pulse",
+          "wireplumber",
+          "wireplumber_wpctl"
+        ],
+        "status": "prerequisites_present"
+      }
+    ],
+    "checks": {
+      "executables": [
+        {
+          "description": "BlueZ control client",
+          "id": "bluez_bluetoothctl",
+          "kind": "executable",
+          "package": "bluez",
+          "path": "/usr/bin/bluetoothctl",
+          "status": "present"
+        },
+        {
+          "description": "BlueZ daemon backend",
+          "id": "bluez_daemon",
+          "kind": "executable",
+          "package": "bluez",
+          "path": "/usr/libexec/bluetooth/bluetoothd",
+          "status": "present"
+        },
+        {
+          "description": "PipeWire audio server",
+          "id": "pipewire",
+          "kind": "executable",
+          "package": "pipewire",
+          "path": "/usr/bin/pipewire",
+          "status": "present"
+        },
+        {
+          "description": "PipeWire PulseAudio compatibility server",
+          "id": "pipewire_pulse",
+          "kind": "executable",
+          "package": "pipewire-pulseaudio",
+          "path": "/usr/bin/pipewire-pulse",
+          "status": "present"
+        },
+        {
+          "description": "WirePlumber session manager",
+          "id": "wireplumber",
+          "kind": "executable",
+          "package": "wireplumber",
+          "path": "/usr/bin/wireplumber",
+          "status": "present"
+        },
+        {
+          "description": "WirePlumber control client",
+          "id": "wireplumber_wpctl",
+          "kind": "executable",
+          "package": "wireplumber",
+          "path": "/usr/bin/wpctl",
+          "status": "present"
+        }
+      ],
+      "plugins": [
+        {
+          "description": "PipeWire BlueZ SPA backend",
+          "id": "bluez_spa_backend",
+          "kind": "plugin",
+          "package": "pipewire-libs",
+          "path": "/usr/lib64/spa-0.2/bluez5/libspa-bluez5.so",
+          "status": "present"
+        },
+        {
+          "description": "A2DP AAC codec",
+          "id": "a2dp_aac",
+          "kind": "plugin",
+          "package": "pipewire-libs",
+          "path": "/usr/lib64/spa-0.2/bluez5/libspa-codec-bluez5-aac.so",
+          "status": "present"
+        },
+        {
+          "description": "A2DP SBC codec",
+          "id": "a2dp_sbc",
+          "kind": "plugin",
+          "package": "pipewire-libs",
+          "path": "/usr/lib64/spa-0.2/bluez5/libspa-codec-bluez5-sbc.so",
+          "status": "present"
+        },
+        {
+          "description": "HFP CVSD speech codec",
+          "id": "hfp_cvsd",
+          "kind": "plugin",
+          "package": "pipewire-libs",
+          "path": "/usr/lib64/spa-0.2/bluez5/libspa-codec-bluez5-hfp-cvsd.so",
+          "status": "present"
+        },
+        {
+          "description": "HFP mSBC speech codec",
+          "id": "hfp_msbc",
+          "kind": "plugin",
+          "package": "pipewire-libs",
+          "path": "/usr/lib64/spa-0.2/bluez5/libspa-codec-bluez5-hfp-msbc.so",
+          "status": "present"
+        }
+      ]
+    },
+    "hardware_qualification": {
+      "reason": "Requires a physical Bluetooth adapter and AirPods hardware.",
+      "status": "NOT TESTED",
+      "tests": {
+        "audio_playback": "NOT TESTED",
+        "battery": "NOT TESTED",
+        "calls_microphone": "NOT TESTED",
+        "pairing": "NOT TESTED",
+        "reconnect": "NOT TESTED"
+      }
+    },
+    "ok": true,
+    "plugin_loadability": {
+      "checks": [
+        {
+          "id": "bluez_spa_backend",
+          "path": "/usr/lib64/spa-0.2/bluez5/libspa-bluez5.so",
+          "status": "loadable"
+        },
+        {
+          "id": "a2dp_aac",
+          "path": "/usr/lib64/spa-0.2/bluez5/libspa-codec-bluez5-aac.so",
+          "status": "loadable"
+        },
+        {
+          "id": "a2dp_sbc",
+          "path": "/usr/lib64/spa-0.2/bluez5/libspa-codec-bluez5-sbc.so",
+          "status": "loadable"
+        },
+        {
+          "id": "hfp_cvsd",
+          "path": "/usr/lib64/spa-0.2/bluez5/libspa-codec-bluez5-hfp-cvsd.so",
+          "status": "loadable"
+        },
+        {
+          "id": "hfp_msbc",
+          "path": "/usr/lib64/spa-0.2/bluez5/libspa-codec-bluez5-hfp-msbc.so",
+          "status": "loadable"
+        }
+      ],
+      "requested": true,
+      "status": "loadable"
+    },
+    "schema_version": 1,
+    "scope": "installed-image",
+    "software": {
+      "status": "prerequisites_present"
+    },
+    "target": {
+      "architecture": "x86_64",
+      "os": "Fedora Linux"
+    }
+  }
+}

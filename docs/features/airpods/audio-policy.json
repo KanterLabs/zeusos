@@ -1,0 +1,38 @@
+[
+  {
+    "id": "bluetooth.autoswitch-to-headset-profile",
+    "default": "true",
+    "value": "true",
+    "saved_value": null
+  },
+  {
+    "id": "device.restore-routes",
+    "default": "true",
+    "value": "true",
+    "saved_value": null
+  },
+  {
+    "id": "linking.follow-default-target",
+    "default": "true",
+    "value": "true",
+    "saved_value": null
+  },
+  {
+    "id": "node.restore-default-targets",
+    "default": "true",
+    "value": "true",
+    "saved_value": null
+  },
+  {
+    "id": "device.restore-profile",
+    "default": "true",
+    "value": "true",
+    "saved_value": null
+  },
+  {
+    "id": "bluetooth.use-persistent-storage",
+    "default": "true",
+    "value": "true",
+    "saved_value": null
+  }
+]

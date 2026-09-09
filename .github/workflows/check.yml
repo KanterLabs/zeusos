@@ -36,6 +36,10 @@ jobs:
         run: |
           python3 -m unittest discover -s tests -p test_settings_window.py -v
           python3 -m py_compile desktop/rootfs/usr/libexec/zeus-settings-window
+      - name: Verify Bluetooth audio readiness checks
+        run: |
+          python3 -m unittest discover -s tests -p test_bluetooth_audio.py -v
+          python3 -m py_compile scripts/validate-bluetooth-audio.py
   cli:
     runs-on: homelab-heavy
     timeout-minutes: 10

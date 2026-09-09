@@ -8,13 +8,14 @@ the native checks, signed update, screenshots and measured results.
 Continue using **0.1.0-preview.2** with a separate Git build ID for each payload.
 
 The next goal is easier everyday use while preserving the attractive desktop,
-quick boot and low idle activity. Start with Settings, then improve search, then
-add optional app installation. Each feature gets its own testable preview build
-and actual VM screenshots.
+quick boot and low idle activity. Settings is delivered; AirPods support is now
+the next priority, followed by better search and optional app installation.
+Runtime features get testable preview builds and actual VM screenshots.
 
 | Order | Feature | What Shane will be able to do | Helm |
 | --- | --- | --- | --- |
 | Delivered | Zeus Settings | Reach laptop controls, appearance, Temp and Updates from one compact window. | ZOS-67 |
+| Next | AirPods support | Reliable listening/calls, clear device status and qualified AirPods controls. | ZOS-70 |
 | 2 | Better search | Press Super+Space and find a setting or useful shortcut as well as an app. | ZOS-68 |
 | 3 | Apps | Browse a small app catalog and explicitly install, update or remove optional apps. | ZOS-69 |
 
@@ -67,6 +68,17 @@ battery life and laptop suspend/resume remain **pending hardware qualification**
 
 Implemented code scope: a native app and desktop entry under `desktop/rootfs`,
 Welcome's launchers, and the Zeus menu in the existing shell extension.
+
+## AirPods priority — ZOS-70
+
+Shane requested good AirPods support after the Settings preview. The
+[AirPods implementation and testing contract](features/airpods.md) records
+the native audio foundation, integration work and physical-device qualification.
+The current image already includes AAC and headset codecs. Model-specific controls
+and real AirPods reliability are still unqualified; the VM and Proxmox host
+currently expose no Bluetooth controller. Search and Apps remain unclaimed Backlog.
+Optional AirPods battery and noise controls have their own unclaimed Backlog card,
+ZOS-71, with protocol, privilege, idle-cost and model qualification gates.
 
 ## 2. Better Super+Space search — ZOS-68
 

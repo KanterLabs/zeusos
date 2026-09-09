@@ -1,0 +1,29 @@
+{
+  "recorded_at_utc": "2026-09-09T18:25:40.955453+00:00",
+  "build_id": "git-fd2125f63159",
+  "versions": [
+    "bluez 5.87-6.fc44",
+    "pipewire 1.6.8-1.fc44",
+    "wireplumber 0.5.14-1.fc44",
+    "fdk-aac-free 2.0.3-2.fc44"
+  ],
+  "codec_files": [
+    "libspa-bluez5.so",
+    "libspa-codec-bluez5-aac.so",
+    "libspa-codec-bluez5-faststream.so",
+    "libspa-codec-bluez5-g722.so",
+    "libspa-codec-bluez5-hfp-cvsd.so",
+    "libspa-codec-bluez5-hfp-lc3-a127.so",
+    "libspa-codec-bluez5-hfp-lc3-swb.so",
+    "libspa-codec-bluez5-hfp-msbc.so",
+    "libspa-codec-bluez5-lc3.so",
+    "libspa-codec-bluez5-ldac.so",
+    "libspa-codec-bluez5-opus-g.so",
+    "libspa-codec-bluez5-opus.so",
+    "libspa-codec-bluez5-sbc.so"
+  ],
+  "guest_bluetooth_controllers": 0,
+  "host_exposed_bluetooth_controllers": 0,
+  "host_controller_probe": "Read-only sysfs check and USB inventory; no device reassignment",
+  "physical_airpods_qualification": "not run; no controller/device pair available"
+}
