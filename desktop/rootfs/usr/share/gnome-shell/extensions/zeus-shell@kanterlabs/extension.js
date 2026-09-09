@@ -634,6 +634,7 @@ export default class ZeusShellExtension extends Extension {
 
         if (!this._menuButton) {
             this._menuButton = new ZeusMenuButton(this);
+            panel.menuManager.addMenu(this._menuButton.menu);
             leftBox.insert_child_at_index(this._menuButton.container, 0);
         }
         if (!this._panelDivider) {
