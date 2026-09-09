@@ -67,3 +67,13 @@ Implementation prerequisites are native Helm dependencies. Testing suites span m
 | Q21 | [ZOS-51 — Run T12 backup restore acceptance](https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-51) | M2–M4, execution |
 
 Sources: [implementation plan](implementation-plan.md), [testing plan](testing-plan.md), [design baseline](design-v0.1.md).
+
+## Temp downloads and control refinement — September 9, 2026
+
+[Feature behavior and testing plan](features/temp-downloads.md). These five cards are unclaimed Backlog work; cleanup is not enabled on the review VM.
+
+- ZOS-57: Slim native traffic-light window controls.
+- ZOS-58: Introduce Temp as the download destination.
+- ZOS-59: Implement scoped Temp cleanup and schedules.
+- ZOS-60: Expose Temp settings and Keep action.
+- ZOS-61: Qualify Temp deletion and populated upgrades.
