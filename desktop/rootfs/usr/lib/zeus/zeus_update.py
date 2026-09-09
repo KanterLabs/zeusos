@@ -148,7 +148,7 @@ def local_status(root=ROOT, share=SHARE, cache=None, this_boot=None):
             if phase in BUSY | {'ready'}:
                 if job.get('boot_id') != (this_boot or boot_id()):
                     return public_result(current, 'interrupted', manifest,
-                                         'The previous update did not finish booting. Check for updates to retry.',
+                                         'The selected update is not running in this session. Check for updates to retry.',
                                          'interrupted')
                 return public_result(current, phase, manifest, job.get('message', ''),
                                      progress=job.get('progress'))
@@ -159,7 +159,10 @@ def local_status(root=ROOT, share=SHARE, cache=None, this_boot=None):
         if remembered:
             manifest = trusted.validate_manifest(remembered['manifest']) if remembered.get('manifest') else None
             state = 'available' if manifest and newer(manifest, current) else 'up_to_date'
-            return public_result(current, state, manifest, remembered.get('message', ''),
+            message = ('A signed update is available.' if state == 'available' else
+                       'The selected update is installed.' if installed else
+                       'The last check found no newer build. Check again for current updates.')
+            return public_result(current, state, manifest, message,
                                  checked_at=remembered.get('checked_at'))
         if installed:
             return public_result(current, 'up_to_date', installed, 'The selected update is installed.')

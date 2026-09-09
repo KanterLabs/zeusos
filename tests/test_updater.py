@@ -239,8 +239,11 @@ class UpdaterTransactions(unittest.TestCase):
         self.request()
         self.installer.run()
         self.install_identity(self.manifest)
+        update.atomic_json(self.cache, {'schema_version': 1, 'manifest': self.manifest,
+                          'message': 'A signed update is available.'})
         result = update.local_status(self.root, self.share, self.cache, 'boot-two')
         self.assertEqual(result['state'], 'up_to_date')
+        self.assertEqual(result['message'], 'The selected update is installed.')
         self.manifest = release(300, 'f' * 40)
         result = update.check_updates(self.root, self.share, self.cache, fetch=lambda: self.manifest)
         self.assertEqual(result['state'], 'available')
