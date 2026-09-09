@@ -1,0 +1,7 @@
+{
+  "measurement_started_at_utc": "2026-09-09T10:43:14.101303+00:00",
+  "measurement_ended_at_utc": "2026-09-09T10:43:39.194244+00:00",
+  "reboot_to_ssh_gdm_s": 25.093,
+  "observation": "93d7bc40-cb98-410a-9e12-220bef50fc6a\ngit-21a465760f53\nactive\nStartup finished in 1.620s (kernel) + 3.409s (initrd) + 3.743s (userspace) = 8.774s \ngraphical.target reached after 3.741s in userspace.\n",
+  "definition": "Explicit warm reboot request to changed boot ID and SSH/GDM readiness; one sample, not cold-start first pixel"
+}
