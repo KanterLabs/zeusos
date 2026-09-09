@@ -1,0 +1,39 @@
+2026-09-09T10:55:39+00:00 zeusos-preview systemd[1]: Starting zeus-update-install.service - Install the owner-selected signed Zeus OS update...
+2026-09-09T10:55:39+00:00 zeusos-preview systemd[1]: Started zeus-update-install.service - Install the owner-selected signed Zeus OS update.
+2026-09-09T10:56:05+00:00 zeusos-preview bootc[4580]: Switching from image /var/lib/zeus/updates/git-21a465760f53/zeusos-0.1.0-preview.2-git-21a465760f53.oci to /var/lib/zeus/updater/downloads/zeusos-0.1.0-preview.2-git-1a34bbfe8509.oci
+2026-09-09T10:56:06+00:00 zeusos-preview podman[4588]: 2026-09-09 10:56:06.113545126 +0000 UTC m=+0.141624142 system refresh
+2026-09-09T10:56:06+00:00 zeusos-preview bootc[4580]: Fetching ostree-unverified-image:oci-archive:/var/lib/zeus/updater/downloads/zeusos-0.1.0-preview.2-git-1a34bbfe8509.oci
+2026-09-09T10:56:10+00:00 zeusos-preview bootc[4580]: Pulling new image: ostree-unverified-image:oci-archive:/var/lib/zeus/updater/downloads/zeusos-0.1.0-preview.2-git-1a34bbfe8509.oci
+2026-09-09T10:56:10+00:00 zeusos-preview bootc[4580]: layers already present: 68; layers needed: 8 (21.0 MB)
+2026-09-09T10:56:11+00:00 zeusos-preview ostree[4792]: Starting syncfs for system repo
+2026-09-09T10:56:11+00:00 zeusos-preview ostree[4792]: Completed syncfs() for system repo in 498 ms
+2026-09-09T10:56:11+00:00 zeusos-preview ostree[4793]: Starting syncfs for system repo
+2026-09-09T10:56:11+00:00 zeusos-preview ostree[4793]: Completed syncfs() for system repo in 12 ms
+2026-09-09T10:56:12+00:00 zeusos-preview ostree[4794]: Starting syncfs for system repo
+2026-09-09T10:56:12+00:00 zeusos-preview ostree[4794]: Completed syncfs() for system repo in 22 ms
+2026-09-09T10:56:12+00:00 zeusos-preview ostree[4795]: Starting syncfs for system repo
+2026-09-09T10:56:12+00:00 zeusos-preview ostree[4795]: Completed syncfs() for system repo in 23 ms
+2026-09-09T10:56:12+00:00 zeusos-preview ostree[4796]: Starting syncfs for system repo
+2026-09-09T10:56:12+00:00 zeusos-preview ostree[4796]: Completed syncfs() for system repo in 8 ms
+2026-09-09T10:56:12+00:00 zeusos-preview ostree[4798]: Starting syncfs for system repo
+2026-09-09T10:56:12+00:00 zeusos-preview ostree[4798]: Completed syncfs() for system repo in 28 ms
+2026-09-09T10:56:12+00:00 zeusos-preview ostree[4799]: Starting syncfs for system repo
+2026-09-09T10:56:12+00:00 zeusos-preview ostree[4799]: Completed syncfs() for system repo in 17 ms
+2026-09-09T10:56:13+00:00 zeusos-preview ostree[4800]: Starting syncfs for system repo
+2026-09-09T10:56:13+00:00 zeusos-preview ostree[4800]: Completed syncfs() for system repo in 17 ms
+2026-09-09T10:56:23+00:00 zeusos-preview bootc[4580]: Starting syncfs for system repo
+2026-09-09T10:56:23+00:00 zeusos-preview bootc[4580]: Completed syncfs() for system repo in 103 ms
+2026-09-09T10:56:24+00:00 zeusos-preview bootc[4580]: Successfully imported image: ostree-unverified-image:oci-archive:/var/lib/zeus/updater/downloads/zeusos-0.1.0-preview.2-git-1a34bbfe8509.oci
+2026-09-09T10:56:24+00:00 zeusos-preview bootc[4580]: Image contains non-ostree compatible file paths: dnf: 1
+2026-09-09T10:56:24+00:00 zeusos-preview bootc[4580]: Staging image for deployment: ostree-unverified-image:oci-archive:/var/lib/zeus/updater/downloads/zeusos-0.1.0-preview.2-git-1a34bbfe8509.oci (digest: sha256:cf9c53528f2a3ee514cabbb4e0b09ed1e05ee215450748b8bb57e2b6d8eb43f9)
+2026-09-09T10:56:30+00:00 zeusos-preview bootc[4580]: Created deployment; subtasks: checkout=2.6s composefs=2.9s etc=491ms
+2026-09-09T10:56:30+00:00 zeusos-preview bootc[4580]: Starting syncfs for system repo
+2026-09-09T10:56:30+00:00 zeusos-preview bootc[4580]: Completed syncfs() for system repo in 124 ms
+2026-09-09T10:56:30+00:00 zeusos-preview bootc[4580]: completed task in 6 seconds: Deploying
+2026-09-09T10:56:30+00:00 zeusos-preview bootc[4580]: Starting pull of bound images for deployment
+2026-09-09T10:56:30+00:00 zeusos-preview bootc[4580]: Found 0 bound images to pull
+2026-09-09T10:56:30+00:00 zeusos-preview bootc[4580]: Starting cleanup of old images and deployments
+2026-09-09T10:56:31+00:00 zeusos-preview zeus-update-admin[4424]: {"ok": true, "action": "install"}
+2026-09-09T10:56:31+00:00 zeusos-preview zeus-update-admin[4861]: {"ok": true, "action": "reconcile"}
+2026-09-09T10:56:31+00:00 zeusos-preview systemd[1]: zeus-update-install.service: Deactivated successfully.
+2026-09-09T10:56:31+00:00 zeusos-preview systemd[1]: zeus-update-install.service: Consumed 29.554s CPU time over 52.764s wall clock time, 3.7G memory peak.

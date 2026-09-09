@@ -71,4 +71,11 @@ feed metadata and root state use schema 1. OS rollback selects a retained image;
 it never restores a profile/database snapshot or replaces mutable owner data.
 
 The [metrics history](../metrics.md) records measured results and limitations.
-Validation and deployment evidence will be linked after native qualification.
+Native installation through signed Updates and an explicit reboot were
+verified on VM 115 for `git-17d205103f3a`. The booted manifest is
+`sha256:4da2b1c5bdba3d5e0451e5f36389d3238bdf739a976951bca11b925f5e9d133d`,
+and the post-reboot status reported `The selected update is installed.` The
+[final iteration receipt](../iterations/git-17d205103f3a/README.md) records the
+full evidence, including the retained `git-1a34bbfe8509` rollback slot. No
+rollback cycle was run. See the [timestamped metrics history](../metrics.md)
+for runtime observations; physical battery remains unmeasured on this VM.

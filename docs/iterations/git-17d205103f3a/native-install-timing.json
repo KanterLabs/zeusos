@@ -1,0 +1,7 @@
+{
+  "measurement_started_at_utc": "2026-09-09T11:16:13.705339+00:00",
+  "measurement_ended_at_utc": "2026-09-09T11:17:08.854175+00:00",
+  "native_authentication_submit_to_ready_s": 55.149,
+  "archive_bytes": 1828931072,
+  "definition": "One native install: before entering authentication through the first observed ready status; includes password entry, verified network fetch, download, staging and up to 3 seconds of status-probe overhead"
+}

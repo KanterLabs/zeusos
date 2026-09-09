@@ -29,6 +29,21 @@ or its signature. Keep the initial release notes as historical evidence and add
 a latest-build reference and dated iteration notes. A Git commit/build is not a
 new product release or version bump.
 
+## Record measurements
+
+After qualifying each deployed iteration, append a dated entry to the
+[metrics history](metrics.md). Include the installed build ID, actual UTC
+measurement window, VM or laptop configuration, test conditions, every sample,
+units, and links to raw evidence under `docs/iterations/<build-id>/`. Record
+failures and regressions alongside improvements; preserve earlier entries.
+
+The `measure-vm-boot.py`, `measure-session.py`, and `measure-app-launch.py`
+scripts emit UTC start and end timestamps. Keep cold boots, update reboots,
+closed/open-app idle measurements, and application launches distinct. Record
+the time an entry was added separately from the time the measurement ran.
+When conditions differ, explain the difference instead of presenting a
+controlled comparison. Physical battery results require a laptop measurement.
+
 ## Signed preview update publication
 
 The owner-triggered Updates path consumes the latest public preview feed at

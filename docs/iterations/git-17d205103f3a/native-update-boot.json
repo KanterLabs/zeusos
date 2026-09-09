@@ -1,0 +1,7 @@
+{
+  "measurement_started_at_utc": "2026-09-09T11:17:52.605446+00:00",
+  "measurement_ended_at_utc": "2026-09-09T11:18:18.234951+00:00",
+  "reboot_to_ssh_gdm_s": 25.629,
+  "observation": "9cc94464-c690-45dd-ac9e-c3673f580a9b\ngit-17d205103f3a\nactive\nStartup finished in 1.426s (kernel) + 3.433s (initrd) + 3.658s (userspace) = 8.518s \ngraphical.target reached after 3.655s in userspace.\n",
+  "definition": "Native GNOME Restart click to changed boot ID and SSH/GDM readiness; one sample, not cold-start first pixel"
+}

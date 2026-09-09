@@ -1,0 +1,7 @@
+{
+  "measurement_started_at_utc": "2026-09-09T10:55:37+00:00",
+  "measurement_ended_at_utc": "2026-09-09T10:56:31+00:00",
+  "native_authentication_submit_to_ready_s": 54.0,
+  "archive_bytes": 1828930560,
+  "definition": "One native install: before entering authentication through root ready status, includes password entry, verified network fetch, download and staging; clocks resolved to seconds"
+}

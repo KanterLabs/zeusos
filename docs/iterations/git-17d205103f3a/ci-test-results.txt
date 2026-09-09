@@ -1,0 +1,8 @@
+cli	Test and build CLI	2026-09-09T11:03:58.2460124Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+cli	Test and build CLI	2026-09-09T11:03:59.7888926Z Ran 13 tests in 0.711s
+image-policy	Validate image inputs, assets and login policy	2026-09-09T11:04:00.5636820Z Ran 6 tests in 0.014s
+image-policy	Preserve owner styles through visual changes	2026-09-09T11:04:00.7742003Z Ran 2 tests in 0.130s
+image-policy	Verify Temp cleanup and migration	2026-09-09T11:04:02.1832742Z Ran 41 tests in 1.259s
+image-policy	Verify desktop interaction and battery measurement contracts	2026-09-09T11:04:02.3132909Z Ran 5 tests in 0.001s
+image-policy	Verify desktop interaction and battery measurement contracts	2026-09-09T11:04:02.3148951Z Ran 9 tests in 0.014s
+image-policy	Verify signed updater trust and transactions	2026-09-09T11:04:04.0172560Z Ran 47 tests in 1.580s

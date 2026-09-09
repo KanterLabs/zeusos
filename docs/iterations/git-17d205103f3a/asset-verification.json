@@ -1,0 +1,44 @@
+[
+  {
+    "name": "SHA256SUMS-git-17d205103f3a",
+    "bytes": 110,
+    "digest": "sha256:fd2095fbfe2406bd530928ad78d89f141db2a980526fe8b7aecf6113fd4b3df7",
+    "verified": true
+  },
+  {
+    "name": "SHA256SUMS-git-17d205103f3a.sig",
+    "bytes": 310,
+    "digest": "sha256:d282b4767abd9d9cdb5cb2815f8326a52e03236642bfbf4543dfcdef5b078996",
+    "verified": true
+  },
+  {
+    "name": "build-info-git-17d205103f3a.json",
+    "bytes": 165,
+    "digest": "sha256:eded131a1323916dd6c0026115d9540459e2aaf4d0185a471491047ada92eb16",
+    "verified": true
+  },
+  {
+    "name": "packages-git-17d205103f3a.lock",
+    "bytes": 35575,
+    "digest": "sha256:4ea9ac5047b4565c3c4c415c04c3cfc4e589fd4a5136d40eda3f4046bc5e0127",
+    "verified": true
+  },
+  {
+    "name": "update-git-17d205103f3a.json",
+    "bytes": 923,
+    "digest": "sha256:9bf3ff4b6012dc0def6f9de765323118209b865b638c34c45f8b08e1e2d7af61",
+    "verified": true
+  },
+  {
+    "name": "update-git-17d205103f3a.json.sig",
+    "bytes": 306,
+    "digest": "sha256:dfb893fe55edd44de8a450d8249ec75cfab00f625672c2e400e49b3f8b648768",
+    "verified": true
+  },
+  {
+    "name": "zeusos-0.1.0-preview.2-git-17d205103f3a.oci",
+    "bytes": 1828931072,
+    "digest": "sha256:c2d606f993c8b06e266bbb633488a79dec8c41d48c688d2ebfaf9551ffb5f2d0",
+    "verified": true
+  }
+]

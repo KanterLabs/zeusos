@@ -1,0 +1,111 @@
+{
+  "label": "updater-final-closed",
+  "measurement_started_at_utc": "2026-09-09T11:22:12.030873406Z",
+  "measurement_ended_at_utc": "2026-09-09T11:24:12.041708493Z",
+  "seconds": 120.01,
+  "settle_seconds": 20,
+  "samples": [
+    {
+      "cpu_percent": 0.15,
+      "memory_used_mib": 978.5
+    },
+    {
+      "cpu_percent": 0.15,
+      "memory_used_mib": 977.9
+    },
+    {
+      "cpu_percent": 0.15,
+      "memory_used_mib": 965.4
+    },
+    {
+      "cpu_percent": 0.15,
+      "memory_used_mib": 965.4
+    },
+    {
+      "cpu_percent": 0.15,
+      "memory_used_mib": 964.6
+    },
+    {
+      "cpu_percent": 0.1,
+      "memory_used_mib": 964.6
+    },
+    {
+      "cpu_percent": 0.1,
+      "memory_used_mib": 964.6
+    },
+    {
+      "cpu_percent": 0.15,
+      "memory_used_mib": 964.6
+    },
+    {
+      "cpu_percent": 0.1,
+      "memory_used_mib": 964.6
+    },
+    {
+      "cpu_percent": 0.15,
+      "memory_used_mib": 964.6
+    },
+    {
+      "cpu_percent": 0.2,
+      "memory_used_mib": 964.6
+    },
+    {
+      "cpu_percent": 0.2,
+      "memory_used_mib": 964.6
+    },
+    {
+      "cpu_percent": 0.1,
+      "memory_used_mib": 964.6
+    },
+    {
+      "cpu_percent": 0.15,
+      "memory_used_mib": 964.6
+    },
+    {
+      "cpu_percent": 0.15,
+      "memory_used_mib": 964.5
+    },
+    {
+      "cpu_percent": 0.1,
+      "memory_used_mib": 964.5
+    },
+    {
+      "cpu_percent": 0.2,
+      "memory_used_mib": 956.0
+    },
+    {
+      "cpu_percent": 0.05,
+      "memory_used_mib": 956.0
+    },
+    {
+      "cpu_percent": 0.1,
+      "memory_used_mib": 956.0
+    },
+    {
+      "cpu_percent": 0.15,
+      "memory_used_mib": 956.0
+    },
+    {
+      "cpu_percent": 0.0,
+      "memory_used_mib": 956.0
+    },
+    {
+      "cpu_percent": 0.3,
+      "memory_used_mib": 956.0
+    },
+    {
+      "cpu_percent": 0.1,
+      "memory_used_mib": 956.0
+    },
+    {
+      "cpu_percent": 0.15,
+      "memory_used_mib": 956.0
+    }
+  ],
+  "median_cpu_percent": 0.15,
+  "median_memory_used_mib": 964.6,
+  "context_switches_per_second": 128.3,
+  "processes_started": 3,
+  "temp_cleanup_activations": 0,
+  "limits": "VM idle activity; no physical battery, energy or hardware-wakeup measurement"
+}

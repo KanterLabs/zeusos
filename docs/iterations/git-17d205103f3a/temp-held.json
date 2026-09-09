@@ -1,0 +1,56 @@
+{
+  "collision": false,
+  "configured": true,
+  "download_destination": "/var/home/shane/Temp",
+  "downloads": "/var/home/shane/Downloads",
+  "due": false,
+  "due_reason": "never",
+  "enabled": true,
+  "enrolled": true,
+  "errors": [],
+  "file_count": 1,
+  "files": [
+    {
+      "directory": false,
+      "is_directory": false,
+      "kind": "file",
+      "modified": "2026-09-09T01:47:20Z",
+      "name": "zeus-temp-test.txt",
+      "partial": false,
+      "size_bytes": 48
+    }
+  ],
+  "interval_seconds": null,
+  "last_boot_id": "e36e10de-b1d9-4bdd-8f9d-33c9b7b8bbf5",
+  "last_cleanup_at": "2026-09-09T01:45:29Z",
+  "last_result": {
+    "deleted": 0,
+    "deleted_bytes": 0,
+    "errors": [],
+    "force": false,
+    "ok": true,
+    "reason": "boot",
+    "removed": 0,
+    "removed_bytes": 0,
+    "skipped": [],
+    "snapshot_count": 0,
+    "swept": true
+  },
+  "mode": "never",
+  "next_cleanup": "Never",
+  "next_cleanup_at": null,
+  "next_cleanup_label": "Never",
+  "ok": true,
+  "policy": {
+    "interval_seconds": null,
+    "mode": "never"
+  },
+  "policy_mode": "never",
+  "setup_created": false,
+  "setup_required": false,
+  "space_used": 48,
+  "space_used_bytes": 48,
+  "state_path": "/var/home/shane/.local/state/zeus/temp-policy.json",
+  "temp": "/var/home/shane/Temp",
+  "temp_path": "/var/home/shane/Temp"
+}

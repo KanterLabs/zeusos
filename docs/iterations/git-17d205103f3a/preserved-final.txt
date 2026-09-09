@@ -1,0 +1,7 @@
+/var/home/shane/Downloads/zeus-preservation-test.txt: OK
+/var/home/shane/Documents/zeus-temp-test.txt: OK
+/var/home/shane/.local/state/zeusos/after-backup.txt: OK
+/var/home/shane/.local/state/zeusos/after-update.txt: OK
+/var/home/shane/.local/state/zeusos/preservation.txt: OK
+/var/home/shane/.local/state/zeusos/visual-after-backup.txt: OK
+0484667c62ebfd44aa8af65e014405061f0631d5c418f01d4b043f61de3d8af8  /var/home/shane/Temp/zeus-temp-test.txt

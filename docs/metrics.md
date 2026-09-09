@@ -170,11 +170,159 @@ receipt](iterations/git-bbd36cc2af2f/build-receipt.json), [baseline boot 1](iter
 
 The battery probe also has an explicit retained result: [`battery-vm-unavailable.json`](iterations/git-de0d8baae5de/battery-vm-unavailable.json) reports `status: error` and `error: no_battery`. The VM therefore has no physical battery result, estimated battery-hours result, wattage result, or runtime claim.
 
+### 2026-09-09 — pre-updater idle baseline and A bootstrap (intermediate)
+
+- Recorded at (UTC): `2026-09-09T11:18:29Z` (entry transcription)
+- Pre-updater idle build: `0.1.0-preview.2`, `git-de0d8baae5de`, source
+  `de0d8baae5de8533c97e7287f997235c7a10d43d`
+- Subsequent A bootstrap warm-reboot build: `0.1.0-preview.2`,
+  `git-21a465760f53`, source `21a465760f53cb7882b3ae65d527532cfd336ead`
+- Environment: existing populated VM 115, 4 vCPUs, 8 GiB RAM, with a long-lived
+  logged-in session and the same owner state used for the updater qualification
+- Idle measurement window (UTC):
+  `2026-09-09T10:34:03.238700597Z` → `2026-09-09T10:36:03.250473641Z`
+- Idle protocol: 20 seconds settling, 120.01 seconds measured, five-second
+  samples (24 rows), closed applications, awake display, and Temp set to
+  `Never`
+
+| Metric | Result | Unit |
+| --- | ---: | --- |
+| Settled aggregate guest CPU median | 0.15 | % |
+| Settled memory-used median | 1,127.2 | MiB |
+| Context switches | 136.3 | /s |
+| Processes started | 6 | count / 120 s |
+| Temp cleanup activations | 0 | count / 120 s |
+
+The idle result is the pre-updater reference on de0; the warm reboot result is
+A's bootstrap. They are distinct observations and do not establish an
+unmatched de0-versus-updater speedup. The idle result is a VM activity
+observation; lower guest activity does not imply lower physical power use.
+
+A's explicit warm update boot was measured from
+`2026-09-09T10:43:14.101303+00:00` to `2026-09-09T10:43:39.194244+00:00`:
+`25.093 s` to changed-boot-ID SSH/GDM readiness and `8.774 s` reported OS
+startup. This is one warm reboot sample, not a cold-start or first-pixel
+measurement.
+
+Raw evidence: [A qualification README](iterations/git-21a465760f53/README.md),
+[A build info](iterations/git-21a465760f53/build-info.json), [Pre-updater idle
+JSON (de0)](iterations/git-21a465760f53/idle-before-updater.json), [A warm-boot
+JSON](iterations/git-21a465760f53/first-update-boot.json), [A payload CI](iterations/git-21a465760f53/payload-ci.json), [A asset verification](iterations/git-21a465760f53/asset-verification.json), and [A update manifest](iterations/git-21a465760f53/update-git-21a465760f53.json).
+
+### 2026-09-09 — A → B native update observations (`git-1a34bbfe8509`, intermediate)
+
+- Recorded at (UTC): `2026-09-09T11:18:29Z` (entry transcription)
+- Version: `0.1.0-preview.2`
+- Previous/current at update start: A, `git-21a465760f53`
+- Candidate and booted payload: B, `git-1a34bbfe8509`, source
+  `1a34bbfe8509aee7cb3271fe7ecead25d53afe6c`, sequence `1788950905`
+- Staged and booted image manifest:
+  `sha256:cf9c53528f2a3ee514cabbb4e0b09ed1e05ee215450748b8bb57e2b6d8eb43f9`
+- Protocol: owner-driven native Updates flow on the existing populated review
+  VM; cancel Polkit first, retry authentication, allow background download and
+  staging, close/reopen the UI, then accept the explicit restart dialog
+
+| Observation | Result | Unit/meaning |
+| --- | ---: | --- |
+| Native authentication submit → root-ready | 54.0 | s |
+| Download progress before → after window close | 661,651,456 → 737,148,928 of 1,828,930,560 | bytes |
+| Explicit Updates restart → changed-boot-ID SSH/GDM | 22.631 | s |
+| OS startup in that update boot | 7.171 | s |
+| Permanent-file hashes retained | 6 | checks, all `OK` |
+| Existing Temp sample retained | 48 | bytes; policy `Never` |
+
+The install measurement window is
+`2026-09-09T10:55:37+00:00` → `2026-09-09T10:56:31+00:00`. The update-boot
+measurement window is `2026-09-09T10:58:19.871391+00:00` →
+`2026-09-09T10:58:42.502324+00:00`. The 54.0-second interval includes password
+entry, verified fetch, download, and staging. The 22.631-second interval is a
+single native warm reboot to SSH/GDM readiness; its 7.171-second OS total is
+`1.375 s` kernel + `2.339 s` initrd + `3.456 s` userspace. Neither is a cold
+boot, first-pixel, or application-launch benchmark.
+
+The Polkit-cancel path left the install service inactive and the candidate
+available. After retry, the download advanced while the Updates window was
+closed, reopening showed `state: staging`, and the root job reached `state:
+ready` before the user-authorized restart. B then booted successfully. The
+post-boot status file still has the stale human message `A signed update is
+available` despite structured `state: up_to_date` and B as the current build.
+That regression keeps B intermediate. Final build `git-17d205103f3a` is
+recorded separately below; no final numbers are included in this entry.
+
+No rollback cycle or rollback/re-forward result is claimed. The VM has no
+physical battery, so this update observation supplies no battery-runtime,
+battery-hours, wattage, or hardware-power result and cannot be used as an
+unmatched speedup claim.
+
+Raw evidence: [B qualification README](iterations/git-1a34bbfe8509/README.md),
+[B build info](iterations/git-1a34bbfe8509/build-info.json), [B update
+manifest](iterations/git-1a34bbfe8509/update-git-1a34bbfe8509.json), [B CI](iterations/git-1a34bbfe8509/updater-b-ci.json), [auth-cancel state](iterations/git-1a34bbfe8509/updater-auth-cancel-state.txt), [install timing](iterations/git-1a34bbfe8509/updater-install-timing.json), [before-close state](iterations/git-1a34bbfe8509/updater-before-close.json), [after-close state](iterations/git-1a34bbfe8509/updater-after-close.txt), [reopened staging state](iterations/git-1a34bbfe8509/updater-reopened-state.json), [ready job state](iterations/git-1a34bbfe8509/updater-current-job.json), [staged identity](iterations/git-1a34bbfe8509/updater-b-stage-verification.json), [asset verification](iterations/git-1a34bbfe8509/updater-b-asset-verification.json), [B first-boot timing](iterations/git-1a34bbfe8509/updater-b-first-boot.json), [booted image](iterations/git-1a34bbfe8509/updater-b-booted.json), [booted status](iterations/git-1a34bbfe8509/updater-b-booted-status.txt), [service journal](iterations/git-1a34bbfe8509/updater-service-journal.txt), [preservation checks](iterations/git-1a34bbfe8509/updater-b-preserved.txt), and [Temp state](iterations/git-1a34bbfe8509/updater-b-temp.json).
+
+### 2026-09-09 — final D cold boot, idle, and B → D update (`git-17d205103f3a`)
+
+- Recorded at (UTC): `2026-09-09T11:28:58Z` (entry transcription)
+- Version/build: `0.1.0-preview.2`, `git-17d205103f3a`, source
+  `17d205103f3aa885fe682d06a724f37e805a15a2`, sequence `1788951816`
+- Environment: VM 115, `amd64`, 4 vCPUs, 8 GiB RAM, 64 GiB disk, VirtIO
+  software graphics, 1280x800; builder VM 116 was stopped during the cold and
+  idle runs, while the shared Proxmox host was otherwise unisolated
+- Update path: native B → D update, with B retained as the rollback deployment
+
+Cold-start protocol used three clean shutdown/start trials. The host probe is
+`qm start` to active GDM via SSH polling every 0.5 seconds; OS startup is the
+separate `systemd-analyze` total. The host probe includes firmware and probe
+overhead and does not measure first-pixel time.
+
+| Trial | Measurement window (UTC) | OS startup (s) | Host → GDM probe (s) |
+| --- | --- | ---: | ---: |
+| 1 | `2026-09-09T11:18:54.990192889Z` → `2026-09-09T11:19:13.740678662Z` | 6.849 | 18.541 |
+| 2 | `2026-09-09T11:20:04.495669497Z` → `2026-09-09T11:20:22.330277406Z` | 6.835 | 17.635 |
+| 3 | `2026-09-09T11:20:28.061828024Z` → `2026-09-09T11:20:46.868044459Z` | 6.861 | 18.574 |
+| Median | — | **6.849** | **18.541** |
+
+Idle protocol used a freshly logged-in session after the cold trials, 20 seconds
+settling, 120.01 seconds measured, 24 five-second samples per state, an awake
+display, Temp set to `Never`, and no concurrent guest tests.
+
+| State | Measurement window (UTC) | CPU median | Memory median | Context switches | Processes started | Temp starts |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Closed | `2026-09-09T11:22:12.030873406Z` → `2026-09-09T11:24:12.041708493Z` | **0.15%** | 964.6 MiB | 128.3 /s | 3 | 0 / 120 s |
+| Updates open | `2026-09-09T11:25:07.584588199Z` → `2026-09-09T11:27:07.594766876Z` | **0.15%** | 1,029.5 MiB | 129.2 /s | 8 | 0 / 120 s |
+
+The final D cold and idle observations are under different conditions from the
+earlier de0 observations: D stopped builder VM 116, while the earlier run had
+the builder idle and used a different session history. For orientation only,
+de0's existing matched record above reports 6.993 s OS startup and 18.945 s
+host-probe median, including its retained 46.328 s sample. These are separate
+observations, so this entry claims no controlled performance win and no battery
+inference.
+
+The native install from B to D ran from
+`2026-09-09T11:16:13.705339+00:00` to `2026-09-09T11:17:08.854175+00:00` and
+took **55.149 s**. It includes authentication entry, signed metadata fetch,
+download, staging, and up to three seconds of status-probe overhead. The
+subsequent explicit restart ran from `2026-09-09T11:17:52.605446+00:00` to
+`2026-09-09T11:18:18.234951+00:00`, taking **25.629 s** to SSH/GDM readiness;
+the reported OS startup was **8.518 s** (`1.426 s` kernel + `3.433 s` initrd +
+`3.658 s` userspace). Both are one-sample update observations, not cold-start
+or first-pixel benchmarks.
+
+The local status captured before a new network check reports D as `up_to_date`
+with message `The selected update is installed.`; the later checked status
+retains the same corrected message. This closes B's stale-status regression.
+No new app-launch or physical battery measurement was made here. The VM result
+does not establish wattage, runtime, battery-hours, suspend drain, or hardware
+power behavior; no rollback cycle was run in this iteration.
+
+Raw evidence: [final README](iterations/git-17d205103f3a/README.md), [build
+info](iterations/git-17d205103f3a/build-info.json), [update manifest](iterations/git-17d205103f3a/update-git-17d205103f3a.json), [payload CI](iterations/git-17d205103f3a/payload-ci.json), [cold boot 1](iterations/git-17d205103f3a/cold-boot-1.json), [cold boot 2](iterations/git-17d205103f3a/cold-boot-2.json), [cold boot 3](iterations/git-17d205103f3a/cold-boot-3.json), [closed idle](iterations/git-17d205103f3a/idle-closed.json), [Updates-open idle](iterations/git-17d205103f3a/idle-updates-open.json), [native install timing](iterations/git-17d205103f3a/native-install-timing.json), [native update boot](iterations/git-17d205103f3a/native-update-boot.json), [status before check](iterations/git-17d205103f3a/installed-status-before-check.json), [checked status](iterations/git-17d205103f3a/checked-status.json), [staged bootc identity](iterations/git-17d205103f3a/staged-bootc.json), [booted bootc identity](iterations/git-17d205103f3a/booted-bootc.json), and [the earlier de0 outlier](iterations/git-de0d8baae5de/boot-final-3.json).
+
 ## Entry template
 
-Copy this compact block to the end of the file for every future run. Replace
-`TBD` only with values present in the run evidence; keep `unknown` when a source
-does not contain an exact measurement timestamp.
+Insert this compact block immediately above the Entry template section for every
+future run, keeping history chronological and the template at the bottom.
+Replace `TBD` only with values present in the run evidence; keep `unknown` when
+a source does not contain an exact measurement timestamp.
 
 ```markdown
 ### YYYY-MM-DD — short run name

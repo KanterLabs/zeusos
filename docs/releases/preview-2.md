@@ -40,7 +40,23 @@ On the trusted LAN, open Proxmox at `https://10.0.0.20:8006`, select VM **115** 
 - Safe desktop disabled both optional extensions and removed managed CSS imports; restore re-enabled them. Four owner files, including a write after the populated backup, retained their exact hashes.
 - Secure Boot enabled, SELinux enforcing, no failed system units. VM allocation remains 4 vCPUs, 8 GiB RAM and 64 GiB disk.
 
-The release distributes an OCI update archive for the existing preview installation. A new Preview 2 QCOW2/installer was not built. Updates remain manually verified and applied; no unattended registry channel is configured.
+At this visual revision, the release distributed an OCI update archive for the
+existing preview installation. A new Preview 2 QCOW2/installer was not built;
+updates were manually verified and applied, with no unattended registry
+channel configured.
+
+## Latest signed Updates iteration
+
+The same-version build `git-17d205103f3a` was subsequently installed through
+native Welcome → **Open Updates** on VM 115 and applied after an explicit
+reboot. The booted manifest is
+`sha256:4da2b1c5bdba3d5e0451e5f36389d3238bdf739a976951bca11b925f5e9d133d`,
+and the previous build `git-1a34bbfe8509` remains available for rollback. The
+post-reboot status reported `The selected update is installed.` The [latest
+iteration receipt](../iterations/git-17d205103f3a/README.md) records the signed
+asset gates and native evidence. CI run `34343529224` passed 123 Python tests;
+no rollback cycle was run. See the [timestamped metrics history](../metrics.md)
+for runtime observations; physical battery remains unmeasured on this VM.
 
 ## Idle measurement
 

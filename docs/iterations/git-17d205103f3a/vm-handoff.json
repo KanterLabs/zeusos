@@ -1,0 +1,11 @@
+{
+  "review_vmid": 115,
+  "build_id": "git-17d205103f3a",
+  "name": "zeusos-preview",
+  "cpus": 4,
+  "memory_mib": 8192,
+  "balloon": 0,
+  "disk_gib": 64,
+  "protection": 1,
+  "description": "Zeus OS 0.1.0-preview.2, build git-17d205103f3a. Owner review VM: 4 vCPU / 8 GiB / 64 GiB. Signed native Updates deployed and verified; open Welcome > Open Updates. Timestamped metrics: docs/metrics.md. Temp policy restored to On boot. Preserve owner settings and data; use verified backups for later upgrades. ZOS-64."
+}

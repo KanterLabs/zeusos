@@ -1,0 +1,7 @@
+/validate/validate-desktop.py:25: PyGIDeprecationWarning: Gio.DesktopAppInfo is deprecated; use GioUnix.DesktopAppInfo instead
+  assert Gio.DesktopAppInfo.new(desktop_id), f'Missing favorite launcher: {desktop_id}'
+Validated 82 desktop settings against installed GNOME schemas.
+GTK 3.0 theme parsed without CSS errors.
+GTK 4.0 theme parsed without CSS errors.
+Updater imports, GTK stylesheet, policy and immutable identity passed
+{"schema_version": 1, "ok": true, "state": "idle", "current": {"version": "0.1.0-preview.2", "build_id": "git-17d205103f3a", "source_commit": "17d205103f3aa885fe682d06a724f37e805a15a2", "sequence": 1788951816}, "candidate": null, "progress": null, "message": "Check for a newer signed Zeus OS build.", "error": null, "checked_at": null}
