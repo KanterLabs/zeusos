@@ -165,18 +165,18 @@ fails.
    backup is:
 
    ```text
-   /mnt/pve/sata-ssd/dump/vzdump-qemu-115-2026_09_08-14_52_08.vma.zst
+   /mnt/pve/sata-ssd/dump/vzdump-qemu-115-2026_09_08-15_51_51.vma.zst
    ```
 
    The recorded storage reference is
-   `sata-ssd:backup/vzdump-qemu-115-2026_09_08-14_52_08.vma.zst`. The checks
+   `sata-ssd:backup/vzdump-qemu-115-2026_09_08-15_51_51.vma.zst`. The checks
    below are the exact integrity checks used for this backup:
 
    ```sh
-   ssh pve 'zstd -t /mnt/pve/sata-ssd/dump/vzdump-qemu-115-2026_09_08-14_52_08.vma.zst'
+   ssh pve 'zstd -t /mnt/pve/sata-ssd/dump/vzdump-qemu-115-2026_09_08-15_51_51.vma.zst'
    # First decompress on the roomy SATA volume, with restrictive permissions.
-   ssh pve 'umask 077; zstd -dc /mnt/pve/sata-ssd/dump/vzdump-qemu-115-2026_09_08-14_52_08.vma.zst > /mnt/pve/sata-ssd/zeusos/verification/visual-preview.vma'
-   ssh pve 'vma verify /mnt/pve/sata-ssd/zeusos/verification/visual-preview.vma'
+   ssh pve 'umask 077; zstd -dc /mnt/pve/sata-ssd/dump/vzdump-qemu-115-2026_09_08-15_51_51.vma.zst > /mnt/pve/sata-ssd/zeusos/verification/temp-preview.vma'
+   ssh pve 'vma verify /mnt/pve/sata-ssd/zeusos/verification/temp-preview.vma'
    ```
 
    Both archive checks are recorded as passed. They verify archive integrity,

@@ -1,0 +1,9 @@
+# Zeus defaults for new standard folders. Existing owner files are preserved.
+DESKTOP=Desktop
+DOWNLOAD=Temp
+TEMPLATES=Templates
+PUBLICSHARE=Public
+DOCUMENTS=Documents
+MUSIC=Music
+PICTURES=Pictures
+VIDEOS=Videos

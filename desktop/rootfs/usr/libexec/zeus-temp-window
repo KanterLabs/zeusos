@@ -71,14 +71,7 @@ CSS = """
 }
 
 .hero {
-  padding: 32px 38px 20px;
-}
-
-.eyebrow {
-  color: @accent_color;
-  font-size: 0.78em;
-  font-weight: 750;
-  letter-spacing: 0.12em;
+  padding: 22px 38px 14px;
 }
 
 .hero-title {
@@ -86,14 +79,14 @@ CSS = """
   font-size: 2.2em;
   font-weight: 800;
   letter-spacing: -0.035em;
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 .hero-copy {
   color: alpha(@window_fg_color, 0.74);
   font-size: 1.06em;
   line-height: 1.38;
-  margin-top: 9px;
+  margin-top: 6px;
 }
 
 .expiration-label {
@@ -102,23 +95,23 @@ CSS = """
   color: @accent_color;
   font-size: 0.88em;
   font-weight: 700;
-  margin-top: 16px;
-  padding: 7px 12px;
+  margin-top: 10px;
+  padding: 5px 10px;
 }
 
 .content-section {
-  margin: 0 38px 17px;
+  margin: 0 38px 12px;
 }
 
 .metric-grid {
-  margin-bottom: 22px;
+  margin-bottom: 14px;
 }
 
 .metric-card {
   background: @card_bg_color;
   border: 1px solid alpha(@window_fg_color, 0.08);
   border-radius: 17px;
-  padding: 16px 18px 15px;
+  padding: 12px 15px 11px;
 }
 
 .metric-title {
@@ -132,7 +125,7 @@ CSS = """
   color: @window_fg_color;
   font-size: 1.42em;
   font-weight: 780;
-  margin-top: 7px;
+  margin-top: 4px;
 }
 
 .section-title {
@@ -158,7 +151,7 @@ CSS = """
 }
 
 .file-row {
-  padding: 7px 13px;
+  padding: 5px 13px;
 }
 
 .file-row:hover {
@@ -183,19 +176,19 @@ CSS = """
 
 .empty-files {
   color: alpha(@window_fg_color, 0.60);
-  padding: 28px 18px;
+  padding: 20px 18px;
 }
 
 .action-bar {
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 .info-banner {
   background: alpha(@accent_bg_color, 0.12);
   border-radius: 14px;
   color: alpha(@window_fg_color, 0.79);
-  margin-top: 16px;
-  padding: 12px 15px;
+  margin-top: 10px;
+  padding: 8px 12px;
 }
 
 .warning-banner {
@@ -209,13 +202,13 @@ CSS = """
 }
 
 .policy-card {
-  padding: 4px 9px 10px;
+  padding: 0 5px 3px;
 }
 
 .policy-note {
   color: alpha(@window_fg_color, 0.66);
   line-height: 1.35;
-  padding: 12px 10px 8px;
+  padding: 7px 10px 2px;
 }
 
 .custom-interval {
@@ -227,7 +220,7 @@ CSS = """
 }
 
 .bottom-space {
-  min-height: 18px;
+  min-height: 8px;
 }
 """
 
@@ -309,6 +302,25 @@ def _normalise_files(status: Mapping[str, Any]) -> list[dict[str, Any]]:
         }
         files.append(item)
     return files
+
+
+def _file_signature(files: list[dict[str, Any]]) -> tuple[tuple[Any, ...], ...]:
+    """Return stable row data so unchanged polls keep keyboard focus."""
+
+    rows = []
+    for item in files:
+        rows.append(
+            (
+                str(item.get("name", "")),
+                str(item.get("path") or ""),
+                int(item.get("size", 0)),
+                str(item.get("modified") or ""),
+                bool(item.get("active")),
+                bool(item.get("partial")),
+                bool(item.get("directory")),
+            )
+        )
+    return tuple(sorted(rows, key=lambda row: row[0].casefold()))
 
 
 def _policy_from_status(status: Mapping[str, Any]) -> tuple[str, int]:
@@ -510,6 +522,7 @@ class TempWindow(Adw.ApplicationWindow):
         self._refresh_source: int | None = None
         self._status: dict[str, Any] = {}
         self._files: list[dict[str, Any]] = []
+        self._file_signature: tuple[tuple[Any, ...], ...] | None = None
         self._file_by_name: dict[str, dict[str, Any]] = {}
         self._selected_names: set[str] = set()
         self._setup_result: Any = None
@@ -593,7 +606,6 @@ class TempWindow(Adw.ApplicationWindow):
 
         hero = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         hero.add_css_class("hero")
-        hero.append(self._label("A LITTLE ROOM TO BREATHE", "eyebrow"))
         hero.append(self._label("Temporary files", "hero-title"))
         hero.append(
             self._label(
@@ -640,52 +652,48 @@ class TempWindow(Adw.ApplicationWindow):
         policy_section.append(self._label("Automatic cleanup", "section-title"))
         policy_section.append(
             self._label(
-                "A policy change schedules the next cleanup from that change."
-                " Applying it never clears Temp immediately.",
+                "Changes apply to the next cleanup; applying never clears Temp immediately.",
                 "section-copy",
                 wrap=True,
             )
         )
-        policy_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        policy_card.add_css_class("policy-card")
+        # Adw preferences rows must be owned by a Gtk.ListBox (or an
+        # Adw.PreferencesGroup).  Keeping both controls in a real list box
+        # preserves their focus/navigation behavior and avoids the
+        # gtk_list_box_row_grab_focus assertion from a bare Gtk.Box parent.
+        policy_rows = Gtk.ListBox()
+        policy_rows.set_selection_mode(Gtk.SelectionMode.NONE)
+        policy_rows.add_css_class("policy-card")
         self._policy_row = Adw.ComboRow()
         self._policy_row.set_title("Clear Temp")
         self._policy_row.set_model(Gtk.StringList.new([label for _, label in POLICIES]))
         self._policy_row.connect("notify::selected", self._on_policy_changed)
-        policy_card.append(self._policy_row)
+        policy_rows.append(self._policy_row)
 
-        self._custom_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        self._custom_row.add_css_class("custom-interval")
-        custom_label = Gtk.Label(label="Custom interval")
-        custom_label.set_xalign(0)
-        custom_label.set_hexpand(True)
-        self._custom_row.append(custom_label)
-        self._custom_minutes = Gtk.SpinButton.new_with_range(
+        self._custom_minutes = Adw.SpinRow.new_with_range(
             MIN_CUSTOM_MINUTES,
             MAX_CUSTOM_MINUTES,
             1,
         )
+        self._custom_minutes.set_title("Custom interval (minutes)")
+        self._custom_minutes.set_subtitle("Minimum 15 minutes")
         self._custom_minutes.set_value(MIN_CUSTOM_MINUTES)
         self._custom_minutes.set_numeric(True)
         self._custom_minutes.set_wrap(False)
         self._custom_minutes.add_css_class("custom-minutes")
         self._custom_minutes.set_tooltip_text("Minimum 15 minutes")
-        self._custom_minutes.connect("value-changed", self._on_custom_interval_changed)
-        self._custom_row.append(self._custom_minutes)
-        minutes_label = Gtk.Label(label="minutes")
-        minutes_label.set_xalign(0)
-        self._custom_row.append(minutes_label)
-        policy_card.append(self._custom_row)
+        self._custom_minutes.connect("notify::value", self._on_custom_interval_changed)
+        policy_rows.append(self._custom_minutes)
+        self._custom_row = self._custom_minutes
         self._custom_row.set_visible(False)
+        policy_section.append(policy_rows)
 
         policy_note = self._label(
-            "On boot clears once per OS boot. Hour, day, and week clear the whole folder."
-            " Active downloads are left for a later cleanup by the engine.",
+            "Boot, hour, day, and week clear the folder; active downloads wait for later.",
             "policy-note",
             wrap=True,
         )
-        policy_card.append(policy_note)
-        policy_section.append(policy_card)
+        policy_section.append(policy_note)
 
         policy_actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         policy_actions.add_css_class("action-bar")
@@ -893,10 +901,15 @@ class TempWindow(Adw.ApplicationWindow):
 
     def _apply_status(self, status: Mapping[str, Any]):
         self._status = dict(status)
-        self._files = _normalise_files(status)
+        files = _normalise_files(status)
+        signature = _file_signature(files)
+        files_changed = signature != self._file_signature
+        self._files = files
         self._file_by_name = {item["name"]: item for item in self._files}
         self._selected_names.intersection_update(self._file_by_name)
-        self._render_files()
+        if files_changed:
+            self._file_signature = signature
+            self._render_files()
 
         used_bytes = _used_bytes_from_status(status, self._files)
         count_value = _nested_first(status, ("usage", "temp", "directory"), "file_count", "count", "items_count")
@@ -904,7 +917,8 @@ class TempWindow(Adw.ApplicationWindow):
         mode, interval = _policy_from_status(status)
         self._current_mode = mode
         self._current_interval = interval
-        self._set_policy_selection(mode, interval)
+        if not self._policy_dirty:
+            self._set_policy_selection(mode, interval)
         next_value = _nested_first(
             status,
             ("schedule", "policy", "temp"),
@@ -1046,7 +1060,7 @@ class TempWindow(Adw.ApplicationWindow):
         )
         self._update_action_sensitivity()
 
-    def _on_custom_interval_changed(self, _spin: Gtk.SpinButton):
+    def _on_custom_interval_changed(self, _spin: Adw.SpinRow, _param: Any = None):
         self._policy_dirty = True
         self._update_action_sensitivity()
 
@@ -1076,7 +1090,15 @@ class TempWindow(Adw.ApplicationWindow):
             self._show_toast(failure)
             return
         self._show_toast("Cleanup policy applied. Temp was not cleared.")
-        self._policy_dirty = False
+        returned_status = result.get("status") if isinstance(result, Mapping) else None
+        if isinstance(returned_status, Mapping):
+            # set_policy returns the canonical status.  Clear the dirty flag
+            # before syncing it so the newly applied selection is reflected;
+            # ordinary polls keep dirty edits untouched until this point.
+            self._policy_dirty = False
+            self._apply_status(returned_status)
+        else:
+            self._policy_dirty = False
         self._request_status()
 
     def _on_adopt_clicked(self, _button: Gtk.Button):

@@ -1,0 +1,1 @@
+{"boot_once": true, "nested_cleanup": true, "legacy_preserved": true, "keep_conflict_safe": true, "active_fd_preserved": true, "partial_companion_preserved": true, "symlink_target_preserved": true, "status_fd_stable": true}
