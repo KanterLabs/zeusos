@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Updates
+GenericName=Operating system updates
+Comment=Review and install signed Zeus OS updates
+Exec=/usr/libexec/zeus-update-window
+Icon=system-software-update
+Terminal=false
+Categories=GTK;GNOME;Settings;System;
+Keywords=system;software;updates;upgrade;restart;
+StartupNotify=true

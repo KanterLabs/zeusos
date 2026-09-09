@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """Time a native Zeus window's first map (not compositor presentation latency)."""
 import time
+
+def utc_rfc3339(epoch_ns):
+    seconds, nanoseconds = divmod(epoch_ns, 1_000_000_000)
+    return time.strftime('%Y-%m-%dT%H:%M:%S', time.gmtime(seconds)) + f'.{nanoseconds:09d}Z'
+
 START = time.monotonic()
+MEASUREMENT_STARTED_AT_UTC = utc_rfc3339(time.time_ns())
 import argparse
 import json
 import runpy
@@ -20,7 +26,9 @@ def mapped(window):
     if reported:return
     reported=True
     print(json.dumps({'app':args.app,'first_map_ms':round((time.monotonic()-START)*1000,1),
-                      'definition':'Python measurement process start to first Gtk map; excludes compositor presentation'}),flush=True)
+                      'definition':'Python measurement process start to first Gtk map; excludes compositor presentation',
+                      'measurement_started_at_utc':MEASUREMENT_STARTED_AT_UTC,
+                      'measurement_ended_at_utc':utc_rfc3339(time.time_ns())}),flush=True)
     def stop():
         app=window.get_application()
         if app:app.quit()

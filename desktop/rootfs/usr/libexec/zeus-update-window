@@ -1,0 +1,1306 @@
+#!/usr/bin/env python3
+"""Native GTK window for signed Zeus OS updates.
+
+The updater engine owns feed verification, downloads, staging, and the root
+systemd job.  This process only presents the JSON contract and submits the
+explicit owner actions.  All updater commands run away from the GTK main
+loop; the root job's status file is observed with a directory monitor so the
+window does not poll while idle.
+"""
+
+from __future__ import annotations
+
+import concurrent.futures
+from dataclasses import dataclass
+import datetime as datetime_module
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+from typing import Any, Callable, Mapping, Sequence
+
+import gi
+
+gi.require_version("Adw", "1")
+gi.require_version("Gtk", "4.0")
+from gi.repository import Adw, Gio, GLib, Gtk, Pango
+
+
+APPLICATION_ID = "org.zeus.Updates"
+UPDATE_COMMAND = "/usr/libexec/zeus-update"
+UPDATE_ADMIN_COMMAND = "/usr/libexec/zeus-update-admin"
+PKEXEC_COMMAND = "/usr/bin/pkexec"
+STATUS_DIRECTORY = Path("/var/lib/zeus/updater")
+STATUS_FILENAME = "status.json"
+STATUS_PATH = STATUS_DIRECTORY / STATUS_FILENAME
+REBOOT_COMMAND = ("/usr/bin/gnome-session-quit", "--reboot")
+REFRESH_DEBOUNCE_MS = 250
+COMMAND_TIMEOUT_SECONDS = 120
+PRODUCT_VERSION = "0.1.0-preview.2"
+
+VALID_STATES = frozenset(
+    {
+        "idle",
+        "available",
+        "up_to_date",
+        "queued",
+        "downloading",
+        "verifying",
+        "staging",
+        "ready",
+        "error",
+        "interrupted",
+    }
+)
+AUTHORITATIVE_STATES = frozenset(
+    {"queued", "downloading", "verifying", "staging", "ready"}
+)
+BUSY_STATES = frozenset({"queued", "downloading", "verifying", "staging"})
+INSTALLABLE_BUILD_RE = re.compile(r"git-[0-9a-f]{12}\Z")
+SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
+
+
+def _read_text(path: Path, fallback: str) -> str:
+    try:
+        value = path.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError):
+        return fallback
+    return value or fallback
+
+
+def _installed_defaults() -> dict[str, str]:
+    """Return display-only fallbacks for images without a status response."""
+
+    return {
+        "version": _read_text(Path("/usr/share/zeus/version"), PRODUCT_VERSION),
+        "build_id": _read_text(Path("/usr/share/zeus/build-id"), "development"),
+    }
+
+
+def _text(value: Any, fallback: str = "") -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if value is None:
+        return fallback
+    return str(value).strip()
+
+
+def _nonnegative_integer(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        number = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return number if number >= 0 else None
+
+
+def _normalise_current(value: Any) -> dict[str, Any]:
+    defaults = _installed_defaults()
+    current = value if isinstance(value, Mapping) else {}
+    result = {
+        "version": _text(current.get("version"), defaults["version"]),
+        "build_id": _text(current.get("build_id"), defaults["build_id"]),
+    }
+    sequence = _nonnegative_integer(current.get("sequence"))
+    if sequence is not None:
+        result["sequence"] = sequence
+    return result
+
+
+def _normalise_candidate(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, Mapping):
+        return None
+    candidate: dict[str, Any] = {}
+    for key in ("version", "build_id", "source_commit", "published_at", "notes"):
+        value_for_key = _text(value.get(key))
+        if value_for_key:
+            candidate[key] = value_for_key
+    sequence = _nonnegative_integer(value.get("sequence"))
+    if sequence is not None:
+        candidate["sequence"] = sequence
+    archive_size = _nonnegative_integer(value.get("archive_size"))
+    if archive_size is not None:
+        candidate["archive_size"] = archive_size
+    archive_sha256 = _text(value.get("archive_sha256"))
+    if archive_sha256:
+        candidate["archive_sha256"] = archive_sha256
+    candidate["installable"] = _candidate_is_installable(candidate)
+    return candidate
+
+
+def _candidate_is_installable(candidate: Mapping[str, Any] | None) -> bool:
+    if not isinstance(candidate, Mapping):
+        return False
+    build_id = candidate.get("build_id")
+    archive_sha256 = candidate.get("archive_sha256")
+    return bool(
+        isinstance(build_id, str)
+        and INSTALLABLE_BUILD_RE.fullmatch(build_id)
+        and isinstance(archive_sha256, str)
+        and SHA256_RE.fullmatch(archive_sha256)
+    )
+
+
+def _normalise_progress(value: Any) -> dict[str, int] | None:
+    if not isinstance(value, Mapping):
+        return None
+    bytes_done = _nonnegative_integer(value.get("bytes"))
+    total = _nonnegative_integer(value.get("total"))
+    if bytes_done is None or total is None or total <= 0:
+        return None
+    return {"bytes": min(bytes_done, total), "total": total}
+
+
+def _normalise_status(value: Any) -> dict[str, Any] | None:
+    """Keep the public JSON contract predictable before rendering it."""
+
+    if not isinstance(value, Mapping):
+        return None
+    raw_state = _text(value.get("state"))
+    state = raw_state.lower() if raw_state else "idle"
+    if value.get("ok") is False and not raw_state:
+        state = "error"
+    if state not in VALID_STATES:
+        state = "error"
+    status: dict[str, Any] = {
+        "ok": value.get("ok") is not False,
+        "state": state,
+        "current": _normalise_current(value.get("current")),
+        "candidate": _normalise_candidate(value.get("candidate")),
+        "progress": _normalise_progress(value.get("progress")),
+        "message": _text(value.get("message")),
+        "error": _text(value.get("error")),
+        "checked_at": _text(value.get("checked_at")),
+    }
+    # Preserve only useful contract fields.  This lets a helper response
+    # carry future metadata without allowing arbitrary values into the UI.
+    return status
+
+
+def _is_authoritative_status(status: Mapping[str, Any] | None) -> bool:
+    return isinstance(status, Mapping) and status.get("state") in AUTHORITATIVE_STATES
+
+
+def _merge_authoritative_status(
+    network_status: Mapping[str, Any] | None,
+    authoritative_status: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Keep an in-flight root job ahead of a stale concurrent network check."""
+
+    network = _normalise_status(network_status)
+    authoritative = _normalise_status(authoritative_status)
+    if authoritative is None or not _is_authoritative_status(authoritative):
+        return network
+    if network is None:
+        return authoritative
+
+    merged = dict(network)
+    # The local root job owns state, progress, message, and errors.  Current
+    # identity and candidate metadata can be enriched by a newer check when
+    # the job record does not contain them.
+    for key in ("state", "progress", "message", "error", "checked_at", "ok"):
+        merged[key] = authoritative.get(key)
+    if authoritative.get("candidate") is not None:
+        merged["candidate"] = authoritative["candidate"]
+    if authoritative.get("current") is not None:
+        merged["current"] = authoritative["current"]
+    return merged
+
+
+def _parse_json_object(output: str) -> dict[str, Any] | None:
+    if not isinstance(output, str):
+        return None
+    text = output.strip()
+    if not text:
+        return None
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        # The CLI contract is one JSON object.  A small amount of launcher
+        # noise should not make an otherwise valid response unusable.
+        start = text.find("{")
+        end = text.rfind("}")
+        if start < 0 or end <= start:
+            return None
+        try:
+            parsed = json.loads(text[start : end + 1])
+        except json.JSONDecodeError:
+            return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _command_error(payload: Mapping[str, Any] | None, stderr: str = "") -> str:
+    if isinstance(payload, Mapping):
+        # Error codes help diagnostics, but a human message is what belongs
+        # in an owner-facing window (for example, a failed signature check
+        # must not be rendered as a generic network failure).
+        for key in ("message", "error"):
+            value = _text(payload.get(key))
+            if value:
+                return value
+    return _text(stderr)
+
+
+@dataclass(frozen=True)
+class CommandOutcome:
+    payload: dict[str, Any] | None
+    returncode: int | None
+    error: str | None = None
+    stdout: str = ""
+    stderr: str = ""
+
+
+def _run_json_command(arguments: Sequence[str], *, timeout: int = COMMAND_TIMEOUT_SECONDS) -> CommandOutcome:
+    """Run one fixed-argv updater command without involving a shell."""
+
+    try:
+        completed = subprocess.run(
+            list(arguments),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return CommandOutcome(None, None, "The update service took too long to respond.")
+    except FileNotFoundError as error:
+        return CommandOutcome(None, None, f"Required updater command is unavailable: {error.filename or arguments[0]}")
+    except OSError as error:
+        return CommandOutcome(None, None, f"The updater could not be started: {error}")
+
+    stdout = _text(completed.stdout)
+    stderr = _text(completed.stderr)
+    payload = _parse_json_object(stdout)
+    error = None
+    if completed.returncode != 0:
+        error = _command_error(payload, stderr) or f"The updater returned exit status {completed.returncode}."
+    elif payload is None:
+        error = "The updater returned an unreadable response."
+    elif payload.get("ok") is False:
+        error = _command_error(payload, stderr) or "The updater could not complete the request."
+    return CommandOutcome(payload, completed.returncode, error, stdout, stderr)
+
+
+def _is_authentication_denial(outcome: CommandOutcome) -> bool:
+    """pkexec uses 126/127 for canceled or denied authentication paths."""
+
+    return outcome.returncode in (126, 127)
+
+
+def _format_size(value: Any) -> str:
+    number = _nonnegative_integer(value)
+    if number is None:
+        return "Size unavailable"
+    units = ("bytes", "KiB", "MiB", "GiB", "TiB")
+    amount = float(number)
+    unit = units[0]
+    for unit in units:
+        if amount < 1024 or unit == units[-1]:
+            break
+        amount /= 1024
+    if unit == "bytes":
+        return f"{number:,} bytes"
+    return f"{amount:.1f} {unit}"
+
+
+def _format_timestamp(value: Any) -> str:
+    timestamp = _text(value)
+    if not timestamp:
+        return "Date unavailable"
+    try:
+        parsed = datetime_module.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=datetime_module.timezone.utc)
+        parsed = parsed.astimezone()
+        return parsed.strftime("%b %-d, %Y")
+    except (TypeError, ValueError, OverflowError):
+        return timestamp
+
+
+def _monitor_event_names(*files: Gio.File | None) -> set[str]:
+    names: set[str] = set()
+    for file in files:
+        if file is None:
+            continue
+        try:
+            path = file.get_path()
+        except (AttributeError, RuntimeError):
+            continue
+        if path:
+            names.add(Path(path).name)
+    return names
+
+
+def _state_heading(state: str) -> str:
+    return {
+        "idle": "Ready to check",
+        "available": "Update available",
+        "up_to_date": "You’re up to date",
+        "queued": "Update queued",
+        "downloading": "Downloading update",
+        "verifying": "Verifying update",
+        "staging": "Preparing update",
+        "ready": "Ready to restart",
+        "error": "Update check needs attention",
+        "interrupted": "Update interrupted",
+    }.get(state, "Update status")
+
+
+def _state_description(status: Mapping[str, Any]) -> str:
+    state = _text(status.get("state"), "idle")
+    message = _text(status.get("message"))
+    if message:
+        return message
+    return {
+        "idle": "Check when you are ready to look for a signed Zeus OS update.",
+        "available": "A signed update is ready for you to review.",
+        "up_to_date": "This installation has the latest signed update available to it.",
+        "queued": "The update is queued and will continue in the background.",
+        "downloading": "The update archive is downloading in the background.",
+        "verifying": "The downloaded archive is being verified before staging.",
+        "staging": "The verified update is being prepared for the next restart.",
+        "ready": "The verified update is staged and will apply after you restart.",
+        "error": _text(status.get("error"), "The update service could not complete the request."),
+        "interrupted": _text(status.get("error"), "The update was interrupted. Check again to retry."),
+    }.get(state, "The updater returned an unknown state.")
+
+
+def _looks_offline(*values: Any) -> bool:
+    text = " ".join(_text(value).lower() for value in values if value is not None)
+    return any(
+        marker in text
+        for marker in (
+            "offline",
+            "network",
+            "no route",
+            "could not reach",
+            "dns",
+            "connection refused",
+            "connection reset",
+            "unable to resolve",
+            "timed out",
+        )
+    )
+
+
+def _looks_trust_error(*values: Any) -> bool:
+    text = " ".join(_text(value).lower() for value in values if value is not None)
+    return any(
+        marker in text
+        for marker in ("signature", "signed", "trust", "manifest", "verification", "verify")
+    )
+
+
+CSS = """
+.zeus-window {
+  background: @window_bg_color;
+}
+
+.updates-hero {
+  padding: 28px 40px 17px;
+}
+
+.eyebrow {
+  color: @accent_color;
+  font-size: 0.78em;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+}
+
+.hero-title {
+  color: @window_fg_color;
+  font-size: 2.25em;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  margin-top: 6px;
+}
+
+.hero-copy {
+  color: alpha(@window_fg_color, 0.74);
+  font-size: 1.06em;
+  line-height: 1.38;
+  margin-top: 8px;
+}
+
+.content-section {
+  margin: 0 40px 14px;
+}
+
+.section-title {
+  color: @window_fg_color;
+  font-size: 1.08em;
+  font-weight: 760;
+}
+
+.section-copy,
+.muted-copy {
+  color: alpha(@window_fg_color, 0.66);
+  margin-top: 4px;
+}
+
+.current-card,
+.candidate-card,
+.status-card {
+  background: @card_bg_color;
+  border: 1px solid alpha(@window_fg_color, 0.09);
+  border-radius: 17px;
+  padding: 17px 18px;
+}
+
+.current-card {
+  padding: 14px 16px;
+}
+
+.metric-label,
+.detail-label {
+  color: alpha(@window_fg_color, 0.58);
+  font-size: 0.78em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.metric-value,
+.detail-value {
+  color: @window_fg_color;
+  font-weight: 680;
+  margin-top: 3px;
+}
+
+.metric-value {
+  font-size: 1.04em;
+}
+
+.status-card {
+  padding: 18px 19px 17px;
+}
+
+.status-card.error,
+.status-card.interrupted {
+  background: alpha(@error_bg_color, 0.13);
+  border-color: alpha(@error_color, 0.28);
+}
+
+.status-card.available,
+.status-card.ready {
+  background: alpha(@accent_bg_color, 0.09);
+  border-color: alpha(@accent_color, 0.20);
+}
+
+.status-icon {
+  color: @accent_color;
+  margin-right: 12px;
+}
+
+.status-heading {
+  color: @window_fg_color;
+  font-size: 1.22em;
+  font-weight: 770;
+}
+
+.status-description {
+  color: alpha(@window_fg_color, 0.72);
+  margin-top: 4px;
+}
+
+.status-meta {
+  color: alpha(@window_fg_color, 0.56);
+  font-size: 0.84em;
+  margin-top: 9px;
+}
+
+.candidate-heading {
+  color: @window_fg_color;
+  font-size: 1.24em;
+  font-weight: 770;
+}
+
+.candidate-version {
+  color: @accent_color;
+  font-size: 0.96em;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.candidate-notes {
+  color: alpha(@window_fg_color, 0.73);
+  line-height: 1.35;
+  margin-top: 13px;
+}
+
+.detail-grid {
+  margin-top: 15px;
+}
+
+.progress-label {
+  color: alpha(@window_fg_color, 0.64);
+  font-size: 0.86em;
+  margin-top: 9px;
+}
+
+.background-copy {
+  color: alpha(@window_fg_color, 0.66);
+  font-size: 0.88em;
+  margin-top: 11px;
+}
+
+.action-bar {
+  margin-top: 14px;
+}
+
+.bottom-space {
+  min-height: 22px;
+}
+"""
+
+
+class UpdatesWindow(Adw.ApplicationWindow):
+    """Native view and asynchronous bridge for the updater contract."""
+
+    def __init__(self, application: Adw.Application):
+        super().__init__(application=application, title="Updates")
+        self.set_default_size(780, 720)
+        self.set_size_request(560, 520)
+        self.add_css_class("zeus-window")
+
+        self._closed = False
+        self._executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=3,
+            thread_name_prefix="zeus-updater",
+        )
+        self._status: dict[str, Any] = _normalise_status({"state": "idle"}) or {"state": "idle"}
+        self._authoritative_status: dict[str, Any] | None = None
+        self._status_request_number = 0
+        self._check_request_number = 0
+        self._status_in_flight = False
+        self._check_in_flight = False
+        self._install_in_flight = False
+        self._refresh_source: int | None = None
+        self._refresh_again = False
+        self._status_file_dirty = False
+        self._initial_check_started = False
+        self._operation_notice = ""
+        self._operation_notice_kind = "info"
+        self._install_error = False
+        self._status_monitor: Gio.FileMonitor | None = None
+
+        self._install_css()
+        self._build_window()
+        self._setup_status_monitor()
+        # One owner-triggered check on open is useful; subsequent updates come
+        # from the explicit button or the status-file monitor only.
+        self._request_status(initial=True)
+
+    @staticmethod
+    def _set_accessible_label(widget: Gtk.Widget, label: str):
+        accessible_property = getattr(Gtk, "AccessibleProperty", None)
+        update_property = getattr(widget, "update_property", None)
+        if accessible_property is not None and update_property is not None:
+            try:
+                update_property([accessible_property.LABEL], [label])
+                return
+            except (AttributeError, TypeError):
+                pass
+        try:
+            widget.set_tooltip_text(label)
+        except (AttributeError, RuntimeError):
+            pass
+
+    def _install_css(self):
+        provider = Gtk.CssProvider()
+        provider.load_from_data(CSS.encode("utf-8"))
+        display = self.get_display()
+        if display is not None:
+            Gtk.StyleContext.add_provider_for_display(
+                display,
+                provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+            )
+
+    @staticmethod
+    def _label(text: str, css_class: str, *, wrap: bool = False) -> Gtk.Label:
+        label = Gtk.Label(label=text)
+        label.set_xalign(0)
+        label.add_css_class(css_class)
+        if wrap:
+            label.set_wrap(True)
+            label.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
+            label.set_hexpand(True)
+        return label
+
+    def _build_window(self):
+        toolbar = Adw.ToolbarView()
+        header = Adw.HeaderBar()
+        header.set_show_start_title_buttons(True)
+        header.set_show_end_title_buttons(True)
+        title = Gtk.Label(label="Updates")
+        title.add_css_class("heading")
+        header.set_title_widget(title)
+
+        self._check_button = Gtk.Button(label="Check for Updates")
+        self._check_button.add_css_class("suggested-action")
+        self._check_button.set_tooltip_text("Check for a newer signed Zeus OS build")
+        self._set_accessible_label(self._check_button, "Check for updates")
+        self._check_button.connect("clicked", self._on_check_clicked)
+        header.pack_end(self._check_button)
+        toolbar.add_top_bar(header)
+
+        self._toast_overlay = Adw.ToastOverlay()
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(860)
+        clamp.set_tightening_threshold(600)
+        clamp.set_child(self._build_content())
+        scroller.set_child(clamp)
+        self._toast_overlay.set_child(scroller)
+        toolbar.set_content(self._toast_overlay)
+        self.set_content(toolbar)
+
+    def _build_content(self) -> Gtk.Widget:
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+
+        hero = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        hero.add_css_class("updates-hero")
+        hero.append(self._label("ZEUS OS", "eyebrow"))
+        hero.append(self._label("Keep Zeus OS up to date", "hero-title"))
+        hero.append(
+            self._label(
+                "Review signed updates here. Installing stages the verified image for a restart you choose.",
+                "hero-copy",
+                wrap=True,
+            )
+        )
+        content.append(hero)
+
+        current_section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        current_section.add_css_class("content-section")
+        current_section.append(self._label("Installed version", "section-title"))
+        current_section.append(
+            self._label("The version and build currently running on this device.", "section-copy", wrap=True)
+        )
+        current_card = Gtk.Grid(column_spacing=22, row_spacing=8)
+        current_card.set_column_homogeneous(True)
+        current_card.add_css_class("current-card")
+        version_box, self._current_version = self._metric("Version", "Checking…")
+        build_box, self._current_build = self._metric("Build", "Checking…")
+        current_card.attach(version_box, 0, 0, 1, 1)
+        current_card.attach(build_box, 1, 0, 1, 1)
+        current_section.append(current_card)
+        content.append(current_section)
+
+        status_section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        status_section.add_css_class("content-section")
+        self._status_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self._status_card.add_css_class("status-card")
+        status_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        self._status_icon = Gtk.Image.new_from_icon_name("system-software-update-symbolic")
+        self._status_icon.set_pixel_size(28)
+        self._status_icon.add_css_class("status-icon")
+        status_row.append(self._status_icon)
+        status_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        status_text.set_hexpand(True)
+        self._status_heading = self._label("Ready to check", "status-heading")
+        status_text.append(self._status_heading)
+        self._status_description = self._label("Check when you are ready to look for a signed Zeus OS update.", "status-description", wrap=True)
+        status_text.append(self._status_description)
+        self._status_meta = self._label("", "status-meta", wrap=True)
+        status_text.append(self._status_meta)
+        status_row.append(status_text)
+        self._status_spinner = Gtk.Spinner()
+        self._status_spinner.set_size_request(24, 24)
+        status_row.append(self._status_spinner)
+        self._status_card.append(status_row)
+        self._progress = Gtk.ProgressBar()
+        self._progress.set_show_text(False)
+        self._progress.set_visible(False)
+        self._status_card.append(self._progress)
+        self._progress_label = self._label("", "progress-label", wrap=True)
+        self._progress_label.set_visible(False)
+        self._status_card.append(self._progress_label)
+        self._background_copy = self._label(
+            "This update is running in the background. You can close this window and it will continue.",
+            "background-copy",
+            wrap=True,
+        )
+        self._background_copy.set_visible(False)
+        self._status_card.append(self._background_copy)
+        status_section.append(self._status_card)
+        content.append(status_section)
+
+        candidate_section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        candidate_section.add_css_class("content-section")
+        candidate_section.append(self._label("Available update", "section-title"))
+        candidate_section.append(
+            self._label("Review the release details before asking to install it.", "section-copy", wrap=True)
+        )
+        self._candidate_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self._candidate_card.add_css_class("candidate-card")
+        self._candidate_title = self._label("Zeus OS update", "candidate-heading")
+        self._candidate_card.append(self._candidate_title)
+        self._candidate_version = self._label("", "candidate-version")
+        self._candidate_card.append(self._candidate_version)
+        self._candidate_notes = self._label("", "candidate-notes", wrap=True)
+        self._candidate_card.append(self._candidate_notes)
+
+        detail_grid = Gtk.Grid(column_spacing=22, row_spacing=11)
+        detail_grid.set_column_homogeneous(True)
+        detail_grid.add_css_class("detail-grid")
+        date_box, self._candidate_date = self._detail("Published", "Date unavailable")
+        size_box, self._candidate_size = self._detail("Download size", "Size unavailable")
+        release_box, self._candidate_release = self._detail("Release build", "Build unavailable")
+        detail_grid.attach(date_box, 0, 0, 1, 1)
+        detail_grid.attach(size_box, 1, 0, 1, 1)
+        detail_grid.attach(release_box, 0, 1, 2, 1)
+        self._candidate_card.append(detail_grid)
+
+        actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        actions.add_css_class("action-bar")
+        self._install_button = Gtk.Button(label="Install Update")
+        self._install_button.add_css_class("suggested-action")
+        self._install_button.set_tooltip_text("Stage the signed update after authentication")
+        self._set_accessible_label(self._install_button, "Install update")
+        self._install_button.connect("clicked", self._on_install_clicked)
+        actions.append(self._install_button)
+        self._restart_button = Gtk.Button(label="Restart to Apply")
+        self._restart_button.add_css_class("suggested-action")
+        self._restart_button.set_tooltip_text("Restart the session after saving your work")
+        self._set_accessible_label(self._restart_button, "Restart to apply update")
+        self._restart_button.connect("clicked", self._on_restart_clicked)
+        actions.append(self._restart_button)
+        self._candidate_card.append(actions)
+        candidate_section.append(self._candidate_card)
+        self._candidate_section = candidate_section
+        content.append(candidate_section)
+
+        bottom_space = Gtk.Box()
+        bottom_space.add_css_class("bottom-space")
+        content.append(bottom_space)
+        self._render_status()
+        return content
+
+    def _metric(self, title: str, value: str) -> tuple[Gtk.Box, Gtk.Label]:
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        box.append(self._label(title.upper(), "metric-label"))
+        value_label = self._label(value, "metric-value")
+        value_label.set_ellipsize(Pango.EllipsizeMode.END)
+        box.append(value_label)
+        return box, value_label
+
+    def _detail(self, title: str, value: str) -> tuple[Gtk.Box, Gtk.Label]:
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        box.append(self._label(title, "detail-label"))
+        value_label = self._label(value, "detail-value", wrap=True)
+        value_label.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+        box.append(value_label)
+        return box, value_label
+
+    def _setup_status_monitor(self):
+        if self._closed:
+            return
+        try:
+            if STATUS_DIRECTORY.is_symlink() or not STATUS_DIRECTORY.is_dir():
+                return
+        except OSError:
+            return
+        flags = getattr(Gio.FileMonitorFlags, "WATCH_MOVES", 0)
+        try:
+            monitor = Gio.File.new_for_path(str(STATUS_DIRECTORY)).monitor_directory(flags, None)
+            monitor.connect("changed", self._on_status_file_changed)
+        except (GLib.Error, OSError, TypeError, ValueError):
+            return
+        self._status_monitor = monitor
+
+    def _on_status_file_changed(
+        self,
+        _monitor: Gio.FileMonitor,
+        file: Gio.File,
+        other_file: Gio.File | None,
+        _event_type: Gio.FileMonitorEvent,
+    ):
+        if self._closed:
+            return
+        if STATUS_FILENAME not in _monitor_event_names(file, other_file):
+            return
+        self._status_file_dirty = True
+        self._schedule_status_refresh()
+
+    def _schedule_status_refresh(self):
+        """Coalesce atomic status-file replacements into one status read."""
+
+        if self._closed:
+            return
+        if self._status_in_flight or self._refresh_source is not None:
+            self._refresh_again = True
+            return
+        try:
+            self._refresh_source = GLib.timeout_add(
+                REFRESH_DEBOUNCE_MS,
+                self._on_refresh_debounce,
+            )
+        except (AttributeError, TypeError, ValueError):
+            self._status_file_dirty = False
+            self._request_status()
+
+    def _on_refresh_debounce(self) -> bool:
+        self._refresh_source = None
+        if self._closed:
+            return GLib.SOURCE_REMOVE
+        self._refresh_again = False
+        self._status_file_dirty = False
+        self._request_status()
+        return GLib.SOURCE_REMOVE
+
+    def _submit_async(
+        self,
+        operation: Callable[[], Any],
+        callback: Callable[[Any, Exception | None], None],
+    ):
+        if self._closed:
+            return
+
+        def worker_done(future: concurrent.futures.Future[Any]):
+            try:
+                result = future.result()
+                error = None
+            except Exception as caught:  # worker failures belong in the UI
+                result = None
+                error = caught
+
+            def deliver() -> bool:
+                if self._closed:
+                    return GLib.SOURCE_REMOVE
+                callback(result, error)
+                return GLib.SOURCE_REMOVE
+
+            try:
+                GLib.idle_add(deliver, priority=GLib.PRIORITY_DEFAULT)
+            except (AttributeError, RuntimeError, TypeError):
+                # GTK may already be tearing down after a close request.
+                return
+
+        try:
+            future = self._executor.submit(operation)
+        except RuntimeError as error:
+            callback(None, error)
+            return
+        future.add_done_callback(worker_done)
+
+    def _request_status(self, *, initial: bool = False):
+        if self._closed:
+            return
+        if self._status_in_flight:
+            self._refresh_again = True
+            return
+        self._status_request_number += 1
+        request_number = self._status_request_number
+        self._status_in_flight = True
+        self._render_status()
+        self._submit_async(
+            lambda: _run_json_command((UPDATE_COMMAND, "status", "--json")),
+            lambda outcome, error: self._after_status(request_number, outcome, error, initial),
+        )
+
+    def _after_status(
+        self,
+        request_number: int,
+        outcome: CommandOutcome | None,
+        error: Exception | None,
+        initial: bool,
+    ):
+        if self._closed or request_number != self._status_request_number:
+            return
+        self._status_in_flight = False
+        payload = outcome.payload if isinstance(outcome, CommandOutcome) else None
+        structured = _normalise_status(payload)
+        terminal_failure = bool(
+            structured is not None
+            and structured.get("state") in {"error", "interrupted"}
+            and isinstance(payload, Mapping)
+            and payload.get("ok") is False
+        )
+        # The client exits nonzero for a structured local error, but that
+        # response is still the authoritative status.  Only a missing or
+        # unusable payload is a transport/read failure.
+        usable = (
+            isinstance(outcome, CommandOutcome)
+            and payload is not None
+            and (outcome.error is None or terminal_failure)
+        )
+        if error is not None:
+            self._handle_status_failure(f"The local update status is unavailable: {error}")
+        elif not usable:
+            detail = outcome.error if isinstance(outcome, CommandOutcome) else None
+            self._handle_status_failure(detail or "The local update status is unavailable.")
+        else:
+            self._apply_status(payload, source="status")
+
+        if self._refresh_again:
+            self._refresh_again = False
+            self._schedule_status_refresh()
+        if initial and not self._initial_check_started:
+            self._initial_check_started = True
+            if not _is_authoritative_status(self._status):
+                self._request_check()
+
+    def _handle_status_failure(self, message: str):
+        if _is_authoritative_status(self._status):
+            self._operation_notice = "The update is still running. Its local progress will appear when the service responds."
+            self._operation_notice_kind = "info"
+        else:
+            status = dict(self._status)
+            status["state"] = "error"
+            status["error"] = message
+            status["message"] = "The local update status could not be read."
+            self._status = status
+        self._render_status()
+
+    def _request_check(self):
+        if self._closed or self._check_in_flight or self._install_in_flight:
+            return
+        if _is_authoritative_status(self._status):
+            return
+        self._operation_notice = ""
+        self._operation_notice_kind = "info"
+        self._install_error = False
+        self._check_request_number += 1
+        request_number = self._check_request_number
+        self._check_in_flight = True
+        self._render_status()
+        self._submit_async(
+            lambda: _run_json_command((UPDATE_COMMAND, "check", "--json")),
+            lambda outcome, error: self._after_check(request_number, outcome, error),
+        )
+
+    def _after_check(
+        self,
+        request_number: int,
+        outcome: CommandOutcome | None,
+        error: Exception | None,
+    ):
+        if self._closed or request_number != self._check_request_number:
+            return
+        self._check_in_flight = False
+        if self._status_file_dirty:
+            # A root-job replacement arrived while the network check was in
+            # flight.  Do not briefly paint its stale result over the job;
+            # the debounced local status read will own the next render.
+            self._operation_notice = "Refreshing the installation state…"
+            self._operation_notice_kind = "info"
+            self._schedule_status_refresh()
+            self._render_status()
+            return
+        if error is not None:
+            self._handle_check_failure(f"Could not check for updates: {error}")
+        elif not isinstance(outcome, CommandOutcome) or outcome.payload is None or outcome.error is not None:
+            message = outcome.error if isinstance(outcome, CommandOutcome) else None
+            self._handle_check_failure(message or "Could not check for updates.")
+        else:
+            self._operation_notice = ""
+            self._operation_notice_kind = "info"
+            self._apply_status(outcome.payload, source="check")
+        self._render_status()
+
+    def _handle_check_failure(self, message: str):
+        if _is_authoritative_status(self._status):
+            self._operation_notice = "The update is still running in the background."
+            self._operation_notice_kind = "info"
+            return
+        status = dict(self._status)
+        status["state"] = "error"
+        status["error"] = message
+        status["message"] = (
+            "You’re offline. Connect to the internet and try again."
+            if _looks_offline(message)
+            else (
+                "The signed update could not be verified."
+                if _looks_trust_error(message)
+                else "The update check could not be completed."
+            )
+        )
+        self._status = status
+        self._operation_notice = message
+        self._operation_notice_kind = "error"
+
+    def _apply_status(self, value: Any, *, source: str):
+        status = _normalise_status(value)
+        if status is None:
+            self._handle_status_failure("The updater returned an unreadable status.")
+            return
+
+        if source == "check":
+            status = _merge_authoritative_status(status, self._authoritative_status) or status
+        elif _is_authoritative_status(status):
+            self._authoritative_status = status
+        elif source in {"status", "install"}:
+            # A terminal local status replaces a previous provisional queued
+            # record and allows later checks to render normally.
+            self._authoritative_status = None
+
+        self._status = status
+        if source in {"status", "check", "install"} and status.get("state") in AUTHORITATIVE_STATES:
+            self._operation_notice = ""
+            self._operation_notice_kind = "info"
+        self._render_status()
+
+    def _on_check_clicked(self, _button: Gtk.Button):
+        self._request_check()
+
+    def _on_install_clicked(self, _button: Gtk.Button):
+        candidate = self._status.get("candidate")
+        if not _candidate_is_installable(candidate):
+            self._show_toast("This update is missing verified selection details. Check again to refresh it.")
+            return
+        if self._install_in_flight or _is_authoritative_status(self._status):
+            return
+        build_id = str(candidate["build_id"])
+        archive_sha256 = str(candidate["archive_sha256"])
+        self._operation_notice = "Authentication is required before the update can be staged."
+        self._operation_notice_kind = "info"
+        self._install_error = False
+        self._install_in_flight = True
+        self._render_status()
+        self._submit_async(
+            lambda: _run_json_command(
+                (
+                    PKEXEC_COMMAND,
+                    "--disable-internal-agent",
+                    UPDATE_ADMIN_COMMAND,
+                    "install",
+                    build_id,
+                    archive_sha256,
+                )
+            ),
+            self._after_install,
+        )
+
+    def _after_install(self, outcome: CommandOutcome | None, error: Exception | None):
+        if self._closed:
+            return
+        self._install_in_flight = False
+        if error is not None:
+            self._set_install_failure(f"The update request could not be started: {error}")
+            return
+        if not isinstance(outcome, CommandOutcome):
+            self._set_install_failure("The update request returned no result. Try again.")
+            return
+        if _is_authentication_denial(outcome):
+            # Authentication denial is never an installation success.  Keep
+            # the candidate available so the owner can retry deliberately.
+            self._set_install_failure(
+                "Authentication was canceled or denied. The update was not started. Try Install Update again."
+            )
+            return
+        if outcome.returncode != 0 or outcome.error is not None:
+            self._set_install_failure(outcome.error or "The update request was not accepted. Try again.")
+            return
+
+        payload = _normalise_status(outcome.payload) if outcome.payload is not None else None
+        if payload is not None and payload.get("state") == "error":
+            self._set_install_failure(_state_description(payload))
+            return
+
+        if payload is not None and _is_authoritative_status(payload):
+            self._authoritative_status = payload
+            self._apply_status(payload, source="install")
+        else:
+            # The helper intentionally returns after the root service starts;
+            # show that accepted handoff immediately while the monitor catches
+            # the queued record written by the service.
+            provisional = dict(self._status)
+            provisional["state"] = "queued"
+            provisional["progress"] = None
+            provisional["error"] = ""
+            provisional["message"] = "Update accepted. Preparing the installation in the background."
+            self._authoritative_status = provisional
+            self._status = provisional
+            self._operation_notice = (
+                "Update request accepted. Installation continues in the background; you can close this window."
+            )
+            self._operation_notice_kind = "info"
+            self._render_status()
+            self._schedule_status_refresh()
+
+    def _set_install_failure(self, message: str):
+        self._install_error = True
+        self._operation_notice = message
+        self._operation_notice_kind = "error"
+        # Keep the signed candidate and available state visible so retrying
+        # authentication or the root request is an obvious action.
+        status = dict(self._status)
+        if status.get("state") not in {"available", "up_to_date"}:
+            status["state"] = "available"
+        status["message"] = "The update was not installed."
+        self._status = status
+        self._render_status()
+
+    def _on_restart_clicked(self, _button: Gtk.Button):
+        if self._status.get("state") != "ready":
+            return
+        dialog = Adw.AlertDialog.new(
+            "Restart to apply the update?",
+            "Save your work first. Zeus will restart this session to apply the staged update. "
+            "If Temp uses the On boot policy, it also applies to this update reboot and eligible "
+            "temporary files may be permanently cleared.",
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("restart", "Restart")
+        dialog.set_response_appearance("restart", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+        dialog.connect("response", self._on_restart_response)
+        dialog.present(self)
+
+    def _on_restart_response(self, _dialog: Adw.AlertDialog, response: str):
+        if response != "restart" or self._closed:
+            return
+        try:
+            subprocess.Popen(list(REBOOT_COMMAND), close_fds=True)
+        except OSError as error:
+            self._operation_notice = f"Could not ask GNOME to restart: {error}"
+            self._operation_notice_kind = "error"
+            self._render_status()
+            return
+        self._operation_notice = "Restart requested. GNOME will confirm before the session closes."
+        self._operation_notice_kind = "info"
+        self._render_status()
+
+    def _show_toast(self, message: str):
+        if self._closed:
+            return
+        try:
+            self._toast_overlay.add_toast(Adw.Toast.new(str(message)))
+        except (AttributeError, RuntimeError):
+            pass
+
+    def _render_status(self):
+        if not hasattr(self, "_status_card") or self._closed:
+            return
+        status = _normalise_status(self._status) or {"state": "error", "error": "Unreadable status"}
+        state = _text(status.get("state"), "idle")
+        candidate = status.get("candidate") if isinstance(status.get("candidate"), Mapping) else None
+        current = status.get("current") if isinstance(status.get("current"), Mapping) else _normalise_current(None)
+
+        self._current_version.set_text(_text(current.get("version"), "Unknown"))
+        self._current_build.set_text(_text(current.get("build_id"), "Unknown"))
+
+        self._status_card.remove_css_class("available")
+        self._status_card.remove_css_class("ready")
+        self._status_card.remove_css_class("error")
+        self._status_card.remove_css_class("interrupted")
+        if state in {"available", "ready"}:
+            self._status_card.add_css_class(state)
+        elif state in {"error", "interrupted"} or self._operation_notice_kind == "error":
+            self._status_card.add_css_class(state if state in {"error", "interrupted"} else "error")
+
+        offline = state == "error" and _looks_offline(status.get("error"), status.get("message"))
+        heading = "Offline" if offline else _state_heading(state)
+        description = "Connect to the internet and try again." if offline else _state_description(status)
+        if self._operation_notice:
+            description = self._operation_notice
+        self._status_heading.set_text(heading)
+        self._status_description.set_text(description)
+        checked_at = _text(status.get("checked_at"))
+        self._status_meta.set_text(f"Last checked {_format_timestamp(checked_at)}" if checked_at else "")
+
+        active = state in AUTHORITATIVE_STATES
+        spinning = self._check_in_flight or self._status_in_flight or state in BUSY_STATES
+        if spinning:
+            self._status_spinner.start()
+        else:
+            self._status_spinner.stop()
+        self._status_spinner.set_visible(spinning)
+
+        progress = _normalise_progress(status.get("progress"))
+        show_progress = active and state == "downloading"
+        self._progress.set_visible(show_progress)
+        self._progress_label.set_visible(show_progress)
+        if progress is not None:
+            self._progress.set_fraction(progress["bytes"] / progress["total"])
+            self._progress_label.set_text(
+                f"{_format_size(progress['bytes'])} of {_format_size(progress['total'])}"
+            )
+        else:
+            self._progress.set_fraction(0)
+            self._progress_label.set_text("")
+
+        self._background_copy.set_visible(state in BUSY_STATES)
+        candidate_visible = candidate is not None and (
+            state == "available" or state in AUTHORITATIVE_STATES
+        )
+        self._candidate_section.set_visible(candidate_visible)
+        self._candidate_card.set_visible(candidate_visible)
+        if candidate_visible and candidate is not None:
+            version = _text(candidate.get("version"), "Signed Zeus OS build")
+            build_id = _text(candidate.get("build_id"), "Build unavailable")
+            notes = _text(candidate.get("notes"), "No release notes were provided.")
+            self._candidate_title.set_text("Signed Zeus OS update")
+            self._candidate_version.set_text(version)
+            self._candidate_notes.set_text(notes)
+            self._candidate_date.set_text(_format_timestamp(candidate.get("published_at")))
+            self._candidate_size.set_text(_format_size(candidate.get("archive_size")))
+            self._candidate_release.set_text(build_id)
+
+        self._check_button.set_label("Checking…" if self._check_in_flight else "Check for Updates")
+        self._check_button.set_sensitive(not self._check_in_flight and not self._install_in_flight and not active)
+        installable = _candidate_is_installable(candidate)
+        can_install = state == "available" and installable and not self._install_in_flight and not self._check_in_flight
+        self._install_button.set_label("Try Install Again" if self._install_error else "Install Update")
+        self._install_button.set_sensitive(can_install)
+        self._restart_button.set_visible(state == "ready")
+        self._restart_button.set_sensitive(state == "ready" and not self._install_in_flight)
+
+    def shutdown(self):
+        if self._closed:
+            return
+        self._closed = True
+        if self._refresh_source is not None:
+            try:
+                GLib.source_remove(self._refresh_source)
+            except (AttributeError, RuntimeError, TypeError):
+                pass
+            self._refresh_source = None
+        if self._status_monitor is not None:
+            try:
+                self._status_monitor.cancel()
+            except (AttributeError, RuntimeError):
+                pass
+            self._status_monitor = None
+        # A running pkexec/helper process is intentionally allowed to finish;
+        # the root service owns the installation after it accepts the request.
+        try:
+            self._executor.shutdown(wait=False, cancel_futures=True)
+        except TypeError:  # Python versions before cancel_futures
+            self._executor.shutdown(wait=False)
+
+
+class UpdatesApplication(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id=APPLICATION_ID)
+        self._window: UpdatesWindow | None = None
+
+    def do_activate(self):
+        if self._window is None:
+            self._window = UpdatesWindow(self)
+            self._window.connect("close-request", self._on_window_close)
+        self._window.present()
+
+    def _on_window_close(self, window: UpdatesWindow) -> bool:
+        window.shutdown()
+        self._window = None
+        return False
+
+    def do_shutdown(self):
+        if self._window is not None:
+            self._window.shutdown()
+        Gio.Application.do_shutdown(self)
+
+
+def main() -> int:
+    return UpdatesApplication().run(sys.argv)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

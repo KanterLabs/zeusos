@@ -22,12 +22,14 @@ FROM desktop-base
 ARG VERSION=0.1.0-preview.2
 ARG SOURCE_COMMIT=unknown
 ARG BUILD_ID=development
+ARG UPDATE_SEQUENCE=0
 LABEL org.opencontainers.image.title="Zeus OS" \
       org.opencontainers.image.description="A focused, beautiful laptop desktop. First preview." \
       org.opencontainers.image.source="https://github.com/KanterLabs/zeusos" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${SOURCE_COMMIT}" \
-      dev.kanterlabs.zeus.build-id="${BUILD_ID}"
+      dev.kanterlabs.zeus.build-id="${BUILD_ID}" \
+      dev.kanterlabs.zeus.update-sequence="${UPDATE_SEQUENCE}"
 COPY desktop/rootfs/ /
 COPY image/rootfs/ /
 COPY --from=branding-builder /usr/share/gnome-shell/gnome-shell-theme.gresource /usr/share/gnome-shell/gnome-shell-theme.gresource
@@ -35,6 +37,7 @@ COPY --from=cli-builder /src/zeus/target/release/zeus /usr/bin/zeus
 COPY zeus/assets/welcome.py /usr/libexec/zeus-welcome
 COPY zeus/assets/org.zeus.Welcome.desktop /usr/share/applications/org.zeus.Welcome.desktop
 COPY image/inputs.json /usr/share/zeus/inputs.json
+COPY security/allowed_signers /usr/share/zeus/update-allowed-signers
 # Foreign-architecture build emulators register dozens of binfmt handlers at
 # every boot. They are optional development tools, not laptop runtime packages.
 RUN dnf remove -y --disable-repo='*' 'qemu-user-static*' && \
@@ -55,5 +58,6 @@ RUN dnf remove -y --disable-repo='*' 'qemu-user-static*' && \
     printf '%s\n' "${VERSION}" > /usr/share/zeus/version && \
     printf '%s\n' "${SOURCE_COMMIT}" > /usr/share/zeus/source-commit && \
     printf '%s\n' "${BUILD_ID}" > /usr/share/zeus/build-id && \
+    printf '%s\n' "${UPDATE_SEQUENCE}" > /usr/share/zeus/update-sequence && \
     sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="Zeus OS 0.1 Preview"/' /usr/lib/os-release && \
     bootc container lint

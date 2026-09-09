@@ -83,7 +83,14 @@ class ZeusCliTests(unittest.TestCase):
                 "bootc",
                 f'#!/bin/sh\nprintf "%s\\n" "$@" > "{arguments_log}"\nprintf "Version: 0.1.0-preview.2\\nPending reboot: yes\\n"\n',
             )
-            result = self.run_cli("update", "status", env={"ZEUS_BOOTC_BIN": bootc})
+            result = self.run_cli(
+                "update",
+                "status",
+                env={
+                    "ZEUS_BOOTC_BIN": bootc,
+                    "ZEUS_UPDATE_HELPER": Path(temporary) / "missing-zeus-update",
+                },
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(arguments_log.read_text(encoding="utf-8").splitlines(), ["status"])
             self.assertIn("Pending reboot: yes", result.stdout)
@@ -94,12 +101,79 @@ class ZeusCliTests(unittest.TestCase):
                 "update",
                 "status",
                 "--json",
-                env={"ZEUS_BOOTC_BIN": bootc},
+                env={
+                    "ZEUS_BOOTC_BIN": bootc,
+                    "ZEUS_UPDATE_HELPER": Path(temporary) / "missing-zeus-update",
+                },
             )
             self.assertEqual(json_result.returncode, 0, json_result.stderr)
             status = json.loads(json_result.stdout)
             self.assertFalse(status["reboot_requested"])
             self.assertEqual(status["status"], "ready")
+
+    def test_update_actions_forward_to_installed_helper(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            arguments_log = Path(temporary) / "update-args"
+            helper = make_executable(
+                temporary,
+                "zeus-update",
+                f'''#!/bin/sh
+printf '%s\\n' "$@" > "{arguments_log}"
+printf '{{"ok":true,"state":"%s"}}\\n' "$1"
+''',
+            )
+
+            for action in ("status", "check", "install"):
+                with self.subTest(action=action):
+                    result = self.run_cli(
+                        "update",
+                        action,
+                        "--json",
+                        env={"ZEUS_UPDATE_HELPER": helper},
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(json.loads(result.stdout)["state"], action)
+                    self.assertEqual(
+                        arguments_log.read_text(encoding="utf-8").splitlines(),
+                        [action, "--json"],
+                    )
+
+    def test_update_helper_failure_forwards_diagnostic_and_exit(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            helper = make_executable(
+                temporary,
+                "zeus-update",
+                '''#!/bin/sh
+printf '{"ok":false,"state":"error"}\\n'
+printf 'signature verification failed\\n' >&2
+exit 23
+''',
+            )
+            result = self.run_cli(
+                "update",
+                "check",
+                "--json",
+                env={"ZEUS_UPDATE_HELPER": helper},
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(json.loads(result.stdout)["ok"], False)
+            self.assertIn("signature verification failed", result.stderr)
+            self.assertIn("zeus update check failed", result.stderr)
+
+    def test_update_check_and_install_fail_clearly_without_helper(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            missing = Path(temporary) / "missing-zeus-update"
+            for action in ("check", "install"):
+                with self.subTest(action=action):
+                    result = self.run_cli(
+                        "update",
+                        action,
+                        env={"ZEUS_UPDATE_HELPER": missing},
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("/usr/libexec/zeus-update is unavailable", result.stderr)
+                    self.assertIn(f"update {action}", result.stderr)
+                    self.assertIn("no reboot was requested", result.stderr)
 
     def test_dev_dry_run_uses_one_validated_ssh_destination(self):
         result = self.run_cli("dev", "--target", "dev.example", "--dry-run")
@@ -203,6 +277,9 @@ class ZeusCliTests(unittest.TestCase):
         desktop_entry = desktop.read_text(encoding="utf-8")
         self.assertIn("Exec=/usr/libexec/zeus-welcome", desktop_entry)
         self.assertIn("Icon=org.zeus.Welcome", desktop_entry)
+        self.assertIn("Software Updates", welcome.read_text(encoding="utf-8"))
+        self.assertIn("org.zeus.Updates", welcome.read_text(encoding="utf-8"))
+        self.assertIn("/usr/libexec/zeus-update-window", welcome.read_text(encoding="utf-8"))
         subprocess.run(["python3", "-m", "py_compile", str(welcome)], cwd=ROOT, check=True)
 
 

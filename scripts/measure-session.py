@@ -14,6 +14,10 @@ parser.add_argument('--settle', type=int, default=20)
 args = parser.parse_args()
 assert 20 <= args.seconds <= 300 and 0 <= args.settle <= 60
 
+def utc_rfc3339(epoch_ns):
+    seconds, nanoseconds = divmod(epoch_ns, 1_000_000_000)
+    return time.strftime('%Y-%m-%dT%H:%M:%S', time.gmtime(seconds)) + f'.{nanoseconds:09d}Z'
+
 def counters():
     rows = {row.split()[0]: row.split()[1:] for row in Path('/proc/stat').read_text().splitlines()}
     cpu = list(map(int, rows['cpu'][:8]))
@@ -21,6 +25,7 @@ def counters():
 
 time.sleep(args.settle)
 start = time.time()
+measurement_started_at_utc = utc_rfc3339(time.time_ns())
 previous = initial = counters()
 samples = []
 for _ in range(args.seconds // 5):
@@ -32,13 +37,16 @@ for _ in range(args.seconds // 5):
                     'memory_used_mib': round((info['MemTotal'] - info['MemAvailable']) / 1024, 1)})
     previous = current
 end = time.time()
+measurement_ended_at_utc = utc_rfc3339(time.time_ns())
 log = subprocess.run(['journalctl', '--user', '-u', 'zeus-temp-clean.service', '--since', '@'+str(int(start)), '--until', '@'+str(int(end)), '-o', 'json', '--no-pager'], capture_output=True, text=True)
 activations = 0
 if log.returncode == 0:
     for row in log.stdout.splitlines():
         event=json.loads(row)
         if str(event.get('MESSAGE','')).startswith('Starting '): activations += 1
-print(json.dumps({'label': args.label, 'seconds':round(end-start,2), 'settle_seconds':args.settle,
+print(json.dumps({'label': args.label, 'measurement_started_at_utc': measurement_started_at_utc,
+                  'measurement_ended_at_utc': measurement_ended_at_utc,
+                  'seconds':round(end-start,2), 'settle_seconds':args.settle,
                   'samples':samples,'median_cpu_percent':statistics.median(s['cpu_percent'] for s in samples),
                   'median_memory_used_mib':statistics.median(s['memory_used_mib'] for s in samples),
                   'context_switches_per_second':round((current[2]-initial[2])/(end-start),1),

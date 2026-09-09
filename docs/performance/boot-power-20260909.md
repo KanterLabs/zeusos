@@ -113,9 +113,13 @@ sample starts only after the inhibitor is confirmed active.
 
 ### Idle activity
 
-Each comparison uses 20 seconds settling followed by 120 seconds sampled every
-five seconds, with the screen kept awake. Temp is set to Never in both images.
-No other guest tests run during a sampling window.
+Correction recorded September 9 while creating the metrics history: the raw
+baseline files record **10 seconds** settling and the final files record **20
+seconds**, followed in both cases by 120 seconds sampled every five seconds.
+The settling conditions therefore were not perfectly matched. The screen was
+kept awake, Temp was set to Never, and no other guest tests ran during sampling.
+Keep the values as observations with this limitation; future comparisons should
+use the same settling interval on both sides.
 
 | Metric | Baseline closed | Final closed | Baseline Temp visible | Final Temp visible |
 | --- | ---: | ---: | ---: | ---: |

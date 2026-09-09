@@ -2,13 +2,16 @@
 
 A focused Fedora bootc laptop desktop with a macOS-inspired layout, original Zeus artwork, and native GNOME security and accessibility.
 
-The current version is **0.1.0-preview.2**. It includes a translucent top bar and floating dock, original icons, traffic-light window controls, compact application search (Super+Space), coordinated light/dark artwork, and a branded native login screen. GNOME/Wayland runs Files, Firefox, Ptyxis, Settings, and Welcome. The Rust `zeus` helper provides diagnostics, safe desktop fallback, read-only update status, and validated SSH launch.
+The current version is **0.1.0-preview.2**. It includes a translucent top bar and floating dock, original icons, traffic-light window controls, compact application search (Super+Space), coordinated light/dark artwork, and a branded native login screen. GNOME/Wayland runs Files, Firefox, Ptyxis, Settings, and Welcome. The Rust `zeus` helper provides diagnostics, safe desktop fallback, signed updates, and validated SSH launch.
 
 The latest build adds clearer **Temp downloads**, permanent saves, Files shortcuts, event-driven desktop updates and laptop power defaults. It removes periodic Temp cleanup checks when using On boot or Never. [Latest iteration and verification](docs/iterations/git-de0d8baae5de/README.md) includes measured startup and idle results.
 
 ![Zeus OS desktop preview](docs/iterations/git-de0d8baae5de/desktop.png)
 
 Deployment and measured results are recorded in the [preview VM runbook](docs/preview-vm.md) and [release notes](docs/releases/preview-2.md). An image build alone is not a graphical or performance test.
+
+The [timestamped metrics history](docs/metrics.md) keeps measurements, testing
+conditions and regressions together across builds.
 
 We keep this version fixed while iterating. Each update has its own Git build ID; see the [iteration build policy](docs/iteration-builds.md).
 
@@ -34,11 +37,19 @@ zeus version
 zeus doctor --json
 zeus desktop safe
 zeus desktop restore
-sudo zeus update status
+zeus update status
+zeus update check
+zeus update install
 zeus dev --target user@your-dev-host
 ```
 
 Safe desktop disables the optional Zeus shell and dock and removes managed GTK styling imports; native GNOME remains usable and personal files and preferences stay in place. Applying an OS update or reboot is always explicit. The preview does not configure an unattended update channel.
+
+Open **Updates** from application search or **Welcome → Open Updates** to check
+for a signed preview build, review its notes, and install it after administrator
+authentication. Installation continues after closing the window. **Restart to
+Apply** is a separate action; the normal Temp cleanup policy also applies to
+update reboots. See the [updater contract](docs/features/os-updater.md).
 
 ## Validation
 

@@ -1,0 +1,5 @@
+#!/usr/bin/python3 -I
+import sys
+sys.path.insert(0, '/usr/lib/zeus')
+from zeus_update import admin_main
+raise SystemExit(admin_main())

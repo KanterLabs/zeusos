@@ -24,6 +24,7 @@ try:
 except OSError:
     BUILD_ID = "development"
 APPLICATION_ID = "org.zeus.Welcome"
+UPDATES_APPLICATION_ID = "org.zeus.Updates"
 
 
 CSS = """
@@ -65,6 +66,34 @@ CSS = """
   font-weight: 700;
   margin-top: 17px;
   padding: 6px 11px;
+}
+
+.update-entry {
+  background: alpha(@accent_bg_color, 0.08);
+  border: 1px solid alpha(@accent_bg_color, 0.14);
+  border-radius: 14px;
+  margin-top: 13px;
+  padding: 9px 11px;
+}
+
+.update-icon {
+  color: @accent_color;
+  margin-right: 10px;
+}
+
+.update-title {
+  color: @window_fg_color;
+  font-weight: 700;
+}
+
+.update-copy {
+  color: alpha(@window_fg_color, 0.66);
+  font-size: 0.84em;
+  margin-top: 2px;
+}
+
+.update-button {
+  margin-left: 12px;
 }
 
 .section-title {
@@ -239,6 +268,7 @@ class WelcomeWindow(Adw.ApplicationWindow):
             )
         )
         hero.append(make_label(f"{VERSION} · {BUILD_ID}", "version-pill"))
+        hero.append(self._build_update_entry())
         content.append(hero)
 
         cards_section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -311,6 +341,39 @@ class WelcomeWindow(Adw.ApplicationWindow):
             )
         )
         return content
+
+    def _build_update_entry(self):
+        entry = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        entry.add_css_class("update-entry")
+
+        icon = Gtk.Image.new_from_icon_name("software-update-available-symbolic")
+        icon.set_pixel_size(20)
+        icon.add_css_class("update-icon")
+        icon.set_valign(Gtk.Align.CENTER)
+        entry.append(icon)
+
+        copy = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        copy.set_hexpand(True)
+        copy.set_valign(Gtk.Align.CENTER)
+        copy.append(make_label("Software Updates", "update-title"))
+        copy.append(
+            make_label(
+                "Review signed OS updates when you are ready.",
+                "update-copy",
+                wrap=True,
+                max_width_chars=52,
+            )
+        )
+        entry.append(copy)
+
+        button = Gtk.Button(label="Open Updates")
+        button.set_valign(Gtk.Align.CENTER)
+        button.add_css_class("update-button")
+        button.add_css_class("flat")
+        button.set_tooltip_text(f"Open {UPDATES_APPLICATION_ID}")
+        button.connect("clicked", self._open_updates)
+        entry.append(button)
+        return entry
 
     def _build_shortcuts(self):
         shortcuts = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -390,6 +453,9 @@ class WelcomeWindow(Adw.ApplicationWindow):
 
     def _open_settings(self, _button):
         self._launch_command(["gnome-control-center"], "Settings")
+
+    def _open_updates(self, _button):
+        self._launch_command(["/usr/libexec/zeus-update-window"], "Software Updates")
 
     def _open_terminal(self, _button):
         self._launch_command(["ptyxis", "gnome-terminal", "kgx"], "Terminal")

@@ -1,9 +1,8 @@
 //! Zeus OS preview command line entry point.
 //!
 //! This binary intentionally has a small standard-library-only surface.  It
-//! is used by the desktop and recovery image, so commands are explicit,
-//! subprocess arguments are passed as arrays, and the preview does not claim
-//! capabilities which have not landed yet.
+//! is used by the desktop and recovery image, so commands are explicit and
+//! subprocess arguments are passed as arrays.
 
 use std::env;
 use std::fmt;
@@ -19,8 +18,12 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 // Keeping the upstream UUID here lets the safe fallback work with the actual
 // installed extension and avoids inventing a second shell module to disable.
 const DOCK_EXTENSION: &str = "dash-to-dock@micxgx.gmail.com";
+const UPDATE_HELPER_PATH: &str = "/usr/libexec/zeus-update";
 const MAX_OUTPUT_BYTES: u64 = 128 * 1024;
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(15);
+const UPDATE_STATUS_TIMEOUT: Duration = Duration::from_secs(15);
+const UPDATE_CHECK_TIMEOUT: Duration = Duration::from_secs(90);
+const UPDATE_INSTALL_TIMEOUT: Duration = Duration::from_secs(300);
 const DEV_TIMEOUT: Duration = Duration::from_secs(60 * 60);
 
 const HELP: &str = "\
@@ -32,6 +35,8 @@ USAGE:
     zeus desktop safe [--dry-run]
     zeus desktop restore [--dry-run]
     zeus update status [--json]
+    zeus update check [--json]
+    zeus update install [--json]
     zeus dev [--target TARGET] [--dry-run]
 
 The preview also reserves these commands for later releases:
@@ -40,6 +45,8 @@ The preview also reserves these commands for later releases:
 
 The desktop actions keep credentials and personal data in place.  `dev`
 opens one validated SSH destination and never accepts a remote command.
+Update checks and installs use the signed system updater; installing starts a
+background job and never reboots automatically.
 ";
 
 #[derive(Debug)]
@@ -378,28 +385,84 @@ fn resolve_desktop_tool() -> Option<DesktopTool> {
 fn command_update(arguments: &[String]) -> Result<(), CliError> {
     let Some(action) = arguments.first() else {
         return Err(CliError::usage(
-            "`update` currently supports read-only `status`; staging and reboot remain manual",
+            "`update` requires one of `status`, `check`, or `install`",
         ));
     };
+
+    if action == "-h" || action == "--help" {
+        print_update_help();
+        return Ok(());
+    }
 
     let mut json = false;
     for argument in &arguments[1..] {
         match argument.as_str() {
             "--json" => json = true,
             "-h" | "--help" => {
-                println!("zeus update status [--json] — read bootc status without rebooting");
+                print_update_help();
                 return Ok(());
             }
-            _ => return Err(CliError::usage("update status accepts only `--json`")),
+            _ => {
+                return Err(CliError::usage(
+                    "`update status|check|install` accepts only `--json`",
+                ))
+            }
         }
     }
-    if action != "status" {
-        return Err(unsupported(
-            &format!("update {}", action),
-            "only read-only bootc status is available in this preview",
-        ));
+
+    match action.as_str() {
+        "status" => run_update_action(action, json, UPDATE_STATUS_TIMEOUT),
+        "check" => run_update_action(action, json, UPDATE_CHECK_TIMEOUT),
+        "install" => run_update_action(action, json, UPDATE_INSTALL_TIMEOUT),
+        _ => Err(CliError::usage(
+            "`update` requires one of `status`, `check`, or `install`",
+        )),
+    }
+}
+
+fn print_update_help() {
+    println!("zeus update status|check|install [--json] — inspect or stage signed OS updates");
+    println!("status reads local state; check fetches signed metadata; install starts a privileged background job");
+    println!("Installing never reboots automatically; reboot remains an explicit user action.");
+}
+
+fn run_update_action(action: &str, json: bool, timeout: Duration) -> Result<(), CliError> {
+    let Some(helper) = resolve_update_helper() else {
+        if action == "status" {
+            return update_status_bootc_fallback(json);
+        }
+        return Err(CliError::operation(format!(
+            "{} is unavailable; `zeus update {}` could not run and no reboot was requested",
+            UPDATE_HELPER_PATH, action
+        )));
+    };
+
+    let arguments = if json {
+        vec![action, "--json"]
+    } else {
+        vec![action]
+    };
+    let result = run_capture(&helper, &arguments, timeout)?;
+
+    if !result.stdout.is_empty() {
+        print!("{}", result.stdout);
+    }
+    if !result.stderr.is_empty() {
+        eprint!("{}", result.stderr);
     }
 
+    if result.status.success() {
+        Ok(())
+    } else {
+        Err(CliError::operation(format!(
+            "zeus update {} failed (exit {})",
+            action,
+            exit_code_text(result.status)
+        )))
+    }
+}
+
+fn update_status_bootc_fallback(json: bool) -> Result<(), CliError> {
     let Some(bootc) = resolve_program("ZEUS_BOOTC_BIN", "bootc") else {
         return Err(CliError::operation(
             "bootc is unavailable; update status could not be read and no reboot was requested",
@@ -851,6 +914,22 @@ fn safe_component(value: &str, fallback: &str) -> String {
 
 fn is_safe_component(character: char) -> bool {
     character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-')
+}
+
+fn resolve_update_helper() -> Option<PathBuf> {
+    // The environment override exists for unprivileged tests and development
+    // fixtures.  Once it is set, an invalid override is treated as absent so
+    // a test cannot accidentally invoke a host-installed helper.
+    if let Some(value) = env::var_os("ZEUS_UPDATE_HELPER") {
+        let path = PathBuf::from(value);
+        if path.components().count() > 1 || path.is_absolute() {
+            return is_executable(&path).then_some(path);
+        }
+        return find_executable(path.to_str().unwrap_or_default());
+    }
+
+    let path = Path::new(UPDATE_HELPER_PATH);
+    is_executable(path).then(|| path.to_path_buf())
 }
 
 fn resolve_program(variable: &str, name: &str) -> Option<PathBuf> {

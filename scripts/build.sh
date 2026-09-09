@@ -14,16 +14,21 @@ git diff --quiet && git diff --cached --quiet || { echo 'Commit tracked build ch
 [[ -z "$(git ls-files --others --exclude-standard desktop image zeus scripts)" ]] || { echo 'Commit build inputs first.' >&2; exit 1; }
 revision=$(git rev-parse HEAD)
 build_id="git-${revision:0:12}"
+update_sequence=$(git show -s --format=%ct "$revision")
+[[ "$update_sequence" =~ ^[1-9][0-9]+$ ]] || { echo 'Invalid payload timestamp.' >&2; exit 1; }
 mkdir -p out
 podman image exists "$base" || podman pull --platform linux/amd64 "$base"
 podman build --pull=never --build-arg "BASE_IMAGE=$base" --build-arg "VERSION=$version" \
-  --build-arg "SOURCE_COMMIT=$revision" --build-arg "BUILD_ID=$build_id" -f image/Containerfile \
+  --build-arg "SOURCE_COMMIT=$revision" --build-arg "BUILD_ID=$build_id" \
+  --build-arg "UPDATE_SEQUENCE=$update_sequence" -f image/Containerfile \
   -t "localhost/zeusos:$version" -t "localhost/zeusos:$version-$build_id" .
 podman image inspect "localhost/zeusos:$version" > out/image-inspect.json
 podman run --rm "localhost/zeusos:$version" cat /usr/share/zeus/packages.lock > out/packages.lock
 printf '%s\n' "$revision" > out/source-commit
-python3 - "$version" "$revision" "$build_id" <<'PYINFO'
+python3 - "$version" "$revision" "$build_id" "$update_sequence" <<'PYINFO'
 import json, sys
 from pathlib import Path
-Path('out/build-info.json').write_text(json.dumps(dict(zip(('version', 'source_commit', 'build_id'), sys.argv[1:])), indent=2) + '\n')
+info = dict(zip(('version', 'source_commit', 'build_id'), sys.argv[1:4]))
+info['update_sequence'] = int(sys.argv[4])
+Path('out/build-info.json').write_text(json.dumps(info, indent=2) + '\n')
 PYINFO

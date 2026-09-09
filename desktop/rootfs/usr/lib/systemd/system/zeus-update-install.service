@@ -1,0 +1,17 @@
+[Unit]
+Description=Install the owner-selected signed Zeus OS update
+After=network.target
+
+[Service]
+Type=exec
+ExecStart=/usr/libexec/zeus-update-admin run
+ExecStopPost=/usr/libexec/zeus-update-admin reconcile
+RuntimeMaxSec=45min
+TimeoutStopSec=90s
+KillMode=control-group
+UMask=0077
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+# Deliberately no Install section: only an authenticated owner request starts it.
