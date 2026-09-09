@@ -1,0 +1,23 @@
+#!/usr/bin/env python3
+"""Command-line entry point for the owner-scoped Zeus Temp service."""
+
+import sys
+
+
+try:
+    from zeus.zeus_temp import main
+except ImportError:
+    # The repository runs this file from the rootfs overlay before it is
+    # installed.  The installed image uses /usr/lib, where the package lives.
+    from pathlib import Path
+
+    sys.path.insert(0, "/usr/lib")
+    try:
+        from zeus.zeus_temp import main
+    except ImportError:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+        from zeus.zeus_temp import main
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

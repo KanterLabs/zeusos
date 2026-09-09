@@ -1,0 +1,11 @@
+[Unit]
+Description=Read-only Zeus active-file inspection socket
+
+[Socket]
+ListenStream=/run/zeus-temp-inspector.sock
+SocketMode=0666
+Accept=yes
+MaxConnections=16
+
+[Install]
+WantedBy=sockets.target

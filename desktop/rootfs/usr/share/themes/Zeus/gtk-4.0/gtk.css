@@ -71,101 +71,6 @@ headerbar:backdrop,
  * subdued at rest and become visible on hover/focus, so all three traffic
  * lights remain discoverable without replacing the titlebar buttons.
  */
-windowcontrols.start,
-windowcontrols.end {
-  margin: 0 4px;
-}
-
-windowcontrols.start > button,
-windowcontrols.end > button {
-  min-width: 14px;
-  min-height: 14px;
-  margin: 0 3px;
-  padding: 0;
-  border-radius: 999px;
-  border: 1px solid rgba(27, 32, 52, 0.18);
-  background-image: none;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.36), 0 1px 2px rgba(9, 17, 43, 0.16);
-}
-
-windowcontrols.start > button.close,
-windowcontrols.end > button.close {
-  background-color: #FF5F57;
-}
-
-windowcontrols.start > button.minimize,
-windowcontrols.end > button.minimize {
-  background-color: #FEBC2E;
-}
-
-windowcontrols.start > button.maximize,
-windowcontrols.end > button.maximize,
-windowcontrols.start > button.restore,
-windowcontrols.end > button.restore {
-  background-color: #28C840;
-}
-
-windowcontrols.start > button.close:hover,
-windowcontrols.end > button.close:hover {
-  background-color: #FF3B30;
-}
-
-windowcontrols.start > button.minimize:hover,
-windowcontrols.end > button.minimize:hover {
-  background-color: #F2A900;
-}
-
-windowcontrols.start > button.maximize:hover,
-windowcontrols.end > button.maximize:hover,
-windowcontrols.start > button.restore:hover,
-windowcontrols.end > button.restore:hover {
-  background-color: #1FAE35;
-}
-
-windowcontrols.start > button.close:active,
-windowcontrols.end > button.close:active {
-  background-color: #D93229;
-}
-
-windowcontrols.start > button.minimize:active,
-windowcontrols.end > button.minimize:active {
-  background-color: #D18E00;
-}
-
-windowcontrols.start > button.maximize:active,
-windowcontrols.end > button.maximize:active,
-windowcontrols.start > button.restore:active,
-windowcontrols.end > button.restore:active {
-  background-color: #168B2A;
-}
-
-windowcontrols > button.close image,
-windowcontrols > button.minimize image,
-windowcontrols > button.maximize image,
-windowcontrols > button.restore image {
-  opacity: 0;
-  color: #2B2332;
-}
-
-windowcontrols > button.close:hover image,
-windowcontrols > button.close:focus-visible image,
-windowcontrols > button.minimize:hover image,
-windowcontrols > button.minimize:focus-visible image,
-windowcontrols > button.maximize:hover image,
-windowcontrols > button.maximize:focus-visible image,
-windowcontrols > button.restore:hover image,
-windowcontrols > button.restore:focus-visible image {
-  opacity: 1;
-  color: #2B2332;
-}
-
-windowcontrols > button.close:focus-visible,
-windowcontrols > button.minimize:focus-visible,
-windowcontrols > button.maximize:focus-visible,
-windowcontrols > button.restore:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--zeus-accent) 72%, transparent);
-  outline-offset: 2px;
-}
 
 button {
   color: var(--zeus-window-fg);
@@ -282,27 +187,44 @@ progressbar progress {
   border-radius: 999px;
 }
 
-/* Keep a 24px native pointer/keyboard target while painting a 16px circle in
- * its content box. This avoids the tall oval produced by generic button
- * padding without shrinking the titlebar control's activation area. */
-windowcontrols > button.close,
-windowcontrols > button.minimize,
-windowcontrols > button.maximize,
-windowcontrols > button.restore {
-  min-width: 16px;
-  min-height: 16px;
-  padding: 4px;
+/* Flat 14px artwork inside a native 24px pointer target. */
+windowcontrols button.close,
+windowcontrols button.minimize,
+windowcontrols button.maximize,
+windowcontrols button.restore {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
   margin: 0;
-  border-radius: 50%;
   border: 0;
-  background-clip: content-box;
+  border-radius: 6px;
+  background-color: transparent;
+  background-size: 14px 14px;
+  background-position: center;
+  background-repeat: no-repeat;
+  box-shadow: none;
 }
-
-windowcontrols > button.close > image,
-windowcontrols > button.minimize > image,
-windowcontrols > button.maximize > image,
-windowcontrols > button.restore > image {
-  min-width: 8px;
-  min-height: 8px;
-  margin: 0;
-}
+windowcontrols button.close image,
+windowcontrols button.minimize image,
+windowcontrols button.maximize image,
+windowcontrols button.restore image { opacity: 0; min-width: 0; min-height: 0; margin: 0; }
+windowcontrols button.close { background-image: url("../assets/close.svg"); }
+windowcontrols button.close:hover,
+windowcontrols button.close:focus,
+windowcontrols button.close:active { background-color: transparent; background-image: url("../assets/close-hover.svg"); box-shadow: none; }
+windowcontrols button.minimize { background-image: url("../assets/minimize.svg"); }
+windowcontrols button.minimize:hover,
+windowcontrols button.minimize:focus,
+windowcontrols button.minimize:active { background-color: transparent; background-image: url("../assets/minimize-hover.svg"); box-shadow: none; }
+windowcontrols button.maximize { background-image: url("../assets/maximize.svg"); }
+windowcontrols button.maximize:hover,
+windowcontrols button.maximize:focus,
+windowcontrols button.maximize:active { background-color: transparent; background-image: url("../assets/maximize-hover.svg"); box-shadow: none; }
+windowcontrols button.restore { background-image: url("../assets/restore.svg"); }
+windowcontrols button.restore:hover,
+windowcontrols button.restore:focus,
+windowcontrols button.restore:active { background-color: transparent; background-image: url("../assets/restore-hover.svg"); box-shadow: none; }
+windowcontrols button.close:focus-visible,
+windowcontrols button.minimize:focus-visible,
+windowcontrols button.maximize:focus-visible,
+windowcontrols button.restore:focus-visible { outline: 2px solid #5475c8; outline-offset: -1px; }

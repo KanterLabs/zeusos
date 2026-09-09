@@ -157,6 +157,9 @@ fn print_help() {
 fn command_version(arguments: &[String]) -> Result<(), CliError> {
     if arguments.is_empty() {
         println!("Zeus OS {}", VERSION);
+        if let Ok(build) = std::fs::read_to_string("/usr/share/zeus/build-id") {
+            println!("Build {}", build.trim());
+        }
         return Ok(());
     }
     if arguments.len() == 1 && (arguments[0] == "-h" || arguments[0] == "--help") {

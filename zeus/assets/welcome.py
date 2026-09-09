@@ -6,6 +6,7 @@ readable message.  It does not own setup or recovery state; those capabilities
 will arrive through the shared ``zeus`` command surface in a later preview.
 """
 
+from pathlib import Path
 import os
 import shutil
 import sys
@@ -18,6 +19,10 @@ from gi.repository import Adw, Gio, GLib, Gtk, Pango
 
 
 VERSION = "0.1.0-preview.2"
+try:
+    BUILD_ID = Path("/usr/share/zeus/build-id").read_text().strip()
+except OSError:
+    BUILD_ID = "development"
 APPLICATION_ID = "org.zeus.Welcome"
 
 
@@ -195,7 +200,7 @@ class WelcomeWindow(Adw.ApplicationWindow):
                 max_width_chars=72,
             )
         )
-        hero.append(make_label(f"Preview {VERSION}", "version-pill"))
+        hero.append(make_label(f"{VERSION} · {BUILD_ID}", "version-pill"))
         content.append(hero)
 
         cards_section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -219,11 +224,11 @@ class WelcomeWindow(Adw.ApplicationWindow):
         )
         cards.attach(
             self._make_card(
-                "emblem-system-symbolic",
-                "Settings",
-                "Shape your desktop, connections, displays, and accessibility preferences.",
-                "Open Settings",
-                self._open_settings,
+                "folder-download-symbolic",
+                "Temp",
+                "New downloads land here. Choose when they clear, or Keep the files you need.",
+                "Open Temp",
+                self._open_temp,
             ),
             1,
             0,
@@ -309,6 +314,9 @@ class WelcomeWindow(Adw.ApplicationWindow):
     def _open_files(self, _button):
         home_uri = GLib.filename_to_uri(os.path.expanduser("~"), None)
         self._launch_uri(home_uri, "Files")
+
+    def _open_temp(self, _button):
+        self._launch_command(["/usr/libexec/zeus-temp-window"], "Temp")
 
     def _open_settings(self, _button):
         self._launch_command(["gnome-control-center"], "Settings")

@@ -21,11 +21,13 @@ RUN python3 /tmp/build-greeter-theme.py
 FROM desktop-base
 ARG VERSION=0.1.0-preview.2
 ARG SOURCE_COMMIT=unknown
+ARG BUILD_ID=development
 LABEL org.opencontainers.image.title="Zeus OS" \
       org.opencontainers.image.description="A focused, beautiful laptop desktop. First preview." \
       org.opencontainers.image.source="https://github.com/KanterLabs/zeusos" \
       org.opencontainers.image.version="${VERSION}" \
-      org.opencontainers.image.revision="${SOURCE_COMMIT}"
+      org.opencontainers.image.revision="${SOURCE_COMMIT}" \
+      dev.kanterlabs.zeus.build-id="${BUILD_ID}"
 COPY desktop/rootfs/ /
 COPY image/rootfs/ /
 COPY --from=branding-builder /usr/share/gnome-shell/gnome-shell-theme.gresource /usr/share/gnome-shell/gnome-shell-theme.gresource
@@ -42,10 +44,11 @@ RUN chmod 0755 /usr/libexec/zeus-welcome && \
     systemctl enable gdm.service NetworkManager.service firewalld.service sshd.service && \
     systemctl enable cloud-init-local.service cloud-init-network.service cloud-init-main.service cloud-config.service cloud-final.service && \
     systemctl mask bootc-fetch-apply-updates.timer && \
-    systemctl enable zeus-tmpfiles.service && \
+    systemctl enable zeus-tmpfiles.service zeus-temp-inspector.socket && \
     mkdir -p /usr/share/zeus && \
     rpm -qa --qf '%{NAME}-%{EPOCHNUM}:%{VERSION}-%{RELEASE}.%{ARCH}\n' | sort > /usr/share/zeus/packages.lock && \
     printf '%s\n' "${VERSION}" > /usr/share/zeus/version && \
     printf '%s\n' "${SOURCE_COMMIT}" > /usr/share/zeus/source-commit && \
+    printf '%s\n' "${BUILD_ID}" > /usr/share/zeus/build-id && \
     sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="Zeus OS 0.1 Preview"/' /usr/lib/os-release && \
     bootc container lint

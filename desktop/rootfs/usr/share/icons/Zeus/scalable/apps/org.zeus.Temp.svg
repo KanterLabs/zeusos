@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title description">
+  <title id="title">Zeus Temp</title>
+  <desc id="description">A rounded indigo tile with a temporary downloads folder and a small clock.</desc>
+  <defs>
+    <linearGradient id="tile" x1="27" y1="17" x2="229" y2="241" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#728FED"/>
+      <stop offset="0.48" stop-color="#4054B0"/>
+      <stop offset="1" stop-color="#302A73"/>
+    </linearGradient>
+    <linearGradient id="folder" x1="43" y1="78" x2="194" y2="204" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E8F5FF"/>
+      <stop offset="0.52" stop-color="#B9D5FF"/>
+      <stop offset="1" stop-color="#819CE7"/>
+    </linearGradient>
+    <linearGradient id="folderTop" x1="53" y1="70" x2="199" y2="127" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F7FCFF"/>
+      <stop offset="1" stop-color="#BBD7FC"/>
+    </linearGradient>
+    <radialGradient id="clock" cx="33%" cy="23%" r="83%">
+      <stop offset="0" stop-color="#FFE8A3"/>
+      <stop offset="0.54" stop-color="#FFB457"/>
+      <stop offset="1" stop-color="#F27B83"/>
+    </radialGradient>
+    <filter id="shadow" x="-24%" y="-24%" width="148%" height="154%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8" result="blur"/>
+      <feOffset dy="8" result="offset"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.27"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="10" y="10" width="236" height="236" rx="58" fill="url(#tile)"/>
+  <path d="M35 75C62 35 105 21 151 28C199 35 228 65 238 105V172C222 218 182 239 127 240C73 240 34 218 20 179V115C22 99 27 84 35 75Z" fill="#FFFFFF" fill-opacity="0.07"/>
+  <g filter="url(#shadow)">
+    <path d="M42 95C42 81 52 70 66 70H105L124 87H193C206 87 215 97 215 110V181C215 194 205 204 192 204H65C52 204 42 194 42 181Z" fill="url(#folder)" stroke="#F5FBFF" stroke-opacity="0.52" stroke-width="3"/>
+    <path d="M43 103C43 90 53 80 66 80H106L123 96H193C205 96 214 105 214 117V130H43Z" fill="url(#folderTop)"/>
+    <path d="M43 126H214V181C214 194 204 204 191 204H66C53 204 43 194 43 181Z" fill="url(#folder)"/>
+    <path d="M57 147H152" stroke="#FFFFFF" stroke-opacity="0.30" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="174" cy="156" r="38" fill="url(#clock)" stroke="#FFF5D0" stroke-opacity="0.92" stroke-width="4"/>
+    <path d="M174 135V157L188 166" fill="none" stroke="#5D407D" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="174" cy="157" r="5" fill="#5D407D"/>
+    <path d="M174 126V130M174 183V187M144 157H148M200 157H204" stroke="#FFF4C2" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <circle cx="59" cy="54" r="3" fill="#DCEBFF" fill-opacity="0.76"/>
+  <circle cx="207" cy="205" r="3" fill="#D3C5FF" fill-opacity="0.62"/>
+</svg>

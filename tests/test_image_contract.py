@@ -16,6 +16,14 @@ class ImageContract(unittest.TestCase):
             self.assertRegex(inputs[name], r'^[a-z0-9./_-]+@sha256:[a-f0-9]{64}$')
         self.assertEqual(inputs['architecture'], 'x86_64')
 
+    def test_release_track_is_consistent(self):
+        import tomllib
+        version = json.loads((ROOT / 'image/release-track.json').read_text())['version']
+        self.assertEqual(json.loads((ROOT / 'image/inputs.json').read_text())['version'], version)
+        self.assertEqual(tomllib.loads((ROOT / 'zeus/Cargo.toml').read_text())['package']['version'], version)
+        self.assertIn(f'ARG VERSION={version}', (ROOT / 'image/Containerfile').read_text())
+        self.assertIn(f'VERSION = "{version}"', (ROOT / 'zeus/assets/welcome.py').read_text())
+
     def test_generic_disk_has_no_owner_credentials(self):
         import tomllib
         disk = tomllib.loads((ROOT / 'image/disk.toml').read_text())

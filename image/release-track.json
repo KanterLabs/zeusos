@@ -1,0 +1,5 @@
+{
+  "version": "0.1.0-preview.2",
+  "policy": "Keep this version throughout implementation. Change it only for an explicit milestone release; identify iterations by source commit.",
+  "build_id_format": "git-<12-character-commit>"
+}

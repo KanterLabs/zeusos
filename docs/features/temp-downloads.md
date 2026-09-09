@@ -1,6 +1,6 @@
 # Temp downloads and compact window controls
 
-Status: planned, not enabled on VM 115. Owner request: September 9, 2026.
+Status: implemented; image and persistent-VM qualification in progress. Owner request: September 9, 2026.
 
 ## Product behavior
 
@@ -19,7 +19,7 @@ The rest of the home directory remains permanent.
 For an overdue timed sweep after sleep or shutdown, run one sweep before new
 applications begin downloading; do not replay every missed interval. A settings
 change schedules the next sweep from that change, never an immediate deletion.
-Wall-clock jumps must not cause repeated sweeps. Boot mode records the completed
+Wall-clock jumps must not cause repeated sweeps. Boot mode records the attempted
 boot identifier so retrying the service or logging in twice cannot wipe new files.
 On systems where the encrypted home is unavailable during early boot, perform
 that boot's sweep when the home becomes available, before the user app session.
@@ -105,8 +105,17 @@ Trash, which would retain the storage the feature is intended to reclaim.
 
 The proposed timed policy deliberately clears the whole folder, including recent
 completed files; an age-based policy would be a separate, explicitly named option.
-The exact active-file detection and native Files integration need a prototype.
-Do not ship a timer that indiscriminately deletes in-progress downloads.
+Active-file detection uses a socket-activated, read-only root inspector authenticated
+by the connecting UID. It returns device/inode identities only; deletion runs as
+the owner. An uncertain inspection defers deletion. Partial-download markers defer
+the entire sweep, preserving browser companion files. Boot cleanup gets one attempt
+per boot; an interrupted or deferred attempt waits until the next boot. Timers
+check once per minute, so the displayed deadline is approximate.
+
+The native Temp app is available in the dock. Files receives a Temp bookmark and
+the XDG download destination; applications with their own explicit destinations
+keep those choices. Keep currently supports regular files into permanent folders
+inside the owner home. Existing directories can be opened in Files.
 
 ## Helm implementation cards
 

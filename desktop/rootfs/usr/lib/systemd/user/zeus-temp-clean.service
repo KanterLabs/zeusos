@@ -1,0 +1,8 @@
+[Unit]
+Description=Clear eligible Zeus Temp files when due
+After=zeus-temp-session.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/zeus-temp sweep
+TimeoutStartSec=20

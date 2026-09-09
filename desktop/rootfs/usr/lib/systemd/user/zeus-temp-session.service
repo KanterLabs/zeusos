@@ -1,0 +1,12 @@
+[Unit]
+Description=Prepare Zeus Temp and run this boot's cleanup
+Before=graphical-session-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/zeus-temp-session
+TimeoutStartSec=20
+RemainAfterExit=yes
+
+[Install]
+WantedBy=default.target

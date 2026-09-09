@@ -55,108 +55,6 @@ headerbar:backdrop,
   color: alpha(@zeus-header-fg, 0.72);
 }
 
-/*
- * Native titlebutton images remain in the widget tree for accessibility. They
- * become visible on hover/focus, which keeps the traffic lights quiet at rest
- * while preserving clear close, minimize, and maximize/restore glyphs.
- */
-.titlebar button.close,
-.titlebar button.minimize,
-.titlebar button.maximize,
-headerbar button.close,
-headerbar button.minimize,
-headerbar button.maximize {
-  min-width: 14px;
-  min-height: 14px;
-  margin: 0 3px;
-  padding: 0;
-  border-radius: 999px;
-  border: 1px solid alpha(#1B2034, 0.18);
-  background-image: none;
-  box-shadow: inset 0 1px 0 alpha(#FFFFFF, 0.36), 0 1px 2px alpha(#09112B, 0.16);
-  -gtk-icon-shadow: none;
-}
-
-.titlebar button.close,
-headerbar button.close {
-  background-color: #FF5F57;
-}
-
-.titlebar button.minimize,
-headerbar button.minimize {
-  background-color: #FEBC2E;
-}
-
-.titlebar button.maximize,
-headerbar button.maximize {
-  background-color: #28C840;
-}
-
-.titlebar button.close:hover,
-headerbar button.close:hover {
-  background-color: #FF3B30;
-}
-
-.titlebar button.minimize:hover,
-headerbar button.minimize:hover {
-  background-color: #F2A900;
-}
-
-.titlebar button.maximize:hover,
-headerbar button.maximize:hover {
-  background-color: #1FAE35;
-}
-
-.titlebar button.close:active,
-headerbar button.close:active {
-  background-color: #D93229;
-}
-
-.titlebar button.minimize:active,
-headerbar button.minimize:active {
-  background-color: #D18E00;
-}
-
-.titlebar button.maximize:active,
-headerbar button.maximize:active {
-  background-color: #168B2A;
-}
-
-.titlebar button.close image,
-.titlebar button.minimize image,
-.titlebar button.maximize image,
-headerbar button.close image,
-headerbar button.minimize image,
-headerbar button.maximize image {
-  opacity: 0;
-  color: #2B2332;
-}
-
-.titlebar button.close:hover image,
-.titlebar button.close:focus image,
-.titlebar button.minimize:hover image,
-.titlebar button.minimize:focus image,
-.titlebar button.maximize:hover image,
-.titlebar button.maximize:focus image,
-headerbar button.close:hover image,
-headerbar button.close:focus image,
-headerbar button.minimize:hover image,
-headerbar button.minimize:focus image,
-headerbar button.maximize:hover image,
-headerbar button.maximize:focus image {
-  opacity: 1;
-  color: #2B2332;
-}
-
-.titlebar button.close:focus-visible,
-.titlebar button.minimize:focus-visible,
-.titlebar button.maximize:focus-visible,
-headerbar button.close:focus-visible,
-headerbar button.minimize:focus-visible,
-headerbar button.maximize:focus-visible {
-  outline: 2px solid alpha(@zeus-accent, 0.72);
-  outline-offset: 2px;
-}
 
 button {
   color: @zeus-window-fg;
@@ -273,31 +171,72 @@ tooltip {
   padding: 5px 8px;
 }
 
-/* Keep a 24px native pointer/keyboard target while painting a 16px circle in
- * its content box. This avoids the tall oval produced by generic button
- * padding without shrinking the titlebar control's activation area. */
+/* Flat 14px artwork inside a native 24px pointer target. */
 .titlebar button.close,
 .titlebar button.minimize,
 .titlebar button.maximize,
+.titlebar button.restore,
 headerbar button.close,
 headerbar button.minimize,
-headerbar button.maximize {
-  min-width: 16px;
-  min-height: 16px;
-  padding: 4px;
+headerbar button.maximize,
+headerbar button.restore {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
   margin: 0;
-  border-radius: 50%;
   border: 0;
-  background-clip: content-box;
+  border-radius: 6px;
+  background-color: transparent;
+  background-size: 14px 14px;
+  background-position: center;
+  background-repeat: no-repeat;
+  box-shadow: none;
 }
-
-.titlebar button.close > image,
-.titlebar button.minimize > image,
-.titlebar button.maximize > image,
-headerbar button.close > image,
-headerbar button.minimize > image,
-headerbar button.maximize > image {
-  min-width: 8px;
-  min-height: 8px;
-  margin: 0;
-}
+.titlebar button.close image,
+.titlebar button.minimize image,
+.titlebar button.maximize image,
+.titlebar button.restore image,
+headerbar button.close image,
+headerbar button.minimize image,
+headerbar button.maximize image,
+headerbar button.restore image { opacity: 0; min-width: 0; min-height: 0; margin: 0; }
+.titlebar button.close,
+headerbar button.close { background-image: url("../assets/close.svg"); }
+.titlebar button.close:hover,
+.titlebar button.close:focus,
+.titlebar button.close:active,
+headerbar button.close:hover,
+headerbar button.close:focus,
+headerbar button.close:active { background-color: transparent; background-image: url("../assets/close-hover.svg"); box-shadow: none; }
+.titlebar button.minimize,
+headerbar button.minimize { background-image: url("../assets/minimize.svg"); }
+.titlebar button.minimize:hover,
+.titlebar button.minimize:focus,
+.titlebar button.minimize:active,
+headerbar button.minimize:hover,
+headerbar button.minimize:focus,
+headerbar button.minimize:active { background-color: transparent; background-image: url("../assets/minimize-hover.svg"); box-shadow: none; }
+.titlebar button.maximize,
+headerbar button.maximize { background-image: url("../assets/maximize.svg"); }
+.titlebar button.maximize:hover,
+.titlebar button.maximize:focus,
+.titlebar button.maximize:active,
+headerbar button.maximize:hover,
+headerbar button.maximize:focus,
+headerbar button.maximize:active { background-color: transparent; background-image: url("../assets/maximize-hover.svg"); box-shadow: none; }
+.titlebar button.restore,
+headerbar button.restore { background-image: url("../assets/restore.svg"); }
+.titlebar button.restore:hover,
+.titlebar button.restore:focus,
+.titlebar button.restore:active,
+headerbar button.restore:hover,
+headerbar button.restore:focus,
+headerbar button.restore:active { background-color: transparent; background-image: url("../assets/restore-hover.svg"); box-shadow: none; }
+.titlebar button.close:focus-visible,
+.titlebar button.minimize:focus-visible,
+.titlebar button.maximize:focus-visible,
+.titlebar button.restore:focus-visible,
+headerbar button.close:focus-visible,
+headerbar button.minimize:focus-visible,
+headerbar button.maximize:focus-visible,
+headerbar button.restore:focus-visible { outline: 2px solid #5475c8; outline-offset: -1px; }

@@ -1,0 +1,1297 @@
+#!/usr/bin/env python3
+"""Native GTK window for the Zeus temporary-download folder.
+
+The cleanup engine owns all filesystem policy and mutation.  This process only
+renders the engine's JSON-friendly results and submits explicit user actions
+to it.  Backend calls run on a single worker so a slow filesystem operation
+never stalls the GTK main loop.
+"""
+
+from __future__ import annotations
+
+import concurrent.futures
+import datetime as datetime_module
+import os
+from pathlib import Path
+import sys
+from typing import Any, Callable, Mapping
+
+import gi
+
+gi.require_version("Adw", "1")
+gi.require_version("Gtk", "4.0")
+from gi.repository import Adw, Gio, GLib, Gtk, Pango
+
+
+BACKEND_PATH = "/usr/lib/zeus"
+if BACKEND_PATH not in sys.path:
+    sys.path.insert(0, BACKEND_PATH)
+
+try:
+    import zeus_temp as temp_backend
+except Exception as error:  # pragma: no cover - exercised on incomplete images
+    temp_backend = None
+    BACKEND_IMPORT_ERROR = error
+else:
+    BACKEND_IMPORT_ERROR = None
+
+
+APPLICATION_ID = "org.zeus.Temp"
+MIN_CUSTOM_MINUTES = 15
+MAX_CUSTOM_MINUTES = 365 * 24 * 60
+
+POLICIES = (
+    ("boot", "On boot"),
+    ("hourly", "Every hour"),
+    ("daily", "Every day"),
+    ("weekly", "Every week"),
+    ("custom", "Custom interval"),
+    ("never", "Never"),
+)
+POLICY_LABELS = {mode: label for mode, label in POLICIES}
+POLICY_ALIASES = {
+    "on_boot": "boot",
+    "boot_once": "boot",
+    "onboot": "boot",
+    "hour": "hourly",
+    "every_hour": "hourly",
+    "day": "daily",
+    "every_day": "daily",
+    "week": "weekly",
+    "every_week": "weekly",
+    "manual": "never",
+    "disabled": "never",
+    "off": "never",
+}
+
+
+CSS = """
+.zeus-window {
+  background: @window_bg_color;
+}
+
+.hero {
+  padding: 32px 38px 20px;
+}
+
+.eyebrow {
+  color: @accent_color;
+  font-size: 0.78em;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+}
+
+.hero-title {
+  color: @window_fg_color;
+  font-size: 2.2em;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  margin-top: 6px;
+}
+
+.hero-copy {
+  color: alpha(@window_fg_color, 0.74);
+  font-size: 1.06em;
+  line-height: 1.38;
+  margin-top: 9px;
+}
+
+.expiration-label {
+  background: alpha(@accent_bg_color, 0.14);
+  border-radius: 999px;
+  color: @accent_color;
+  font-size: 0.88em;
+  font-weight: 700;
+  margin-top: 16px;
+  padding: 7px 12px;
+}
+
+.content-section {
+  margin: 0 38px 17px;
+}
+
+.metric-grid {
+  margin-bottom: 22px;
+}
+
+.metric-card {
+  background: @card_bg_color;
+  border: 1px solid alpha(@window_fg_color, 0.08);
+  border-radius: 17px;
+  padding: 16px 18px 15px;
+}
+
+.metric-title {
+  color: alpha(@window_fg_color, 0.62);
+  font-size: 0.80em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.metric-value {
+  color: @window_fg_color;
+  font-size: 1.42em;
+  font-weight: 780;
+  margin-top: 7px;
+}
+
+.section-title {
+  color: @window_fg_color;
+  font-size: 1.08em;
+  font-weight: 760;
+}
+
+.section-copy {
+  color: alpha(@window_fg_color, 0.65);
+  margin-top: 4px;
+}
+
+.files-card,
+.policy-card {
+  background: @card_bg_color;
+  border: 1px solid alpha(@window_fg_color, 0.08);
+  border-radius: 17px;
+}
+
+.files-card {
+  padding: 7px 0;
+}
+
+.file-row {
+  padding: 7px 13px;
+}
+
+.file-row:hover {
+  background: alpha(@accent_bg_color, 0.08);
+}
+
+.file-icon {
+  color: @accent_color;
+  margin-right: 10px;
+}
+
+.file-name {
+  color: @window_fg_color;
+  font-weight: 650;
+}
+
+.file-detail {
+  color: alpha(@window_fg_color, 0.60);
+  font-size: 0.88em;
+  margin-top: 2px;
+}
+
+.empty-files {
+  color: alpha(@window_fg_color, 0.60);
+  padding: 28px 18px;
+}
+
+.action-bar {
+  margin-top: 12px;
+}
+
+.info-banner {
+  background: alpha(@accent_bg_color, 0.12);
+  border-radius: 14px;
+  color: alpha(@window_fg_color, 0.79);
+  margin-top: 16px;
+  padding: 12px 15px;
+}
+
+.warning-banner {
+  background: @warning_bg_color;
+  color: @warning_fg_color;
+}
+
+.error-banner {
+  background: @error_bg_color;
+  color: @error_fg_color;
+}
+
+.policy-card {
+  padding: 4px 9px 10px;
+}
+
+.policy-note {
+  color: alpha(@window_fg_color, 0.66);
+  line-height: 1.35;
+  padding: 12px 10px 8px;
+}
+
+.custom-interval {
+  padding: 0 10px 5px;
+}
+
+.custom-minutes {
+  min-width: 94px;
+}
+
+.bottom-space {
+  min-height: 18px;
+}
+"""
+
+
+def _mapping(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
+
+
+def _first(mapping: Mapping[str, Any], *keys: str, default: Any = None) -> Any:
+    for key in keys:
+        if key in mapping and mapping[key] is not None:
+            return mapping[key]
+    return default
+
+
+def _nested_first(mapping: Mapping[str, Any], groups: tuple[str, ...], *keys: str) -> Any:
+    value = _first(mapping, *keys)
+    if value is not None:
+        return value
+    for group in groups:
+        nested = _mapping(mapping.get(group))
+        value = _first(nested, *keys)
+        if value is not None:
+            return value
+    return None
+
+
+def _integer(value: Any, default: int = 0) -> int:
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
+def _normalise_mode(value: Any) -> str:
+    mode = str(value or "boot").strip().lower().replace("-", "_")
+    mode = POLICY_ALIASES.get(mode, mode)
+    return mode if mode in POLICY_LABELS else "boot"
+
+
+def _normalise_files(status: Mapping[str, Any]) -> list[dict[str, Any]]:
+    candidates: Any = _first(status, "files", "items", "entries", "children")
+    if candidates is None:
+        for group in ("temp", "directory", "contents"):
+            nested = _mapping(status.get(group))
+            candidates = _first(nested, "files", "items", "entries", "children")
+            if candidates is not None:
+                break
+    if isinstance(candidates, Mapping):
+        candidates = list(candidates.values())
+    if not isinstance(candidates, (list, tuple)):
+        return []
+
+    files: list[dict[str, Any]] = []
+    for candidate in candidates:
+        if isinstance(candidate, str):
+            candidate = {"name": candidate}
+        if not isinstance(candidate, Mapping):
+            continue
+        raw_name = _first(candidate, "name", "relative_name", "relative_path", "filename", "path")
+        if raw_name is None:
+            continue
+        name = str(raw_name)
+        if not name:
+            continue
+        size = _first(candidate, "size_bytes", "bytes", "size", default=0)
+        item = {
+            "name": name,
+            "path": _first(candidate, "path", "absolute_path"),
+            "size": _integer(size),
+            "modified": _first(candidate, "modified", "modified_at", "mtime", "updated_at"),
+            "active": bool(_first(candidate, "active", "is_active", "in_use", "busy", "in_progress", default=False)),
+            "partial": bool(_first(candidate, "partial", "partial_download", default=False)),
+            "directory": bool(
+                _first(candidate, "directory", "is_directory", "is_dir", default=False)
+                or str(candidate.get("type", "")).lower() in {"directory", "dir", "folder"}
+                or str(candidate.get("kind", "")).lower() in {"directory", "dir", "folder"}
+            ),
+        }
+        files.append(item)
+    return files
+
+
+def _policy_from_status(status: Mapping[str, Any]) -> tuple[str, int]:
+    policy = _mapping(status.get("policy"))
+    schedule = _mapping(status.get("schedule"))
+    raw_policy = status.get("policy")
+    default_mode = raw_policy if isinstance(raw_policy, str) else _first(
+        status,
+        "policy_mode",
+        "mode",
+        default=_first(schedule, "mode"),
+    )
+    mode_value = _first(
+        policy,
+        "mode",
+        "policy",
+        default=default_mode,
+    )
+    interval = _first(
+        policy,
+        "interval_seconds",
+        "interval",
+        default=_first(
+            status,
+            "interval_seconds",
+            "custom_interval_seconds",
+            default=_first(schedule, "interval_seconds", default=0),
+        ),
+    )
+    return _normalise_mode(mode_value), _integer(interval)
+
+
+def _temp_root_from_status(status: Mapping[str, Any]) -> Path:
+    raw_root = _first(status, "temp_path", "temp", "root", "directory", "path")
+    if isinstance(raw_root, Mapping):
+        raw_root = _first(raw_root, "path", "temp_path", "root", "directory")
+    if raw_root is None:
+        raw_root = _nested_first(
+            status,
+            ("temp", "directory", "location"),
+            "path",
+            "temp_path",
+            "root",
+            "directory",
+        )
+    if not isinstance(raw_root, str) or not raw_root:
+        return Path.home() / "Temp"
+    return Path(os.path.expanduser(raw_root))
+
+
+def _used_bytes_from_status(status: Mapping[str, Any], files: list[dict[str, Any]]) -> int:
+    value = _nested_first(
+        status,
+        ("usage", "temp", "directory"),
+        "used_bytes",
+        "bytes_used",
+        "size_bytes",
+        "bytes",
+        "space_used",
+    )
+    if value is not None:
+        return _integer(value)
+    return sum(item["size"] for item in files)
+
+
+def _format_size(value: Any) -> str:
+    size = float(_integer(value))
+    units = ("B", "KB", "MB", "GB", "TB")
+    index = 0
+    while size >= 1024 and index < len(units) - 1:
+        size /= 1024
+        index += 1
+    if index == 0:
+        return f"{int(size)} {units[index]}"
+    if size >= 100:
+        return f"{size:.0f} {units[index]}"
+    if size >= 10:
+        return f"{size:.1f} {units[index]}"
+    return f"{size:.2f} {units[index]}"
+
+
+def _result_count(value: Any, default: int = 0) -> int:
+    if isinstance(value, (list, tuple, set, Mapping)):
+        return len(value)
+    if value is None:
+        return default
+    return _integer(value, default)
+
+
+def _format_modified(value: Any) -> str:
+    if value is None or value == "":
+        return ""
+    moment: datetime_module.datetime | None = None
+    if isinstance(value, (int, float)):
+        try:
+            moment = datetime_module.datetime.fromtimestamp(value).astimezone()
+        except (OverflowError, OSError, ValueError):
+            moment = None
+    elif isinstance(value, str):
+        raw = value.strip()
+        try:
+            moment = datetime_module.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            if moment.tzinfo is not None:
+                moment = moment.astimezone()
+        except ValueError:
+            return raw[:32]
+    if moment is None:
+        return ""
+    return moment.strftime("%b %-d, %H:%M")
+
+
+def _format_next(value: Any, mode: str) -> str:
+    if mode == "boot":
+        return "Next boot"
+    if mode == "never":
+        return "Manual only"
+    if isinstance(value, Mapping):
+        value = _first(value, "at", "timestamp", "next_sweep", "next_run", "when")
+    if value is None or value == "":
+        return "Not scheduled"
+    moment: datetime_module.datetime | None = None
+    if isinstance(value, (int, float)):
+        try:
+            moment = datetime_module.datetime.fromtimestamp(value).astimezone()
+        except (OverflowError, OSError, ValueError):
+            moment = None
+    elif isinstance(value, str):
+        try:
+            moment = datetime_module.datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+            if moment.tzinfo is not None:
+                moment = moment.astimezone()
+        except ValueError:
+            return value[:48]
+    if moment is None:
+        return str(value)[:48]
+    return moment.strftime("%b %-d, %H:%M")
+
+
+def _result_error(result: Any) -> str | None:
+    if not isinstance(result, Mapping):
+        return None
+    if result.get("ok") is False or result.get("success") is False:
+        return str(_first(result, "error", "message", default="The Temp operation was not completed."))
+    status = str(result.get("status", "")).lower()
+    if status in {"error", "failed", "failure"}:
+        return str(_first(result, "error", "message", default="The Temp operation was not completed."))
+    error = result.get("error")
+    if error:
+        return str(error)
+    return None
+
+
+def _collision_message(result: Any) -> str | None:
+    if not isinstance(result, Mapping):
+        return None
+    collision = _first(result, "collision", "temp_collision", "existing_temp")
+    setup_required = bool(_first(result, "setup_required", "needs_setup", default=False))
+    status = str(result.get("status", "")).lower()
+    disabled_reason = str(result.get("disabled_reason", "")).lower()
+    reason_is_collision = "collision" in disabled_reason or "adopt" in disabled_reason
+    if collision or setup_required or reason_is_collision or status in {"collision", "needs_setup", "blocked"}:
+        detail = ""
+        if isinstance(collision, Mapping):
+            detail = str(_first(collision, "message", "path", default=""))
+        elif isinstance(collision, str):
+            detail = collision
+        if detail and not detail.startswith("/"):
+            detail = f" {detail}"
+        return (
+            "An existing Temp folder needs an explicit setup choice before cleanup can be enabled."
+            f"{detail} Review it, then choose Use existing Temp below to enable cleanup."
+            " Existing Temp files are preserved,"
+            " and the existing Downloads folder is untouched."
+        )
+    return None
+
+
+def _is_cancelled(error: GLib.Error) -> bool:
+    return "cancel" in str(error).lower()
+
+
+class TempWindow(Adw.ApplicationWindow):
+    """The Temp view and its non-blocking backend bridge."""
+
+    def __init__(self, application: Adw.Application):
+        super().__init__(application=application, title="Temp")
+        self.set_default_size(790, 760)
+        self.set_size_request(560, 540)
+        self.add_css_class("zeus-window")
+
+        self._closed = False
+        self._executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="zeus-temp",
+        )
+        self._refresh_in_flight = False
+        self._refresh_again = False
+        self._operation_in_flight = False
+        self._refresh_source: int | None = None
+        self._status: dict[str, Any] = {}
+        self._files: list[dict[str, Any]] = []
+        self._file_by_name: dict[str, dict[str, Any]] = {}
+        self._selected_names: set[str] = set()
+        self._setup_result: Any = None
+        self._collision = False
+        self._current_mode = "boot"
+        self._current_interval = 0
+        self._policy_dirty = False
+        self._folder_dialog: Gtk.FileDialog | None = None
+        self._pending_keep_names: list[str] = []
+        self._last_keep_count = 0
+
+        self._install_css()
+        self._build_window()
+        self._refresh_source = GLib.timeout_add_seconds(4, self._on_refresh_timer)
+        self._start_setup()
+
+    def _install_css(self):
+        provider = Gtk.CssProvider()
+        provider.load_from_data(CSS.encode("utf-8"))
+        display = self.get_display()
+        if display is not None:
+            Gtk.StyleContext.add_provider_for_display(
+                display,
+                provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+            )
+
+    @staticmethod
+    def _label(text: str, css_class: str, *, wrap: bool = False) -> Gtk.Label:
+        label = Gtk.Label(label=text)
+        label.set_xalign(0)
+        label.add_css_class(css_class)
+        if wrap:
+            label.set_wrap(True)
+            label.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
+            label.set_hexpand(True)
+        return label
+
+    @staticmethod
+    def _set_accessible_label(widget: Gtk.Widget, label: str):
+        # GTK4 exposes accessible names through update_property; keep a
+        # tooltip fallback for older introspection data and lightweight probes.
+        accessible_property = getattr(Gtk, "AccessibleProperty", None)
+        update_property = getattr(widget, "update_property", None)
+        if accessible_property is not None and update_property is not None:
+            try:
+                update_property([accessible_property.LABEL], [label])
+                return
+            except (AttributeError, TypeError):
+                pass
+        widget.set_tooltip_text(label)
+
+    def _build_window(self):
+        toolbar = Adw.ToolbarView()
+        header = Adw.HeaderBar()
+        title = Gtk.Label(label="Temp")
+        title.add_css_class("heading")
+        header.set_title_widget(title)
+
+        refresh_button = Gtk.Button.new_from_icon_name("view-refresh-symbolic")
+        refresh_button.set_tooltip_text("Refresh temporary files")
+        self._set_accessible_label(refresh_button, "Refresh temporary files")
+        refresh_button.connect("clicked", self._on_refresh_clicked)
+        header.pack_end(refresh_button)
+        toolbar.add_top_bar(header)
+
+        self._toast_overlay = Adw.ToastOverlay()
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(900)
+        clamp.set_tightening_threshold(620)
+        clamp.set_child(self._build_content())
+        scroller.set_child(clamp)
+        self._toast_overlay.set_child(scroller)
+        toolbar.set_content(self._toast_overlay)
+        self.set_content(toolbar)
+
+    def _build_content(self) -> Gtk.Widget:
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+
+        hero = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        hero.add_css_class("hero")
+        hero.append(self._label("A LITTLE ROOM TO BREATHE", "eyebrow"))
+        hero.append(self._label("Temporary files", "hero-title"))
+        hero.append(
+            self._label(
+                "New downloads land here. Keep anything you want to save.",
+                "hero-copy",
+                wrap=True,
+            )
+        )
+        self._expiration_label = self._label("Temporary files — checking cleanup policy…", "expiration-label")
+        self._expiration_label.set_halign(Gtk.Align.START)
+        hero.append(self._expiration_label)
+        self._setup_banner = self._label(
+            "Temporary files follow the policy below. Existing Downloads is preserved.",
+            "info-banner",
+            wrap=True,
+        )
+        self._setup_banner.set_visible(True)
+        hero.append(self._setup_banner)
+        self._setup_action_button = Gtk.Button(label="Use existing Temp")
+        self._setup_action_button.set_halign(Gtk.Align.START)
+        self._setup_action_button.set_tooltip_text(
+            "Enroll the existing Temp folder without moving or deleting its contents"
+        )
+        self._setup_action_button.add_css_class("suggested-action")
+        self._setup_action_button.connect("clicked", self._on_adopt_clicked)
+        self._setup_action_button.set_visible(False)
+        hero.append(self._setup_action_button)
+        content.append(hero)
+
+        metrics = Gtk.Grid(column_spacing=12, row_spacing=12)
+        metrics.add_css_class("content-section")
+        metrics.add_css_class("metric-grid")
+        metrics.set_column_homogeneous(True)
+        used_card, self._used_value = self._metric_card("Used space", "Checking…")
+        count_card, self._count_value = self._metric_card("Items", "Checking…")
+        next_card, self._next_value = self._metric_card("Clears next", "Checking…")
+        metrics.attach(used_card, 0, 0, 1, 1)
+        metrics.attach(count_card, 1, 0, 1, 1)
+        metrics.attach(next_card, 2, 0, 1, 1)
+        content.append(metrics)
+
+        policy_section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        policy_section.add_css_class("content-section")
+        policy_section.append(self._label("Automatic cleanup", "section-title"))
+        policy_section.append(
+            self._label(
+                "A policy change schedules the next cleanup from that change."
+                " Applying it never clears Temp immediately.",
+                "section-copy",
+                wrap=True,
+            )
+        )
+        policy_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        policy_card.add_css_class("policy-card")
+        self._policy_row = Adw.ComboRow()
+        self._policy_row.set_title("Clear Temp")
+        self._policy_row.set_model(Gtk.StringList.new([label for _, label in POLICIES]))
+        self._policy_row.connect("notify::selected", self._on_policy_changed)
+        policy_card.append(self._policy_row)
+
+        self._custom_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        self._custom_row.add_css_class("custom-interval")
+        custom_label = Gtk.Label(label="Custom interval")
+        custom_label.set_xalign(0)
+        custom_label.set_hexpand(True)
+        self._custom_row.append(custom_label)
+        self._custom_minutes = Gtk.SpinButton.new_with_range(
+            MIN_CUSTOM_MINUTES,
+            MAX_CUSTOM_MINUTES,
+            1,
+        )
+        self._custom_minutes.set_value(MIN_CUSTOM_MINUTES)
+        self._custom_minutes.set_numeric(True)
+        self._custom_minutes.set_wrap(False)
+        self._custom_minutes.add_css_class("custom-minutes")
+        self._custom_minutes.set_tooltip_text("Minimum 15 minutes")
+        self._custom_minutes.connect("value-changed", self._on_custom_interval_changed)
+        self._custom_row.append(self._custom_minutes)
+        minutes_label = Gtk.Label(label="minutes")
+        minutes_label.set_xalign(0)
+        self._custom_row.append(minutes_label)
+        policy_card.append(self._custom_row)
+        self._custom_row.set_visible(False)
+
+        policy_note = self._label(
+            "On boot clears once per OS boot. Hour, day, and week clear the whole folder."
+            " Active downloads are left for a later cleanup by the engine.",
+            "policy-note",
+            wrap=True,
+        )
+        policy_card.append(policy_note)
+        policy_section.append(policy_card)
+
+        policy_actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        policy_actions.add_css_class("action-bar")
+        self._apply_button = Gtk.Button(label="Apply")
+        self._apply_button.add_css_class("suggested-action")
+        self._apply_button.set_tooltip_text("Apply the selected cleanup policy")
+        self._apply_button.connect("clicked", self._on_apply_clicked)
+        policy_actions.append(self._apply_button)
+        policy_section.append(policy_actions)
+        content.append(policy_section)
+
+        files_section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        files_section.add_css_class("content-section")
+        files_section.append(self._label("Files in Temp", "section-title"))
+        files_section.append(
+            self._label(
+                "Select one or more items to open or keep permanently.",
+                "section-copy",
+            )
+        )
+        self._file_list = Gtk.ListBox()
+        self._file_list.set_selection_mode(Gtk.SelectionMode.NONE)
+        self._file_list.add_css_class("files-card")
+        self._file_list.set_margin_top(12)
+        files_section.append(self._file_list)
+
+        actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        actions.add_css_class("action-bar")
+        self._open_button = Gtk.Button(label="Open")
+        self._open_button.add_css_class("suggested-action")
+        self._open_button.set_tooltip_text("Open the selected temporary file")
+        self._open_button.connect("clicked", self._on_open_clicked)
+        self._keep_button = Gtk.Button(label="Keep…")
+        self._keep_button.set_tooltip_text("Move selected files to a permanent folder")
+        self._keep_button.connect("clicked", self._on_keep_clicked)
+        self._clear_button = Gtk.Button(label="Clear now")
+        self._clear_button.add_css_class("destructive-action")
+        self._clear_button.set_tooltip_text("Permanently clear eligible items from Temp")
+        self._clear_button.connect("clicked", self._on_clear_clicked)
+        actions.append(self._open_button)
+        actions.append(self._keep_button)
+        spacer = Gtk.Box()
+        spacer.set_hexpand(True)
+        actions.append(spacer)
+        actions.append(self._clear_button)
+        files_section.append(actions)
+        content.append(files_section)
+
+        bottom_space = Gtk.Box()
+        bottom_space.add_css_class("bottom-space")
+        content.append(bottom_space)
+
+        self._render_files()
+        self._update_action_sensitivity()
+        return content
+
+    def _metric_card(self, title: str, value: str) -> tuple[Gtk.Box, Gtk.Label]:
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        card.add_css_class("metric-card")
+        card.append(self._label(title.upper(), "metric-title"))
+        value_label = self._label(value, "metric-value")
+        value_label.set_ellipsize(Pango.EllipsizeMode.END)
+        card.append(value_label)
+        return card, value_label
+
+    def _start_setup(self):
+        if temp_backend is None:
+            self._setup_result = {"error": "The Temp service is not installed in this image."}
+            self._show_setup_error()
+            self._request_status()
+            return
+        self._submit_backend("setup", temp_backend.setup, self._after_setup)
+
+    def _after_setup(self, result: Any, error: Exception | None):
+        self._setup_result = result
+        if error is not None:
+            error_text = str(error)
+            lowered = error_text.lower()
+            if "temp" in lowered and any(word in lowered for word in ("exists", "adopt", "collision")):
+                self._collision = True
+                self._show_setup_banner(
+                    "An existing Temp folder needs an explicit setup choice before cleanup can be enabled."
+                    " Review it, then choose Use existing Temp below to enable cleanup. Existing Temp files are"
+                    " preserved, and the existing Downloads folder is untouched.",
+                    warning=True,
+                )
+            else:
+                self._show_setup_error(
+                    f"Temp setup could not be checked: {error}. Existing Temp and Downloads files were preserved."
+                )
+        else:
+            self._collision = _collision_message(result) is not None
+            collision = _collision_message(result)
+            if collision:
+                self._show_setup_banner(collision, warning=True)
+            else:
+                operation_error = _result_error(result)
+                if operation_error:
+                    self._show_setup_error(operation_error)
+                else:
+                    self._setup_banner.set_visible(False)
+                    self._setup_action_button.set_visible(False)
+        self._request_status()
+
+    def _show_setup_banner(self, message: str, *, warning: bool = False, error: bool = False):
+        self._setup_banner.set_text(message)
+        self._setup_banner.remove_css_class("warning-banner")
+        self._setup_banner.remove_css_class("error-banner")
+        if warning:
+            self._setup_banner.add_css_class("warning-banner")
+        if error:
+            self._setup_banner.add_css_class("error-banner")
+        self._setup_banner.set_visible(True)
+        self._setup_action_button.set_visible(warning and self._collision and temp_backend is not None)
+
+    def _show_setup_error(self, message: str | None = None):
+        self._collision = True
+        self._show_setup_banner(
+            message or "Temp setup is unavailable. Cleanup actions are paused until it can be checked.",
+            error=True,
+        )
+        self._update_action_sensitivity()
+
+    def _submit_backend(
+        self,
+        operation_name: str,
+        operation: Callable[[], Any],
+        callback: Callable[[Any, Exception | None], None],
+        *,
+        operation_action: bool = False,
+    ):
+        if self._closed:
+            return
+        if operation_action:
+            self._operation_in_flight = True
+            self._update_action_sensitivity()
+
+        def worker_done(future: concurrent.futures.Future[Any]):
+            try:
+                result = future.result()
+                error = None
+            except Exception as caught:
+                result = None
+                error = caught
+
+            def deliver() -> bool:
+                if self._closed:
+                    return GLib.SOURCE_REMOVE
+                if operation_action:
+                    self._operation_in_flight = False
+                    self._update_action_sensitivity()
+                callback(result, error)
+                return GLib.SOURCE_REMOVE
+
+            try:
+                GLib.idle_add(deliver, priority=GLib.PRIORITY_DEFAULT)
+            except Exception:
+                # GTK is already tearing down; there is no UI left to update.
+                return
+
+        try:
+            future = self._executor.submit(operation)
+        except RuntimeError as error:
+            if operation_action:
+                self._operation_in_flight = False
+                self._update_action_sensitivity()
+            callback(None, error)
+            return
+        future.add_done_callback(worker_done)
+
+    def _request_status(self):
+        if self._closed or temp_backend is None:
+            return
+        if self._refresh_in_flight:
+            self._refresh_again = True
+            return
+        self._refresh_in_flight = True
+        self._submit_backend("status", temp_backend.status, self._after_status)
+
+    def _after_status(self, result: Any, error: Exception | None):
+        self._refresh_in_flight = False
+        if error is not None:
+            if not self._status:
+                self._show_setup_error(f"Temp status is unavailable: {error}")
+            else:
+                self._show_toast(f"Could not refresh Temp: {error}")
+        elif isinstance(result, Mapping):
+            collision = _collision_message(result)
+            failure = _result_error(result)
+            if collision:
+                self._collision = True
+                self._show_setup_banner(collision, warning=True)
+            elif failure:
+                if not self._status:
+                    self._show_setup_error(failure)
+                else:
+                    self._show_toast(f"Could not refresh Temp: {failure}")
+            else:
+                self._apply_status(result)
+        else:
+            self._show_toast("Temp returned an unreadable status.")
+        if self._refresh_again:
+            self._refresh_again = False
+            GLib.idle_add(self._request_status)
+
+    def _apply_status(self, status: Mapping[str, Any]):
+        self._status = dict(status)
+        self._files = _normalise_files(status)
+        self._file_by_name = {item["name"]: item for item in self._files}
+        self._selected_names.intersection_update(self._file_by_name)
+        self._render_files()
+
+        used_bytes = _used_bytes_from_status(status, self._files)
+        count_value = _nested_first(status, ("usage", "temp", "directory"), "file_count", "count", "items_count")
+        count = _integer(count_value, len(self._files)) if count_value is not None else len(self._files)
+        mode, interval = _policy_from_status(status)
+        self._current_mode = mode
+        self._current_interval = interval
+        self._set_policy_selection(mode, interval)
+        next_value = _nested_first(
+            status,
+            ("schedule", "policy", "temp"),
+            "next_cleanup_label",
+            "next_sweep",
+            "next_cleanup",
+            "next_run",
+            "next_at",
+        )
+        self._used_value.set_text(_format_size(used_bytes))
+        self._count_value.set_text(str(count))
+        self._next_value.set_text(_format_next(next_value, mode))
+        self._expiration_label.set_text(self._expiration_text(mode, interval))
+
+        status_collision = _collision_message(status)
+        if status_collision:
+            self._collision = True
+            self._show_setup_banner(status_collision, warning=True)
+        elif (
+            self._setup_result is not None
+            and _collision_message(self._setup_result) is None
+            and not _result_error(self._setup_result)
+        ):
+            self._collision = False
+            self._setup_banner.set_visible(False)
+            self._setup_action_button.set_visible(False)
+        self._update_action_sensitivity()
+
+    def _set_policy_selection(self, mode: str, interval: int):
+        index = next((index for index, (candidate, _) in enumerate(POLICIES) if candidate == mode), 0)
+        if self._policy_row.get_selected() != index:
+            self._policy_row.handler_block_by_func(self._on_policy_changed)
+            self._policy_row.set_selected(index)
+            self._policy_row.handler_unblock_by_func(self._on_policy_changed)
+        if mode == "custom" and interval >= MIN_CUSTOM_MINUTES * 60:
+            self._custom_minutes.handler_block_by_func(self._on_custom_interval_changed)
+            self._custom_minutes.set_value(interval / 60)
+            self._custom_minutes.handler_unblock_by_func(self._on_custom_interval_changed)
+        self._custom_row.set_visible(mode == "custom")
+        self._policy_dirty = False
+
+    def _expiration_text(self, mode: str, interval: int) -> str:
+        if mode == "custom":
+            minutes = max(MIN_CUSTOM_MINUTES, round(interval / 60)) if interval else MIN_CUSTOM_MINUTES
+            return f"Temporary files — clears every {minutes} minutes"
+        if mode == "never":
+            return "Temporary files — kept until you clear them"
+        return f"Temporary files — clears {POLICY_LABELS.get(mode, 'on the next boot').lower()}"
+
+    def _render_files(self):
+        if not hasattr(self, "_file_list"):
+            return
+        child = self._file_list.get_first_child()
+        while child is not None:
+            next_child = child.get_next_sibling()
+            self._file_list.remove(child)
+            child = next_child
+        if not self._files:
+            empty = self._label("Temp is empty. New downloads will appear here.", "empty-files", wrap=True)
+            empty.set_justify(Gtk.Justification.CENTER)
+            self._file_list.append(empty)
+            self._update_action_sensitivity()
+            return
+
+        for item in sorted(self._files, key=lambda candidate: candidate["name"].casefold()):
+            row = Gtk.ListBoxRow()
+            row.set_selectable(False)
+            row.set_activatable(False)
+            row.add_css_class("file-row")
+            layout = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+            check = Gtk.CheckButton()
+            check.set_active(item["name"] in self._selected_names)
+            check.set_tooltip_text(f"Select {item['name']}")
+            self._set_accessible_label(check, f"Select {item['name']}")
+            check.connect("toggled", self._on_file_toggled, item["name"])
+            layout.append(check)
+            icon_name = "folder-symbolic" if item["directory"] else "text-x-generic-symbolic"
+            icon = Gtk.Image.new_from_icon_name(icon_name)
+            icon.set_pixel_size(22)
+            icon.add_css_class("file-icon")
+            layout.append(icon)
+            text_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+            text_box.set_hexpand(True)
+            name_label = self._label(item["name"], "file-name")
+            name_label.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+            text_box.append(name_label)
+            detail = _format_size(item["size"]) if not item["directory"] else "Folder"
+            modified = _format_modified(item["modified"])
+            if modified:
+                detail = f"{detail}  ·  {modified}"
+            if item["active"]:
+                detail = f"{detail}  ·  In use; will be revisited"
+            elif item["partial"]:
+                detail = f"{detail}  ·  Partial download; cleanup waits"
+            text_box.append(self._label(detail, "file-detail"))
+            layout.append(text_box)
+            row.set_child(layout)
+            self._file_list.append(row)
+        self._update_action_sensitivity()
+
+    def _on_file_toggled(self, check: Gtk.CheckButton, name: str):
+        if check.get_active():
+            self._selected_names.add(name)
+        else:
+            self._selected_names.discard(name)
+        self._update_action_sensitivity()
+
+    def _selected_items(self) -> list[dict[str, Any]]:
+        return [self._file_by_name[name] for name in self._selected_names if name in self._file_by_name]
+
+    def _update_action_sensitivity(self):
+        selected = self._selected_items()
+        can_mutate = not self._collision and temp_backend is not None and not self._operation_in_flight
+        if hasattr(self, "_open_button"):
+            self._open_button.set_sensitive(len(selected) == 1)
+            self._keep_button.set_sensitive(bool(selected) and can_mutate)
+            self._clear_button.set_sensitive(bool(self._files) and can_mutate)
+            self._apply_button.set_sensitive(can_mutate and self._policy_dirty)
+            if hasattr(self, "_setup_action_button"):
+                self._setup_action_button.set_sensitive(
+                    self._collision and temp_backend is not None and not self._operation_in_flight
+                )
+
+    def _on_refresh_timer(self) -> bool:
+        self._request_status()
+        return GLib.SOURCE_CONTINUE
+
+    def _on_refresh_clicked(self, _button: Gtk.Button):
+        self._request_status()
+
+    def _on_policy_changed(self, _row: Adw.ComboRow, _param: Any):
+        if not hasattr(self, "_custom_row"):
+            return
+        selected = self._policy_row.get_selected()
+        mode = POLICIES[selected][0] if 0 <= selected < len(POLICIES) else "boot"
+        self._custom_row.set_visible(mode == "custom")
+        self._policy_dirty = mode != self._current_mode or (
+            mode == "custom" and round(self._custom_minutes.get_value() * 60) != self._current_interval
+        )
+        self._update_action_sensitivity()
+
+    def _on_custom_interval_changed(self, _spin: Gtk.SpinButton):
+        self._policy_dirty = True
+        self._update_action_sensitivity()
+
+    def _on_apply_clicked(self, _button: Gtk.Button):
+        selected = self._policy_row.get_selected()
+        mode = POLICIES[selected][0] if 0 <= selected < len(POLICIES) else "boot"
+        interval_seconds: int | None = None
+        if mode == "custom":
+            minutes = int(round(self._custom_minutes.get_value()))
+            if minutes < MIN_CUSTOM_MINUTES:
+                self._custom_minutes.set_value(MIN_CUSTOM_MINUTES)
+                minutes = MIN_CUSTOM_MINUTES
+            interval_seconds = minutes * 60
+        self._submit_backend(
+            "set_policy",
+            lambda: temp_backend.set_policy(mode, interval_seconds),
+            self._after_policy,
+            operation_action=True,
+        )
+
+    def _after_policy(self, result: Any, error: Exception | None):
+        if error is not None:
+            self._show_toast(f"Could not update cleanup policy: {error}")
+            return
+        failure = _result_error(result)
+        if failure:
+            self._show_toast(failure)
+            return
+        self._show_toast("Cleanup policy applied. Temp was not cleared.")
+        self._policy_dirty = False
+        self._request_status()
+
+    def _on_adopt_clicked(self, _button: Gtk.Button):
+        if self._operation_in_flight or temp_backend is None:
+            return
+        dialog = Adw.AlertDialog.new(
+            "Use the existing Temp folder?",
+            "Zeus will enroll this folder without moving or deleting its contents."
+            " Existing Downloads is preserved, and cleanup will follow the policy below.",
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("adopt", "Use existing Temp")
+        dialog.set_response_appearance("adopt", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+        dialog.connect("response", self._on_adopt_response)
+        dialog.present(self)
+
+    def _on_adopt_response(self, _dialog: Adw.AlertDialog, response: str):
+        if response != "adopt" or temp_backend is None:
+            return
+        self._submit_backend(
+            "setup",
+            lambda: temp_backend.setup(adopt=True),
+            self._after_setup,
+            operation_action=True,
+        )
+
+    def _on_open_clicked(self, _button: Gtk.Button):
+        selected = self._selected_items()
+        if len(selected) != 1:
+            self._show_toast("Select one item to open.")
+            return
+        path = self._safe_item_path(selected[0])
+        if path is None:
+            self._show_toast("That item is outside the managed Temp folder.")
+            return
+        try:
+            launched = Gio.AppInfo.launch_default_for_uri(Gio.File.new_for_path(str(path)).get_uri(), None)
+        except GLib.Error as error:
+            self._show_toast(f"Could not open the selected item: {error.message}")
+            return
+        if not launched:
+            self._show_toast("No application is available to open that item.")
+
+    def _safe_item_path(self, item: Mapping[str, Any]) -> Path | None:
+        root = _temp_root_from_status(self._status)
+        raw_path = item.get("path")
+        candidate = (
+            Path(os.path.expanduser(str(raw_path)))
+            if isinstance(raw_path, str) and raw_path
+            else root / item["name"]
+        )
+        if not candidate.is_absolute():
+            candidate = root / candidate
+        try:
+            resolved_root = root.resolve(strict=False)
+            resolved_candidate = candidate.resolve(strict=False)
+            resolved_candidate.relative_to(resolved_root)
+        except (OSError, RuntimeError, ValueError):
+            return None
+        return resolved_candidate
+
+    def _on_keep_clicked(self, _button: Gtk.Button):
+        names = [item["name"] for item in self._selected_items()]
+        if not names:
+            self._show_toast("Select at least one item to keep.")
+            return
+        if not hasattr(Gtk, "FileDialog"):
+            self._show_toast("Folder selection is unavailable in this GTK build.")
+            return
+        self._pending_keep_names = names
+        self._last_keep_count = len(names)
+        dialog = Gtk.FileDialog()
+        dialog.set_title("Choose a permanent folder")
+        documents = Path.home() / "Documents"
+        # Documents is the first suggested permanent destination.  The
+        # chooser can still navigate elsewhere when an installation has not
+        # provisioned that XDG directory yet.
+        dialog.set_initial_folder(Gio.File.new_for_path(str(documents)))
+        self._folder_dialog = dialog
+        dialog.select_folder(self, None, self._on_folder_selected, None)
+
+    def _on_folder_selected(self, dialog: Gtk.FileDialog, result: Gio.AsyncResult, _user_data: Any = None):
+        self._folder_dialog = None
+        names = list(self._pending_keep_names)
+        self._pending_keep_names = []
+        try:
+            folder = dialog.select_folder_finish(result)
+        except GLib.Error as error:
+            if not _is_cancelled(error):
+                self._show_toast(f"Could not choose a permanent folder: {error.message}")
+            return
+        destination = folder.get_path() if folder is not None else None
+        if not destination or not names:
+            return
+        self._submit_backend(
+            "keep",
+            lambda: temp_backend.keep(names, destination),
+            self._after_keep,
+            operation_action=True,
+        )
+
+    def _after_keep(self, result: Any, error: Exception | None):
+        if error is not None:
+            self._show_toast(f"Could not keep the selected files: {error}")
+            return
+        failure = _result_error(result)
+        if failure:
+            conflicts = result.get("conflicts") if isinstance(result, Mapping) else None
+            if conflicts:
+                self._show_toast(f"Nothing was overwritten. Resolve {len(conflicts)} name conflict(s) and try again.")
+            else:
+                self._show_toast(failure)
+            return
+        conflicts = result.get("conflicts") if isinstance(result, Mapping) else None
+        kept = result.get("kept") if isinstance(result, Mapping) else None
+        if conflicts:
+            self._show_toast(
+                f"Kept {_result_count(kept)} item(s); {_result_count(conflicts)} conflict(s) were left in Temp."
+            )
+        else:
+            self._show_toast(
+                f"Kept {_result_count(kept, self._last_keep_count)} item(s) permanently."
+            )
+        self._selected_names.clear()
+        self._request_status()
+
+    def _on_clear_clicked(self, _button: Gtk.Button):
+        count = len(self._files)
+        if count == 0:
+            self._show_toast("Temp is already empty.")
+            return
+        dialog = Adw.AlertDialog.new(
+            f"Clear {count} temporary item{'s' if count != 1 else ''}?",
+            "This permanently removes all eligible items from Temp. Existing Downloads is preserved."
+            " Active downloads are left for a later cleanup.",
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("clear", "Clear now")
+        dialog.set_response_appearance("clear", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+        dialog.connect("response", self._on_clear_response)
+        dialog.present(self)
+
+    def _on_clear_response(self, _dialog: Adw.AlertDialog, response: str):
+        if response != "clear":
+            return
+        self._submit_backend(
+            "sweep",
+            lambda: temp_backend.sweep(force=True),
+            self._after_clear,
+            operation_action=True,
+        )
+
+    def _after_clear(self, result: Any, error: Exception | None):
+        if error is not None:
+            self._show_toast(f"Could not clear Temp: {error}")
+            return
+        failure = _result_error(result)
+        if failure:
+            self._show_toast(failure)
+            return
+        deleted = result.get("deleted") if isinstance(result, Mapping) else None
+        if deleted is not None:
+            self._show_toast(f"Cleared {_result_count(deleted)} item(s) from Temp.")
+        else:
+            self._show_toast("Temp cleanup finished.")
+        self._selected_names.clear()
+        self._request_status()
+
+    def _show_toast(self, message: str):
+        if self._closed:
+            return
+        self._toast_overlay.add_toast(Adw.Toast.new(str(message)))
+
+    def shutdown(self):
+        if self._closed:
+            return
+        self._closed = True
+        if self._refresh_source is not None:
+            GLib.source_remove(self._refresh_source)
+            self._refresh_source = None
+        try:
+            self._executor.shutdown(wait=False, cancel_futures=True)
+        except TypeError:  # pragma: no cover - compatibility with older Python
+            self._executor.shutdown(wait=False)
+
+
+class TempApplication(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id=APPLICATION_ID)
+        self._window: TempWindow | None = None
+
+    def do_activate(self):
+        if self._window is None:
+            self._window = TempWindow(self)
+            self._window.connect("close-request", self._on_window_close)
+        self._window.present()
+
+    def _on_window_close(self, window: TempWindow) -> bool:
+        window.shutdown()
+        self._window = None
+        return False
+
+    def do_shutdown(self):
+        if self._window is not None:
+            self._window.shutdown()
+        super().do_shutdown()
+
+
+def main() -> int:
+    return TempApplication().run(sys.argv)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

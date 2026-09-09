@@ -1,0 +1,21 @@
+[Unit]
+Description=Inspect open files for one local Zeus user
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/libexec/zeus-temp-inspector
+StandardInput=socket
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE CAP_SYS_PTRACE
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+TimeoutStartSec=10
+RuntimeMaxSec=10
+MemoryMax=64M
+TasksMax=4

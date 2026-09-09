@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Temp
+GenericName=Temporary files
+Comment=Manage temporary downloads and cleanup
+Exec=/usr/libexec/zeus-temp-window
+Icon=org.zeus.Temp
+Terminal=false
+Categories=GTK;GNOME;Utility;FileManager;
+Keywords=temporary;downloads;cleanup;
+StartupNotify=true

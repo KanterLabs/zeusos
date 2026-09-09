@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+"""Read-only open-file metadata for the connecting Unix socket peer's UID.
+
+No request body, filesystem path, PID or UID is accepted from the client.
+This helper never reads file contents, changes files, or performs cleanup.
+"""
+import errno
+import json
+import os
+from pathlib import Path
+import socket
+import struct
+
+MAX_IDENTITIES = 50000
+
+def inspect_uid(uid, proc=Path('/proc')):
+    active = set()
+    reliable = True
+    try:
+        pids = [p for p in proc.iterdir() if p.name.isdecimal()]
+    except OSError:
+        return {'active': [], 'reliable': False}
+    for pid in pids:
+        try:
+            status = (pid / 'status').read_text()
+            row = next(line for line in status.splitlines() if line.startswith('Uid:'))
+            if uid not in [int(x) for x in row.split()[1:]]:
+                continue
+            for item in (pid / 'fd').iterdir():
+                try:
+                    value = item.stat()
+                    active.add((value.st_dev, value.st_ino))
+                except FileNotFoundError:
+                    pass  # Descriptor closed or process exited.
+                except OSError:
+                    reliable = False
+            # A mapping can remain in use after its descriptor has closed.
+            for line in (pid / 'maps').read_text().splitlines():
+                fields = line.split(None, 5)
+                if len(fields) < 5 or fields[4] == '0':
+                    continue
+                major, minor = fields[3].split(':')
+                active.add((os.makedev(int(major, 16), int(minor, 16)), int(fields[4])))
+            for name in ('cwd', 'exe'):
+                try:
+                    value = (pid / name).stat()
+                    active.add((value.st_dev, value.st_ino))
+                except FileNotFoundError:
+                    pass
+                except OSError:
+                    reliable = False
+        except (FileNotFoundError, ProcessLookupError):
+            continue
+        except (OSError, ValueError, StopIteration):
+            reliable = False
+        if len(active) > MAX_IDENTITIES:
+            return {'active': [], 'reliable': False}
+    return {'active': sorted(active), 'reliable': reliable}
+
+if __name__ == '__main__':
+    with socket.socket(fileno=os.dup(0)) as connection:
+        connection.settimeout(5)
+        _pid, uid, _gid = struct.unpack('3i', connection.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize('3i')))
+        response = inspect_uid(uid)
+        connection.sendall(json.dumps(response, separators=(',', ':')).encode() + b'\n')

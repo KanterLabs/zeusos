@@ -18,8 +18,10 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_image_contract.py -v
       - name: Preserve owner styles through visual changes
         run: python3 -m unittest discover -s tests -p test_style_preservation.py -v
+      - name: Verify Temp cleanup and migration
+        run: python3 -m unittest discover -s tests -p "test_temp*.py" -v
       - name: Check build script syntax
-        run: bash -n scripts/build.sh scripts/build-disk.sh
+        run: bash -n scripts/build.sh scripts/build-disk.sh scripts/export-iteration.sh
       - name: Check welcome application syntax
         run: python3 -m py_compile zeus/assets/welcome.py scripts/build-greeter-theme.py
   cli:
