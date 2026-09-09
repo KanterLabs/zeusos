@@ -41,7 +41,8 @@ COPY security/allowed_signers /usr/share/zeus/update-allowed-signers
 # Foreign-architecture build emulators register dozens of binfmt handlers at
 # every boot. They are optional development tools, not laptop runtime packages.
 RUN dnf remove -y --disable-repo='*' 'qemu-user-static*' && \
-    chmod 0755 /usr/libexec/zeus-welcome && \
+    chmod 0755 /usr/libexec/zeus-welcome /usr/libexec/zeus-settings-window && \
+    chmod 0644 /usr/lib/zeus/settings_model.py /usr/share/applications/org.zeus.Settings.desktop /usr/share/icons/hicolor/scalable/apps/org.zeus.Settings.svg && \
     glib-compile-schemas /usr/share/gnome-shell/extensions/zeus-shell@kanterlabs/schemas && \
     dconf update && \
     systemd-hwdb update --usr && \
