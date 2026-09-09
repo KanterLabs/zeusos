@@ -120,8 +120,8 @@ inside the owner home. Existing directories can be opened in Files.
 
 ## Helm implementation cards
 
-- ZOS-57: Slim native traffic-light window controls — unclaimed Backlog.
-- ZOS-58: Introduce Temp as the download destination — unclaimed Backlog.
-- ZOS-59: Implement scoped Temp cleanup and schedules — unclaimed Backlog.
-- ZOS-60: Expose Temp settings and Keep action — unclaimed Backlog.
-- ZOS-61: Qualify Temp deletion and populated upgrades — unclaimed Backlog.
+- ZOS-57: Controls shipped; full cross-scale console action/focus matrix remains Backlog.
+- ZOS-58: Temp destination and preservation — completed.
+- ZOS-59: Scoped Temp cleanup and schedules — completed.
+- ZOS-60: Settings and Keep shipped; explicit first-setup update-reboot explanation remains Backlog.
+- ZOS-61: Preview deletion and populated upgrade qualification — completed, with limits recorded in iteration notes.
