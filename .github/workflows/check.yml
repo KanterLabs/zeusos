@@ -22,6 +22,8 @@ jobs:
         run: node --test tests/lock_background.test.mjs
       - name: Verify Temp cleanup and migration
         run: python3 -m unittest discover -s tests -p "test_temp*.py" -v
+      - name: Verify Chrome defaults and package trust
+        run: python3 -m unittest discover -s tests -p 'test_browser*.py' -v
       - name: Verify desktop interaction and battery measurement contracts
         run: |
           python3 -m unittest discover -s tests -p test_desktop_interactions.py -v

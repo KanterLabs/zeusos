@@ -1,5 +1,0 @@
-{
-  "policies": {
-    "DefaultDownloadDirectory": "${home}/Temp"
-  }
-}

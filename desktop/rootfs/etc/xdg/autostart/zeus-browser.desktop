@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Zeus browser default migration
+Exec=/usr/libexec/zeus-browser-session
+NoDisplay=true
+OnlyShowIn=GNOME;

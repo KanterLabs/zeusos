@@ -1,0 +1,491 @@
+#!/usr/bin/python3 -I
+"""Migrate the old Firefox desktop choice once for an existing user.
+
+The image supplies Chrome and Firefox as an ordered system fallback through
+``/etc/xdg/mimeapps.list``.  This small login hook only updates an explicit
+user favorite list and explicit user MIME defaults that still name Firefox.
+It never reads or writes a browser profile, and a completion marker prevents a
+later login from replaying the migration over a user's subsequent choices.
+"""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+import re
+import stat
+import sys
+import uuid
+
+
+CHROME_DESKTOP_ID = "google-chrome.desktop"
+FIREFOX_FAVORITE_ID = "org.mozilla.firefox.desktop"
+# ``firefox.desktop`` was used by older distributions.  It is accepted only
+# as an existing user MIME choice; the current image's fallback remains the
+# Fedora desktop ID above.
+FIREFOX_MIME_IDS = ("org.mozilla.firefox.desktop", "firefox.desktop")
+FAVORITES_SCHEMA = "org.gnome.shell"
+FAVORITES_KEY = "favorite-apps"
+TARGET_MIME_TYPES = (
+    "x-scheme-handler/http",
+    "x-scheme-handler/https",
+    "text/html",
+    "application/xhtml+xml",
+)
+MARKER_FILENAME = "browser-session-complete"
+MARKER_CONTENT = "zeus-browser-session=1\n"
+MAX_CONFIGURATION_BYTES = 1024 * 1024
+
+
+class BrowserMigrationError(RuntimeError):
+    """A user-owned input was unavailable or unsafe to update."""
+
+
+def _uid():
+    return os.getuid()
+
+
+def _path_stat(path):
+    try:
+        return os.lstat(path)
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        raise BrowserMigrationError("browser configuration could not be inspected") from error
+
+
+def _check_directory(path, *, create=False):
+    """Validate one directory without following a symlink.
+
+    Parents are checked as well, so an XDG path cannot redirect a write into a
+    different tree.  Missing directories are created one component at a time
+    only when ``create`` is requested for the final component.
+    """
+
+    path = Path(path)
+    if not path.is_absolute():
+        raise BrowserMigrationError("browser configuration path is not absolute")
+
+    current = Path(path.anchor)
+    parts = path.parts[1:]
+    for index, part in enumerate(parts):
+        current /= part
+        value = _path_stat(current)
+        if value is None:
+            if not create or index != len(parts) - 1:
+                return False
+            try:
+                current.mkdir(mode=0o700)
+            except FileExistsError:
+                value = _path_stat(current)
+                if value is None:
+                    raise BrowserMigrationError("browser configuration directory changed")
+            except OSError as error:
+                raise BrowserMigrationError("browser configuration directory could not be created") from error
+            value = _path_stat(current)
+        if stat.S_ISLNK(value.st_mode) or not stat.S_ISDIR(value.st_mode):
+            raise BrowserMigrationError("browser configuration directory is unsafe")
+        # Shared parent directories such as /tmp are expected to be owned by
+        # root.  The directory being used for owner state must belong to the
+        # current user; ancestors only need to be real directories.
+        if index == len(parts) - 1 and value.st_uid != _uid():
+            raise BrowserMigrationError("browser configuration directory owner is invalid")
+    return True
+
+
+def _safe_read(path, *, required=False, limit=MAX_CONFIGURATION_BYTES):
+    """Read an owner-owned regular file without following a symlink."""
+
+    path = Path(path)
+    value = _path_stat(path)
+    if value is None:
+        if required:
+            raise BrowserMigrationError("browser configuration is missing")
+        return None
+    if stat.S_ISLNK(value.st_mode) or not stat.S_ISREG(value.st_mode) or value.st_uid != _uid():
+        raise BrowserMigrationError("browser configuration file is unsafe")
+
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(path, flags)
+    except OSError as error:
+        raise BrowserMigrationError("browser configuration could not be read") from error
+    try:
+        opened = os.fstat(fd)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_uid != _uid()
+            or (opened.st_dev, opened.st_ino) != (value.st_dev, value.st_ino)
+            or opened.st_size > limit
+        ):
+            raise BrowserMigrationError("browser configuration file changed or is unsafe")
+        chunks = []
+        remaining = limit + 1
+        while remaining > 0:
+            chunk = os.read(fd, min(64 * 1024, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        raw = b"".join(chunks)
+        if len(raw) > limit:
+            raise BrowserMigrationError("browser configuration file is too large")
+        try:
+            content = raw.decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise BrowserMigrationError("browser configuration is not valid UTF-8") from error
+        return {
+            "content": content,
+            "device": int(opened.st_dev),
+            "inode": int(opened.st_ino),
+            "size": int(opened.st_size),
+            "mtime_ns": int(opened.st_mtime_ns),
+            "mode": stat.S_IMODE(opened.st_mode),
+        }
+    except BrowserMigrationError:
+        raise
+    except OSError as error:
+        raise BrowserMigrationError("browser configuration could not be read") from error
+    finally:
+        os.close(fd)
+
+
+def _same_snapshot(path, snapshot):
+    value = _path_stat(path)
+    if value is None or stat.S_ISLNK(value.st_mode) or not stat.S_ISREG(value.st_mode):
+        return False
+    return (
+        value.st_uid == _uid()
+        and int(value.st_dev) == snapshot["device"]
+        and int(value.st_ino) == snapshot["inode"]
+        and int(value.st_size) == snapshot["size"]
+        and int(value.st_mtime_ns) == snapshot["mtime_ns"]
+        and stat.S_IMODE(value.st_mode) == snapshot["mode"]
+    )
+
+
+def _atomic_write(path, content, *, mode=0o600, expected=None, must_not_exist=False):
+    """Atomically replace an owner file after checking its read snapshot."""
+
+    path = Path(path)
+    if not _check_directory(path.parent, create=False):
+        raise BrowserMigrationError("browser configuration directory is unavailable")
+
+    current = _path_stat(path)
+    if must_not_exist:
+        if current is not None:
+            raise BrowserMigrationError("browser migration marker appeared during update")
+    elif expected is not None:
+        if not _same_snapshot(path, expected):
+            raise BrowserMigrationError("browser configuration changed during update")
+    elif current is not None:
+        if stat.S_ISLNK(current.st_mode) or not stat.S_ISREG(current.st_mode) or current.st_uid != _uid():
+            raise BrowserMigrationError("browser configuration file is unsafe")
+
+    temporary = path.parent / f".{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    payload = content.encode("utf-8")
+    fd = None
+    try:
+        fd = os.open(temporary, flags, mode)
+        os.fchmod(fd, mode)
+        view = memoryview(payload)
+        while view:
+            written = os.write(fd, view)
+            if written <= 0:
+                raise OSError("short browser configuration write")
+            view = view[written:]
+        os.fsync(fd)
+        os.close(fd)
+        fd = None
+
+        if must_not_exist:
+            if _path_stat(path) is not None:
+                raise BrowserMigrationError("browser migration marker appeared during update")
+        elif expected is not None and not _same_snapshot(path, expected):
+            raise BrowserMigrationError("browser configuration changed during update")
+        os.replace(temporary, path)
+        try:
+            directory_fd = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        except OSError:
+            directory_fd = None
+        if directory_fd is not None:
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+    except BrowserMigrationError:
+        raise
+    except OSError as error:
+        raise BrowserMigrationError("browser configuration could not be written") from error
+    finally:
+        if fd is not None:
+            os.close(fd)
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            pass
+
+
+def migrate_favorites(favorites):
+    """Replace exact Firefox favorites while retaining order and custom apps."""
+
+    values = list(favorites)
+    if any(not isinstance(item, str) for item in values):
+        raise BrowserMigrationError("GNOME favorite applications are malformed")
+    if FIREFOX_FAVORITE_ID not in values:
+        return values, False
+
+    migrated = []
+    chrome_seen = False
+    for item in values:
+        if item == FIREFOX_FAVORITE_ID:
+            if not chrome_seen:
+                migrated.append(CHROME_DESKTOP_ID)
+                chrome_seen = True
+            continue
+        if item == CHROME_DESKTOP_ID:
+            if chrome_seen:
+                continue
+            chrome_seen = True
+        migrated.append(item)
+    return migrated, migrated != values
+
+
+def _line_body(line):
+    if line.endswith("\n"):
+        body = line[:-1]
+        newline = "\n"
+        if body.endswith("\r"):
+            body = body[:-1]
+            newline = "\r\n"
+        return body, newline
+    return line, ""
+
+
+_SECTION_RE = re.compile(r"^\s*\[([^\]\r\n]+)\]\s*$")
+
+
+def _association_ids(value):
+    """Parse a MIME association value and reject ambiguous syntax."""
+
+    value = value.strip()
+    if not value:
+        return []
+    pieces = value.split(";")
+    if pieces[-1].strip() == "":
+        pieces.pop()
+    if not pieces:
+        return []
+    result = []
+    for piece in pieces:
+        token = piece.strip()
+        if not token or any(character.isspace() for character in token):
+            raise BrowserMigrationError("MIME association value is malformed")
+        result.append(token)
+    return result
+
+
+def migrate_mime_content(content):
+    """Update only Firefox primary defaults in a MIME apps file.
+
+    The line-oriented parser deliberately leaves comments, ordering, unrelated
+    groups, and unrelated handlers byte-for-byte unchanged.
+    """
+
+    if not isinstance(content, str) or "\x00" in content:
+        raise BrowserMigrationError("MIME applications configuration is malformed")
+
+    lines = content.splitlines(keepends=True)
+    section = None
+    sections = set()
+    keys = set()
+    replacements = {}
+
+    for index, line in enumerate(lines):
+        body, newline = _line_body(line)
+        if "\r" in body:
+            raise BrowserMigrationError("MIME applications configuration is malformed")
+        stripped = body.strip()
+        if not stripped or stripped.startswith("#") or stripped.startswith(";"):
+            continue
+        section_match = _SECTION_RE.fullmatch(body)
+        if section_match:
+            section = section_match.group(1).strip()
+            if not section or section in sections:
+                raise BrowserMigrationError("MIME applications configuration is malformed")
+            sections.add(section)
+            continue
+        equals = body.find("=")
+        if section is None or equals <= 0:
+            raise BrowserMigrationError("MIME applications configuration is malformed")
+        key = body[:equals].strip()
+        if not key or (section, key) in keys:
+            raise BrowserMigrationError("MIME applications configuration is malformed")
+        keys.add((section, key))
+        if section != "Default Applications" or key not in TARGET_MIME_TYPES:
+            continue
+
+        associations = _association_ids(body[equals + 1 :])
+        if not associations or associations[0] not in FIREFOX_MIME_IDS:
+            continue
+
+        # Preserve the old Firefox ID and every other fallback.  Remove only
+        # duplicate Chrome entries so the new primary is deterministic.
+        migrated = [CHROME_DESKTOP_ID]
+        migrated.extend(item for item in associations if item != CHROME_DESKTOP_ID)
+        updated_value = ";".join(migrated) + ";"
+        replacements[index] = body[: equals + 1] + updated_value + newline
+
+    if not replacements:
+        return content, False
+    updated = "".join(replacements.get(index, line) for index, line in enumerate(lines))
+    return updated, updated != content
+
+
+def _config_home(home):
+    configured = os.environ.get("XDG_CONFIG_HOME")
+    path = Path(configured) if configured else Path(home) / ".config"
+    if not path.is_absolute():
+        raise BrowserMigrationError("XDG configuration path is not absolute")
+    return path
+
+
+def _read_marker(marker):
+    snapshot = _safe_read(marker)
+    if snapshot is None:
+        return False
+    if snapshot["content"] != MARKER_CONTENT:
+        raise BrowserMigrationError("browser migration marker is malformed")
+    return True
+
+
+def _read_explicit_favorites(settings):
+    try:
+        user_value = settings.get_user_value(FAVORITES_KEY)
+    except Exception as error:
+        raise BrowserMigrationError("GNOME favorites could not be inspected") from error
+    # A system default is intentionally not copied into the user's writable
+    # dconf database.  Only an explicit user value is eligible for migration.
+    if user_value is None:
+        return None
+    try:
+        values = settings.get_strv(FAVORITES_KEY)
+    except Exception as error:
+        raise BrowserMigrationError("GNOME favorites could not be read") from error
+    return values
+
+
+def _new_gio_settings():
+    try:
+        import gi
+
+        gi.require_version("Gio", "2.0")
+        from gi.repository import Gio
+
+        source = Gio.SettingsSchemaSource.get_default()
+        if source is None or source.lookup(FAVORITES_SCHEMA, True) is None:
+            raise BrowserMigrationError("GNOME settings schema is unavailable")
+        return Gio.Settings.new(FAVORITES_SCHEMA), Gio.Settings.sync
+    except Exception as error:
+        raise BrowserMigrationError("GNOME settings are unavailable") from error
+
+
+def _write_favorites(settings, sync, migrated):
+    try:
+        settings.set_strv(FAVORITES_KEY, migrated)
+        sync()
+        if list(settings.get_strv(FAVORITES_KEY)) != list(migrated):
+            raise BrowserMigrationError("GNOME favorites did not persist")
+    except BrowserMigrationError:
+        raise
+    except Exception as error:
+        raise BrowserMigrationError("GNOME favorites could not be updated") from error
+
+
+def run(home=None, *, settings=None):
+    """Run one safe migration; return ``True`` only after completion."""
+
+    if home is None:
+        try:
+            # Fedora may expose /home through a trusted /var/home alias.  The
+            # OS supplied passwd home is safe to canonicalize before checking
+            # its owner; user configuration paths below remain no-follow.
+            home = Path.home().resolve(strict=True)
+        except OSError as error:
+            raise BrowserMigrationError("user home is unavailable") from error
+    else:
+        # Test/injected homes and explicit paths stay lexical so a symlink is
+        # rejected by _check_directory rather than silently followed.
+        home = Path(os.path.abspath(home))
+    _check_directory(home, create=False)
+    config = _config_home(home)
+    config_exists = _check_directory(config, create=False)
+    state_dir = config / "zeus"
+    state_exists = _check_directory(state_dir, create=False) if config_exists else False
+    marker = state_dir / MARKER_FILENAME
+
+    if state_exists and _read_marker(marker):
+        return True
+
+    mime_path = config / "mimeapps.list"
+    mime_snapshot = _safe_read(mime_path) if config_exists else None
+    mime_updated = None
+    mime_changed = False
+    if mime_snapshot is not None:
+        mime_updated, mime_changed = migrate_mime_content(mime_snapshot["content"])
+
+    sync = None
+    if settings is None:
+        settings, sync = _new_gio_settings()
+    explicit = _read_explicit_favorites(settings)
+    favorites_updated = None
+    favorites_changed = False
+    if explicit is not None:
+        favorites_updated, favorites_changed = migrate_favorites(explicit)
+
+    if mime_changed:
+        _atomic_write(
+            mime_path,
+            mime_updated,
+            mode=mime_snapshot["mode"],
+            expected=mime_snapshot,
+        )
+    if favorites_changed:
+        if sync is None:
+            sync = getattr(settings, "sync", None)
+            if sync is None:
+                raise BrowserMigrationError("GNOME favorites synchronizer is unavailable")
+        _write_favorites(settings, sync, favorites_updated)
+
+    # Create the marker only after all applicable writes and post-write checks
+    # have succeeded.  Existing marker/configuration links are never replaced.
+    _check_directory(config, create=True)
+    _check_directory(state_dir, create=True)
+    _atomic_write(
+        marker,
+        MARKER_CONTENT,
+        mode=0o600,
+        must_not_exist=True,
+    )
+    return True
+
+
+def main():
+    if len(sys.argv) != 1:
+        print("Usage: zeus-browser-session", file=sys.stderr)
+        return 2
+    try:
+        run()
+    except BrowserMigrationError:
+        # Keep login output stable and free of owner paths or configuration
+        # contents.  The absent marker makes the next login retry safely.
+        print("Browser defaults migration deferred; it will retry next login.", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

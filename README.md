@@ -2,7 +2,7 @@
 
 A focused Fedora bootc laptop desktop with a macOS-inspired layout, original Zeus artwork, and native GNOME security and accessibility.
 
-The current version is **0.1.0-preview.2**. It includes a translucent top bar and floating dock, original icons, traffic-light window controls, compact application search (Super+Space), a New York dusk wallpaper, and a branded native login screen. GNOME/Wayland runs Files, Firefox, Ptyxis, Settings, and Welcome. The Rust `zeus` helper provides diagnostics, safe desktop fallback, signed updates, and validated SSH launch.
+The current version is **0.1.0-preview.2**. It includes a translucent top bar and floating dock, original icons, traffic-light window controls, compact application search (Super+Space), a New York dusk wallpaper, and a branded native login screen. GNOME/Wayland runs Files, Google Chrome, Ptyxis, Settings, and Welcome. The Rust `zeus` helper provides diagnostics, safe desktop fallback, signed updates, and validated SSH launch.
 
 The latest build brings **New York at dusk** to the desktop, lock screen and native login, with a larger, lighter lock clock and restrained translucent login controls. City and gradient backgrounds remain selectable in **Settings → Appearance**. [Screenshots and verification](docs/iterations/git-31f0851a9d07/README.md) record the signed update, accessibility, preservation and performance checks. The change adds no packages or background services.
 
@@ -80,4 +80,4 @@ The review VM now has a qualified signed preview updater for owner-triggered Upd
 - [Original design](docs/design-v0.1.md)
 - [Planning overview](docs/backlog-overview.md)
 
-Project code is MIT licensed. Original desktop artwork is CC0-1.0; Fedora packages retain their upstream licenses.
+Project code is MIT licensed. Original desktop artwork is CC0-1.0; Fedora packages and Google Chrome retain their upstream licenses. Chrome is Google's official proprietary browser; its binaries and trademarks are not covered by the Zeus code or artwork licenses.

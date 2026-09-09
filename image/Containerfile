@@ -1,8 +1,14 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE} AS desktop-base
 COPY image/packages.txt /tmp/zeus-packages.txt
-RUN dnf install -y --setopt=install_weak_deps=False $(cat /tmp/zeus-packages.txt) && \
-    dnf clean all && rm -f /tmp/zeus-packages.txt
+COPY image/repos/google-chrome.repo /etc/yum.repos.d/google-chrome.repo
+COPY image/keys/google-linux.asc /etc/pki/rpm-gpg/RPM-GPG-KEY-google-linux
+RUN dnf install -y --enable-repo=google-chrome --setopt=install_weak_deps=False $(cat /tmp/zeus-packages.txt) && \
+    dnf clean all && rm -f /tmp/zeus-packages.txt /etc/cron.daily/google-chrome && \
+    printf 'repo_add_once="false"\n' > /etc/default/google-chrome
+# Chrome's RPM configures its own repo. Keep the verified, restricted build repo;
+# the running immutable OS receives browser upgrades through signed Zeus Updates.
+COPY image/repos/google-chrome.repo /etc/yum.repos.d/google-chrome.repo
 
 FROM ${BASE_IMAGE} AS cli-builder
 RUN dnf install -y --setopt=install_weak_deps=False cargo rust gcc && dnf clean all
@@ -39,14 +45,18 @@ COPY zeus/assets/org.zeus.Welcome.desktop /usr/share/applications/org.zeus.Welco
 COPY image/inputs.json /usr/share/zeus/inputs.json
 COPY security/allowed_signers /usr/share/zeus/update-allowed-signers
 COPY scripts/validate-bluetooth-audio.py /tmp/zeus-validate-bluetooth-audio.py
+COPY scripts/validate-browser.py /tmp/zeus-validate-browser.py
 # Foreign-architecture build emulators register dozens of binfmt handlers at
 # every boot. They are optional development tools, not laptop runtime packages.
 RUN dnf remove -y --disable-repo='*' 'qemu-user-static*' && \
     python3 /tmp/zeus-validate-bluetooth-audio.py --load-plugins --json && \
-    rm /tmp/zeus-validate-bluetooth-audio.py && \
+    python3 /tmp/zeus-validate-browser.py && \
+    rm /tmp/zeus-validate-bluetooth-audio.py /tmp/zeus-validate-browser.py && \
     chmod 0644 /usr/share/backgrounds/zeus/zeus-city-new-york-dusk.png /usr/share/gnome-background-properties/zeus.xml && \
     chmod 0644 /usr/share/gnome-shell/extensions/zeus-lock-background@kanterlabs/extension.js /usr/share/gnome-shell/extensions/zeus-lock-background@kanterlabs/metadata.json && \
     chmod 0755 /usr/libexec/zeus-welcome /usr/libexec/zeus-settings-window && \
+    chmod 0755 /usr/libexec/zeus-browser-session && \
+    chmod 0644 /etc/xdg/autostart/zeus-browser.desktop /etc/xdg/mimeapps.list /etc/opt/chrome/policies/recommended/zeus.json && \
     chmod 0644 /usr/lib/zeus/settings_model.py /usr/share/applications/org.zeus.Settings.desktop /usr/share/icons/hicolor/scalable/apps/org.zeus.Settings.svg && \
     glib-compile-schemas /usr/share/gnome-shell/extensions/zeus-shell@kanterlabs/schemas && \
     dconf update && \

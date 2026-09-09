@@ -1,0 +1,8 @@
+# Prefer the installed Chrome desktop entry for browser content and schemes.
+# Firefox remains second so a retained release without Chrome can resolve the
+# first installed application through GLib's ordered association fallback.
+[Default Applications]
+x-scheme-handler/http=google-chrome.desktop;org.mozilla.firefox.desktop;
+x-scheme-handler/https=google-chrome.desktop;org.mozilla.firefox.desktop;
+text/html=google-chrome.desktop;org.mozilla.firefox.desktop;
+application/xhtml+xml=google-chrome.desktop;org.mozilla.firefox.desktop;

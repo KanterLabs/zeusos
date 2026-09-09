@@ -44,7 +44,9 @@ Trash, which would retain the storage the feature is intended to reclaim.
 - Detect an existing `~/Temp`. Never adopt or clear it silently. Resolve the name
   collision through an explicit setup choice before enabling cleanup.
 - Existing explicit browser download destinations remain owner choices. Offer to
-  switch them; verify Firefox, file chooser and sandboxed app behavior separately.
+  switch them; verify Chrome, file chooser and sandboxed app behavior separately.
+  The [Chrome integration](google-chrome.md) replaces the initial Firefox default
+  while preserving Firefox data and existing Downloads.
 - Cleanup must operate only on the provisioned, owner-specific Temp directory.
   Reject a symlinked root; never follow child symlinks, traverse mounted filesystems,
   or accept arbitrary deletion roots from preferences. Test path replacement races.
@@ -83,7 +85,7 @@ Trash, which would retain the storage the feature is intended to reclaim.
 
 - Measure actual rendered control circles and hit targets at 100% and 200% scaling;
   check light/dark, keyboard focus, hover and all three window actions in GTK3/GTK4.
-- Fresh account: Temp is private and the standard download destination. Test Firefox
+- Fresh account: Temp is private and the standard download destination. Test Chrome
   downloads, save dialogs and a sandboxed app; report applications that ignore it.
 - Populated account: existing Downloads, existing Temp, custom paths and unrelated
   documents survive migration byte-for-byte. Re-running setup is idempotent.

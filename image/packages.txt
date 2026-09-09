@@ -9,7 +9,7 @@ gnome-keyring-pam
 gnome-shell-extension-dash-to-dock
 nautilus
 ptyxis
-firefox
+google-chrome-stable
 xdg-desktop-portal-gnome
 xdg-user-dirs-gtk
 pipewire
