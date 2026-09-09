@@ -2,11 +2,11 @@
 
 A focused Fedora bootc laptop desktop with a macOS-inspired layout, original Zeus artwork, and native GNOME security and accessibility.
 
-The first version is **0.1.0-preview.1**. It includes GNOME/Wayland, a centered dock, light/dark wallpapers, native login and lock screen, Files, Firefox, Ptyxis, Settings, and a small Welcome app. The Rust `zeus` helper provides diagnostics, safe desktop fallback, read-only update status, and validated SSH launch.
+The current version is **0.1.0-preview.2**. It includes a translucent top bar and floating dock, original icons, traffic-light window controls, compact application search (Super+Space), coordinated light/dark artwork, and a branded native login screen. GNOME/Wayland runs Files, Firefox, Ptyxis, Settings, and Welcome. The Rust `zeus` helper provides diagnostics, safe desktop fallback, read-only update status, and validated SSH launch.
 
-![Zeus OS desktop preview](docs/releases/preview-1/desktop.png)
+![Zeus OS desktop preview](docs/releases/preview-2/desktop.png)
 
-Deployment and measured results are recorded in the [preview VM runbook](docs/preview-vm.md) and [release notes](docs/releases/preview-1.md). An image build alone is not a graphical or performance test.
+Deployment and measured results are recorded in the [preview VM runbook](docs/preview-vm.md) and [release notes](docs/releases/preview-2.md). An image build alone is not a graphical or performance test.
 
 ## Build
 
@@ -34,7 +34,7 @@ sudo zeus update status
 zeus dev --target user@your-dev-host
 ```
 
-Safe desktop disables the optional dock; native GNOME remains usable and personal files and preferences stay in place. Applying an OS update or reboot is always explicit. The preview does not configure an unattended update channel.
+Safe desktop disables the optional Zeus shell and dock and removes managed GTK styling imports; native GNOME remains usable and personal files and preferences stay in place. Applying an OS update or reboot is always explicit. The preview does not configure an unattended update channel.
 
 ## Validation
 

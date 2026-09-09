@@ -139,13 +139,13 @@ ssh-keygen -Y verify \
   -f security/allowed_signers \
   -I zeusos-preview \
   -n zeusos-release \
-  -s docs/releases/preview-1/SHA256SUMS.sig \
-  < docs/releases/preview-1/SHA256SUMS
+  -s docs/releases/preview-2/SHA256SUMS.sig \
+  < docs/releases/preview-2/SHA256SUMS
 
 repo_dir=/path/to/zeusos
-# Place both named artifacts in /path/to/verified-artifacts first.
+# Place the named archive in /path/to/verified-artifacts first.
 (cd /path/to/verified-artifacts && \
-  sha256sum -c "$repo_dir/docs/releases/preview-1/SHA256SUMS")
+  sha256sum -c "$repo_dir/docs/releases/preview-2/SHA256SUMS")
 ```
 
 Run the signature check from an independently obtained checkout or verification
@@ -188,7 +188,7 @@ fails.
    permissions, and checksum before switching:
 
    ```sh
-   ROOTOWNED_ARCHIVE=/var/lib/zeus/updates/release/zeusos-preview-1-release.oci
+   ROOTOWNED_ARCHIVE=/var/lib/zeus/updates/preview-2-final/zeusos-preview-2.oci
    sudo stat -c '%U:%G %a %n' "$ROOTOWNED_ARCHIVE"
    sudo sha256sum "$ROOTOWNED_ARCHIVE"
    ```
@@ -277,6 +277,28 @@ The declared comparison and budgets are in
 [`preview-1-budgets.md`](releases/preview-1-budgets.md). Record actual values
 and variability; the 4-vCPU/8-GiB VM allocation is not performance evidence.
 
+## Current Preview 2 deployment
+
+VM 115 runs source `c11e57b8569b2332bbd570b6aef51d79b5c38cec`, booted
+manifest `sha256:c35a6a8a2a42a42b508c74bf55e0ae5022d4848d0cfaff11816d56295aec22e5`.
+The [Preview 2 notes](releases/preview-2.md) and
+[receipt](releases/preview-2/build-receipt.json) record the six visual changes,
+console checks, signed OCI artifact and idle sample.
+
+The final archive is root-owned under `/var/lib/zeus/updates/preview-2-final/`
+and retained on Proxmox at
+`/mnt/pve/sata-ssd/zeusos/releases/0.1.0-preview.2/`.
+The populated backup above passed both zstd and VMA verification. Four owner
+files survived, including one created after that backup. No restore or disk
+replacement was performed. The previous backup was pruned by the existing
+keep-last-one policy; historical Preview 1 backup paths are not current targets.
+
+The bootc rollback slot currently contains the initial Preview 2 candidate,
+which predates the shell startup fixes. This revision did not repeat a
+rollback/re-forward cycle; use the safe-desktop command for a presentation
+fallback. The separately retained Preview 1 release archive is still available
+for a reviewed manual OS recovery; it does not require restoring owner data.
+
 ## Preview 1 historical qualification
 
 The previous Preview 1 release used source `38bb7fc53002a76dbfa4a5c891c3d1b1bbdb4f20`
@@ -308,7 +330,7 @@ results are in the [release receipt](releases/preview-1/build-receipt.json) and
 The final generic artifacts and signed checksums are retained on Proxmox at
 `/mnt/pve/sata-ssd/zeusos/releases/0.1.0-preview.1/release/`. The isolated builder
 is shut down after assembly; VM 115 remains running for review. Its native
-idle lock remains enabled, so use the private credentials file if it locks.
+idle lock remains enabled, so use the requested preview password if it locks.
 
 This work changed only the dedicated Zeus guests and related artifact/backup
 paths. The final comparison found 21 unrelated guest configuration hashes

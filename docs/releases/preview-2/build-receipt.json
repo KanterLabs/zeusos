@@ -1,0 +1,33 @@
+{
+  "version": "0.1.0-preview.2",
+  "source_commit": "c11e57b8569b2332bbd570b6aef51d79b5c38cec",
+  "image_config_digest": "sha256:e3d95f723ceddf435ed0ffff2fa89bcd6e6cfb982bf6da2e7c659961c661b105",
+  "booted_manifest_digest": "sha256:c35a6a8a2a42a42b508c74bf55e0ae5022d4848d0cfaff11816d56295aec22e5",
+  "artifacts": {
+    "zeusos-preview-2.oci": {
+      "sha256": "ce4627880d579d0faf6e516a6b0c4bb9a46935df4e02479f117b705a3d7958cb",
+      "bytes": 1808356352
+    }
+  },
+  "validation": {
+    "python_tests": 17,
+    "installed_settings": 69,
+    "gtk3_parser": "passed",
+    "gtk4_parser": "passed",
+    "native_login": "passed",
+    "lock_unlock": "passed",
+    "safe_restore": "passed",
+    "preserved_files": 4,
+    "backup_zstd": "passed",
+    "backup_vma": "passed",
+    "backup_restore": "not run",
+    "rollback_this_revision": "not run",
+    "secure_boot": true,
+    "selinux": "Enforcing",
+    "failed_system_units": 0,
+    "github_archive_digest_matches": true
+  },
+  "measurements": {
+    "zeus": "idle-zeus.json"
+  }
+}

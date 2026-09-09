@@ -1,0 +1,30 @@
+{
+  "label": "preview-2-zeus",
+  "settle_seconds": 60,
+  "interval_seconds": 4,
+  "samples": [
+    {
+      "cpu_percent": 0.313,
+      "memory_used_mib": 1053.8
+    },
+    {
+      "cpu_percent": 0.25,
+      "memory_used_mib": 1053.8
+    },
+    {
+      "cpu_percent": 0.375,
+      "memory_used_mib": 1053.8
+    },
+    {
+      "cpu_percent": 0.125,
+      "memory_used_mib": 1053.8
+    },
+    {
+      "cpu_percent": 0.313,
+      "memory_used_mib": 1053.8
+    }
+  ],
+  "median_cpu_percent": 0.313,
+  "median_memory_used_mib": 1053.8,
+  "memory_definition": "MemTotal minus MemAvailable; includes non-reclaimable guest memory"
+}
