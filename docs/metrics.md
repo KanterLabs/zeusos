@@ -796,3 +796,21 @@ or battery-hours from VM counters.
   recorded in the signed release receipt. No physical laptop installation or
   new boot-time/battery measurement is claimed.
 - Evidence: [owner choice and recovery](iterations/installer-20260910/owner-choice-recovery.md).
+
+### 2026-09-10 17:33 UTC — GRUB finalization continuation
+
+- Product stays `0.1.0-preview.2`. Error-phase continuation now requires the
+  executor's explicit final boot-menu boundary and current target proof.
+- Parent installer suite: 180 tests passed in 12.524 seconds. The coupled
+  backend/executor test crosses error → installing → installed and confirms
+  that the only mutating command on retry is Fedora GRUB regeneration.
+- Controller/roundtrip checks: 52 passed in 0.505 seconds. Failed calls clear
+  stale eligibility; qualified finalization uses the saved plan.
+- Owner-shaped inventory verification accepts canonical and raw Fedora
+  aliases and refuses changed partition or mount identity. These are injected
+  inventory checks, not a physical laptop continuation.
+- The independent 14-file Fedora VM backup was reverified before packaging.
+  Installed-RPM fixture tests, full GPT/file preservation, and exact-commit CI
+  results are recorded in the signed release receipt.
+- No new OS image, boot-time measurement, or battery measurement. Evidence:
+  [GRUB finalization record](iterations/installer-20260910/grub-finalization.md).

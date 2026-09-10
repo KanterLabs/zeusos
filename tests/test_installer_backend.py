@@ -311,6 +311,70 @@ class BackendTests(TempRootMixin, unittest.TestCase):
                 installer_backend._invoke_helper(action, without_backup=True)
             self.assertEqual(context.exception.code, "invalid_action")
 
+    def test_finalization_error_requires_explicit_executor_proof(self) -> None:
+        for proof in (True, False):
+            with self.subTest(proof=proof):
+                calls = []
+                class Executor:
+                    qualified = True
+                    def can_resume_finalization(self, record):
+                        return record.get("error") == "grub_invalid"
+                    def verify_finalization_resume(self, **kwargs):
+                        calls.append("verify")
+                        return proof
+                    def execute(self, **kwargs):
+                        calls.append("execute")
+                        return {"phase": "installed"}
+                service = self._backend(executor=Executor())
+                service.prepare(plan())
+                record = service.journal.load()
+                service.journal.transition(record, installer_backend.PHASE_ERROR, error="grub_invalid")
+                self.assertTrue(service.status()["can_resume_finalization"])
+                if proof:
+                    self.assertEqual(service.install()["phase"], "installed")
+                    self.assertEqual(calls, ["verify", "execute"])
+                else:
+                    with self.assertRaises(installer_backend.InstallError) as context:
+                        service.install()
+                    self.assertEqual(context.exception.code, "target_mismatch")
+                    self.assertEqual(calls, ["verify"])
+                # The fixture shares a temporary root across subtests.
+                service.journal.path.unlink()
+                for artifact in service.journal.artifacts_path.iterdir():
+                    artifact.unlink()
+
+    def test_finalization_still_verifies_artifact_before_executor_proof(self) -> None:
+        calls = []
+        class Executor:
+            qualified = True
+            def can_resume_finalization(self, record):
+                return True
+            def verify_finalization_resume(self, **kwargs):
+                calls.append("verify")
+                return True
+            def execute(self, **kwargs):
+                calls.append("execute")
+                return {"phase": "installed"}
+        service = self._backend(executor=Executor())
+        service.prepare(plan())
+        record = service.journal.load()
+        Path(record["artifact"]["path"]).write_bytes(b"corrupt")
+        service.journal.transition(record, installer_backend.PHASE_ERROR, error="grub_invalid")
+        with self.assertRaises(installer_backend.InstallError) as context:
+            service.install()
+        self.assertEqual(context.exception.code, "artifact_tampered")
+        self.assertEqual(calls, [])
+
+    def test_unqualified_or_unknown_error_cannot_resume_finalization(self) -> None:
+        service = self._backend()
+        service.prepare(plan())
+        record = service.journal.load()
+        service.journal.transition(record, installer_backend.PHASE_ERROR, error="grub_invalid")
+        self.assertFalse(service.status()["can_resume_finalization"])
+        with self.assertRaises(installer_backend.InstallError):
+            service.install()
+        self.assertEqual(service.journal.load()["phase"], "error")
+
     def test_prepare_stages_verified_release_and_reports_progress(self) -> None:
         updates: list[dict[str, object]] = []
         service = self._backend()

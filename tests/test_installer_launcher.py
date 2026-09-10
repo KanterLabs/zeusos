@@ -783,6 +783,123 @@ class ControllerGateTests(unittest.TestCase):
         with self.assertRaises(gui.BackendUnavailableError):
             controller.request_restart()
 
+    def test_finalization_error_flag_enables_only_qualified_continuation(self):
+        plan = {
+            "supported": True,
+            "blockers": [],
+            "target": {"allocation_gib": 128},
+            "fingerprint": "sha256:" + "g" * 64,
+        }
+        for qualified, expected in ((True, True), (False, False)):
+            with self.subTest(qualified=qualified):
+                calls = []
+
+                def install(*args, **kwargs):
+                    calls.append((args, kwargs))
+                    return {"ok": True, "phase": "installed"}
+
+                backend = types.SimpleNamespace(
+                    status=lambda: {
+                        "ok": False,
+                        "phase": "error",
+                        "error": "grub_invalid",
+                        "can_resume_finalization": True,
+                        "plan": plan,
+                    },
+                    qualification=lambda: {"qualified": qualified, "status": "qualified"},
+                    prepare=lambda *_args, **_kwargs: {"ok": True, "state": "ready"},
+                    install=install,
+                    restart=lambda: {"ok": True},
+                )
+                controller = gui.InstallerController(backend_module=backend)
+                controller.refresh()
+                self.assertTrue(controller.resume_pending)
+                self.assertEqual(controller.can_install(), expected)
+                if expected:
+                    controller.install()
+                    self.assertEqual(calls, [((), {})])
+                else:
+                    self.assertEqual(calls, [])
+
+    def test_unrelated_error_status_is_not_resume_eligible(self):
+        plan = {
+            "supported": True,
+            "blockers": [],
+            "target": {"allocation_gib": 128},
+            "fingerprint": "sha256:" + "h" * 64,
+        }
+        backend = types.SimpleNamespace(
+            status=lambda: {
+                "ok": False,
+                "phase": "error",
+                "error": "executor_failed",
+                "can_resume_finalization": False,
+                "plan": plan,
+            },
+            qualification=lambda: {"qualified": True, "status": "qualified"},
+            prepare=lambda *_args, **_kwargs: {"ok": True, "state": "ready"},
+            install=lambda *_args, **_kwargs: {"ok": True, "phase": "installed"},
+            restart=lambda: {"ok": True},
+        )
+        controller = gui.InstallerController(backend_module=backend)
+        controller.refresh()
+        self.assertFalse(controller.resume_pending)
+        self.assertFalse(controller.can_install())
+        self.assertFalse(controller.can_prepare())
+        self.assertTrue(controller.operation_blocked)
+
+    def test_failed_install_clears_old_resume_flags_without_extra_status_call(self):
+        calls = []
+
+        def status():
+            calls.append("status")
+            return {
+                "ok": False,
+                "phase": "error",
+                "error": "grub_conflict",
+                "can_resume_finalization": True,
+                "plan": {
+                    "supported": True,
+                    "blockers": [],
+                    "target": {"allocation_gib": 128},
+                    "fingerprint": "sha256:" + "i" * 64,
+                },
+            }
+
+        def install():
+            calls.append("install")
+            raise RuntimeError("fixture executor failure")
+
+        backend = types.SimpleNamespace(
+            status=status,
+            qualification=lambda: {"qualified": True, "status": "qualified"},
+            prepare=lambda *_args, **_kwargs: {"ok": True, "state": "ready"},
+            install=install,
+            restart=lambda: {"ok": True},
+        )
+        controller = gui.InstallerController(backend_module=backend)
+        controller.refresh()
+        self.assertTrue(controller.resume_pending)
+        self.assertTrue(controller.can_install())
+        with self.assertRaisesRegex(InstallerError, "could not run safely"):
+            controller.install()
+        self.assertEqual(calls, ["status", "install"])
+        self.assertFalse(controller.resume_pending)
+        self.assertFalse(controller.prepared)
+        self.assertFalse(controller.can_install())
+        self.assertFalse(controller.can_prepare())
+        self.assertTrue(controller.operation_blocked)
+
+    def test_grub_error_message_includes_backend_path(self):
+        message = gui._status_error_message(
+            {
+                "error": "grub_invalid",
+                "message": "The managed entry at /etc/grub.d/40_zeus is invalid.",
+            }
+        )
+        self.assertIn("GRUB", message)
+        self.assertIn("/etc/grub.d/40_zeus", message)
+
     def test_prepared_status_reuses_journal_plan_and_enables_install(self):
         calls: list[str] = []
 

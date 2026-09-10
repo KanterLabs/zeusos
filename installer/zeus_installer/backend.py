@@ -1501,6 +1501,19 @@ class InstallerBackend:
             finally:
                 os.close(descriptor)
 
+    def _can_resume_finalization(self, record: Mapping[str, Any] | None) -> bool:
+        """Advertise only the qualified executor's explicit finalization boundary."""
+        if not isinstance(record, Mapping) or record.get("phase") != PHASE_ERROR:
+            return False
+        executor = self.maintenance_executor
+        predicate = getattr(executor, "can_resume_finalization", None)
+        if getattr(executor, "qualified", False) is not True or not callable(predicate):
+            return False
+        try:
+            return predicate(record) is True
+        except Exception:
+            return False
+
     def _prepared_result(self, record: Mapping[str, Any], *, ok: bool = True) -> dict[str, Any]:
         phase = str(record.get("phase", PHASE_ERROR))
         result: dict[str, Any] = {
@@ -1518,6 +1531,7 @@ class InstallerBackend:
             "operation_id": record.get("operation_id"),
             "updated_at": record.get("updated_at"),
             "can_recover_prewrite": self._can_recover_prewrite(record),
+            "can_resume_finalization": self._can_resume_finalization(record),
         }
         # Surface an explicit owner-declined backup choice without exposing a
         # synthetic receipt. The executor state is root-owned and may be
@@ -2194,6 +2208,17 @@ class InstallerBackend:
     ) -> None:
         """Revalidate the target, including an explicit reboot resume proof."""
 
+        if record.get("phase") == PHASE_ERROR:
+            verifier = getattr(executor, "verify_finalization_resume", None)
+            if not self._can_resume_finalization(record) or not callable(verifier):
+                raise InstallError("recovery_not_allowed", "This failure has no qualified finalization resume path.")
+            try:
+                verified = verifier(plan=plan, record=record, inventory=inventory)
+            except Exception as error:
+                raise InstallError("target_unverified", "The finalization target could not be revalidated.") from error
+            if verified is not True:
+                raise InstallError("target_mismatch", "The finalization target no longer matches the recorded installation.")
+            return
         try:
             validate_target(plan, inventory)
             return
@@ -2271,7 +2296,15 @@ class InstallerBackend:
                     "unsupported_plan", "The preflight plan contains blockers and cannot be installed."
                 )
             self._refuse_interrupted(record)
-            if record is None or record.get("phase") not in {PHASE_PREPARED, PHASE_REBOOT_REQUIRED}:
+            if record is None or (
+                record.get("phase") not in {PHASE_PREPARED, PHASE_REBOOT_REQUIRED}
+                and not self._can_resume_finalization(record)
+            ):
+                if record is not None and record.get("phase") == PHASE_ERROR:
+                    raise InstallError(
+                        "recovery_not_allowed",
+                        "The saved installation failure needs review before it can continue.",
+                    )
                 raise InstallError(
                     "not_prepared", "Prepare a verified Zeus artifact before installation."
                 )
@@ -2347,7 +2380,7 @@ class InstallerBackend:
                     record = self._reload_record()
                     error_message = (
                         str(error)[:2048]
-                        if code in {"backup_receipt_missing", "backup_unverified", "file_missing"}
+                        if code in {"backup_receipt_missing", "backup_unverified", "file_missing", "grub_invalid", "grub_conflict"}
                         else "The maintenance operation did not complete safely."
                     )
                     record = self.journal.transition(

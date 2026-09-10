@@ -429,6 +429,8 @@ def _status_error_message(status: Mapping[str, Any]) -> str:
             "backup, or explicitly choose Install without a backup to continue."
         ),
         "file_missing": "A required installer file was missing before installation could start.",
+        "grub_invalid": "The Fedora GRUB finalization check failed.",
+        "grub_conflict": "The Fedora Zeus GRUB entry changed before finalization could complete.",
     }
     if error == "file_missing" and status.get("can_recover_prewrite") is True:
         messages[error] = (
@@ -526,19 +528,60 @@ class InstallerController:
                 and not self.resume_blocked
             )
             return True
+        if (
+            phase == "error"
+            and isinstance(status, Mapping)
+            and status.get("can_resume_finalization") is True
+        ):
+            # The backend sets this only for a qualified stage-two GRUB
+            # finalization boundary. Keep the persisted plan and let install()
+            # continue it without forwarding a freshly collected plan.
+            self.resume_status = dict(status)
+            self.resume_pending = True
+            self.resume_blocked = False
+            self.operation_pending = False
+            self.operation_blocked = False
+            self.plan = _status_display_plan(status, self.allocation_gib, phase)
+            self.preparation = status
+            self.prepared = False
+            self.installation = None
+            self.reboot_ready = False
+            self.terminal = False
+            self.last_error = _status_error_message(status)
+            return True
         if isinstance(status, Mapping) and phase in JOURNAL_PHASES:
             # A prepared or interrupted journal is already authoritative.
             # Recollecting here could offer a second allocation while a
             # root-owned operation is still bound to the first one.
             self.resume_status = dict(status)
+            self.resume_pending = False
+            self.resume_blocked = False
             self.operation_pending = True
             self.operation_blocked = phase != "prepared" or not _result_ok(status)
             self.plan = _status_display_plan(status, self.allocation_gib, phase)
             self.preparation = status
             self.prepared = phase == "prepared" and _result_ok(status)
+            self.installation = None
+            self.reboot_ready = False
+            self.terminal = False
             self.last_error = _status_error_message(status)
             return True
         return False
+
+    def _clear_failed_install(self) -> None:
+        """Disable all continuation actions until the next explicit review."""
+
+        self.preparation = None
+        self.installation = None
+        self.resume_status = None
+        self.resume_pending = False
+        self.resume_blocked = False
+        self.operation_pending = True
+        self.operation_blocked = True
+        self.terminal = False
+        self.prepared = False
+        self.reboot_ready = False
+        self.last_error = None
 
     def refresh(self, allocation_gib: int | None = None) -> dict[str, Any]:
         if allocation_gib is not None:
@@ -765,11 +808,17 @@ class InstallerController:
                 # and fixtures whose install method accepts only a plan.
                 result = function() if self.resume_pending else function(self.plan or {})
         except BackendUnavailableError:
+            self._clear_failed_install()
             raise
         except Exception as error:  # pragma: no cover - backend-specific failures
+            self._clear_failed_install()
             raise InstallerError("The qualified installer executor could not run safely.") from error
         if not _result_ok(result):
-            message = result.get("message") if isinstance(result, Mapping) else None
+            if isinstance(result, Mapping) and self._consume_status(result):
+                message = _status_error_message(result)
+            else:
+                self._clear_failed_install()
+                message = result.get("message") if isinstance(result, Mapping) else None
             raise InstallerError(_safe_text(message, "The backend refused to install this plan."))
         self.installation = result
         self.reboot_ready = _result_reboot_ready(result)
@@ -1515,12 +1564,25 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
                         "Restart is unavailable because this installer build has not completed testing."
                     )
             elif controller.resume_pending:
-                self._status.set_text(
-                    "A maintenance operation is waiting after reboot. Continue installation to resume the recorded plan."
+                status = controller.resume_status or {}
+                error_code = (
+                    _safe_text(status.get("error") or status.get("code")).lower()
+                    if isinstance(status, Mapping)
+                    else ""
                 )
-                self._footer.set_text(
-                    "Continue uses the original root-owned journal plan after the Fedora reboot boundary."
-                )
+                if error_code in {"grub_invalid", "grub_conflict"}:
+                    detail = controller.last_error or _status_error_message(status)
+                    self._status.set_text(
+                        f"{detail} Continue installation to retry the recorded finalization."
+                    )
+                    self._footer.set_text("Finish the remaining boot-menu setup using the saved installation.")
+                else:
+                    self._status.set_text(
+                        "A maintenance operation is waiting after reboot. Continue installation to resume the recorded plan."
+                    )
+                    self._footer.set_text(
+                        "Continue uses the original root-owned journal plan after the Fedora reboot boundary."
+                    )
             elif controller.resume_blocked:
                 self._status.set_text(
                     "The recorded reboot boundary could not be verified. Restart and continuation are disabled pending review."
@@ -1774,7 +1836,7 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
         def _install_clicked(self, _button: Any) -> None:
             without_backup = self._without_backup_check.get_active() is True
             self._set_busy(True, "Installing Zeus…")
-            self._footer.set_text("Working on the reviewed plan; Fedora is unchanged.")
+            self._footer.set_text("Finishing reviewed installation…")
             self._progress_determinate = False
             self._progress.set_fraction(0.0)
             self._progress.set_text("Installing Zeus…")
