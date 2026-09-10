@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-10T14:19:15Z",
+  "vmid": 118,
+  "dmi_uuid": "29f40b00-bc18-4ff3-82da-1d9006d7db4c",
+  "root_os": "fedora",
+  "scope": "menu-only rehearsal; no destructive operation was invoked; Zeus filesystems remained unmounted and were not read",
+  "independent_menu_copy": {
+    "path": "out/installer/tmp/vm118-menu-before.sh",
+    "bytes": 328,
+    "mode": "0755",
+    "sha256": "17e858ba66ae3bd29c406ed912c6ba519ae7f7a71e4555ea1b71611604e1b466"
+  },
+  "journal": {
+    "path": "/var/lib/zeus/installer/journal.json",
+    "operation_id": "1d69f6bb-c85e-4615-8086-c5ae24e6238a",
+    "phase_before": "installed",
+    "removal_phase_during_test": "menu_disabled",
+    "removal_state_cleared_after_exact_restore": true,
+    "final_record_matches_pretest_record": true
+  },
+  "plan": {
+    "plan_id": "1d69f6bb-c85e-4615-8086-c5ae24e6238a",
+    "plan_digest": "020b9f537cb7bd7f4a3492848195fe22dfdde61ccd2cf13e15607bc8c28447fe",
+    "mode": "menu_only",
+    "menu_action": "remove_managed_script",
+    "recorded_menu_sha256": "17e858ba66ae3bd29c406ed912c6ba519ae7f7a71e4555ea1b71611604e1b466",
+    "disk": {
+      "path": "/dev/sda",
+      "guid": "c7ca432a-3aa0-4c61-95c7-7c06037adabf"
+    },
+    "zeus_partitions": [
+      {
+        "number": 4,
+        "path": "/dev/sda4",
+        "guid": "2796ae19-20a7-4499-8b9a-293c4901938e",
+        "mounted": false
+      },
+      {
+        "number": 5,
+        "path": "/dev/sda5",
+        "guid": "7494a6ed-5a72-4f54-b9e6-cab7ec801727",
+        "mounted": false
+      },
+      {
+        "number": 6,
+        "path": "/dev/sda6",
+        "guid": "d6dcbcaa-df8a-4959-9a1e-839024457831",
+        "mounted": false
+      }
+    ],
+    "backup": null,
+    "operations": [
+      {
+        "kind": "remove_file",
+        "path": "/etc/grub.d/42_zeus_dualboot",
+        "expected_sha256": "17e858ba66ae3bd29c406ed912c6ba519ae7f7a71e4555ea1b71611604e1b466"
+      },
+      {
+        "kind": "regenerate_grub",
+        "argv": [
+          "/usr/sbin/grub2-mkconfig",
+          "--no-grubenv-update",
+          "-o",
+          "/boot/grub2/grub.cfg"
+        ]
+      }
+    ]
+  },
+  "cancellation": {
+    "cancelled": true,
+    "mutated": false,
+    "operations": []
+  },
+  "repeat": {
+    "plan_action": "already_disabled",
+    "plan_operations": [],
+    "executor_state": "menu_disabled",
+    "executor_idempotent": true,
+    "executor_mutated": false
+  },
+  "commands": {
+    "removal": [
+      [
+        "/usr/sbin/grub2-mkconfig",
+        "--no-grubenv-update",
+        "-o",
+        "/boot/grub2/grub.cfg"
+      ]
+    ],
+    "restoration": [
+      [
+        "/usr/sbin/grub2-mkconfig",
+        "--no-grubenv-update",
+        "-o",
+        "/boot/grub2/grub.cfg"
+      ]
+    ],
+    "destructive_partition_commands": []
+  },
+  "gpt": {
+    "table_sha256_before_after_restore": "90edcd305f034aeed5beee7db6ad6d323ede4b8112a2ca9117353063b0e15a25",
+    "partition_count_before_after": 6,
+    "partition_layout_unchanged": true,
+    "automatic_reallocation_or_growth": false
+  },
+  "grub": {
+    "defaults_sha256_before_after": "7340e96f1a53599872f3dc4e72cfd53489d9485392a2be3bbeb570cd63ec1f2f",
+    "grubenv_sha256_before_after": "f56b20113aeb286c61840f95c7685721981e71702f5e736faa478c0ce3955054",
+    "config_sha256_before": "d7b003f4d681c6a63a516027a2abf7ec7bc3ce962f14a34ec8d773fbd92a465a",
+    "config_sha256_after_menu_only": "6a1538c51ca9c27057094588136ef261812ce5eb6163aefa0c76c332a303e8bc",
+    "config_sha256_after_restore": "d7b003f4d681c6a63a516027a2abf7ec7bc3ce962f14a34ec8d773fbd92a465a",
+    "menu_absent_during_check": true,
+    "zeus_entry_absent_during_check": true,
+    "exact_menu_copy_restored": true,
+    "other_generated_blocks_unchanged": true,
+    "removed_generated_block": [
+      "### BEGIN /etc/grub.d/42_zeus_dualboot ###",
+      "menuentry 'Zeus OS' --id 'zeusos-dualboot' {",
+      "    insmod part_gpt",
+      "    insmod fat",
+      "    insmod chain",
+      "    search --no-floppy --fs-uuid --set=zeus_esp 1AC2-C88A",
+      "    chainloader ($zeus_esp)/EFI/fedora/shimx64.efi",
+      "}",
+      "### END /etc/grub.d/42_zeus_dualboot ###"
+    ]
+  },
+  "fedora_and_sentinel_hashes_before_after_restore": {
+    "/home/zeus-fixture-data.bin": "539223ac55586887d82ee4e3baf7f5477f0e7716017e0bd0ed69f0a81edca9e7",
+    "/home/zeus-fixture-home-sentinel.txt": "0b2c97a680dfd29e32a1c4ff125ead76976f5e810cf97343e29a0bcd33eae1a9",
+    "/var/lib/zeus-fixture/root-data.bin": "bd9e655a141fbfdafcd0133515caa96baf6344e9396b7312866218f6672cbba5",
+    "/var/lib/zeus-fixture/root-sentinel.txt": "19db55e790d086d40871871dc5efa448b04b772004d17b7f7e1becccd874c27b",
+    "/var/lib/zeus-sentinel/data.bin": "0a4a2e2918a0f745813c5650b211c39ca5a37e612b9977b2ca6a2d470c034a93",
+    "/var/lib/zeus-sentinel/independent-disk-sentinel.txt": "baf0bcf0f27de6aee3f22bcdabc7d6befa817ab53e9e49be4771973adb957841"
+  },
+  "baseline_manifest": {
+    "file_count": 16,
+    "all_manifest_files_unchanged": true,
+    "efi_and_loader_paths_remained_unchanged": true
+  },
+  "checks": {
+    "root_identity_is_fedora": true,
+    "gpt_disk_and_partition_guids_match_journal": true,
+    "all_zeus_partitions_unmounted": true,
+    "menu_only_emitted_no_partition_operation": true,
+    "grubenv_unchanged_with_no_grubenv_update": true,
+    "fedora_defaults_unchanged": true,
+    "fedora_and_sentinel_data_unchanged": true,
+    "zeus_partition_content_hashed": false,
+    "all_gpt_data_unchanged": true,
+    "all_other_grub_scripts_unchanged": true,
+    "both_boot_choices_restored": true
+  }
+}

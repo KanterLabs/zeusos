@@ -1,0 +1,51 @@
+{
+  "all_preflight_mounts_loop_owned": true,
+  "bootupd": "0.2.35",
+  "cleanup": "see efi-update-probe.txt CLEANUP line",
+  "date": "2026-09-10",
+  "environment": "VM116 dedicated builder; disposable 2GiB loop image in isolated privileged container",
+  "fedora_sentinel_sha256_check": "passed",
+  "firmware_changes_requested": false,
+  "host_efi_mounted": false,
+  "image": "localhost/zeusos:0.1.0-preview.2",
+  "image_etc_mode_after": "755",
+  "image_etc_mode_before": "775",
+  "layout": "first ESP Fedora sentinel; second ESP Zeus target; one backing loop disk",
+  "payload_fixture": "synthetic one-byte mutation of the preview image shim",
+  "metadata_fixture": {
+    "kind": "synthetic future package versions",
+    "base_version": "grub2-1:2.12-64.fc44,shim-16.1-5",
+    "fixture_version": "grub2-1:2.12-65.fc44,shim-16.1-6",
+    "timestamp": "2099-01-01T00:00:00Z"
+  },
+  "released_efi_upgrade_tested": false,
+  "efi_bootability_qualified": false,
+  "loop_device": "/dev/loop2",
+  "status_before_update": {
+    "components": [
+      "BIOS",
+      "EFI"
+    ]
+  },
+  "wrapper_command": [
+    "/usr/bin/python3",
+    "/work/efi_update.py",
+    "--config",
+    "/etc/zeus/efi-update.json",
+    "--json"
+  ],
+  "wrapper_result": {
+    "bootupctl_returncode": 0,
+    "esp_uuid": "9E48-7FEC",
+    "mounted_for_update": false,
+    "mountpoint": "/boot/efi",
+    "ok": true,
+    "stderr": "",
+    "stdout": "Previous EFI: grub2-1:2.12-64.fc44,shim-16.1-5\nUpdated EFI: grub2-1:2.12-65.fc44,shim-16.1-6\n"
+  },
+  "zeus_esp_fat_uuid": "9E48-7FEC",
+  "zeus_payload_changed": true,
+  "zeus_shim_sha256_after": "7b012327185a08627d07c2af61456c531cb93e1b9cf58ffde3179aedfe5145de",
+  "zeus_shim_sha256_before": "571ea56b855dcf73bec6acb63c5ded44c2a191138bca0d8cfa5aa93f60f46fff",
+  "zeus_static_uuid_sha256_check": "passed"
+}

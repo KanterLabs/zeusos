@@ -28,6 +28,19 @@ conditions and regressions together across builds.
 
 We keep this version fixed while iterating. Each update has its own Git build ID; see the [iteration build policy](docs/iteration-builds.md).
 
+## Install alongside Fedora
+
+The [Fedora Zeus Installer](installer/README.md) adds a separate Zeus system
+through Fedora's existing boot menu, with a default 128 GiB allocation and
+Fedora kept as the default choice. It targets the documented Fedora 43,
+unencrypted Btrfs, UEFI layout with Secure Boot disabled. No USB or firmware
+setup was needed in the VM rehearsal.
+
+The installer is a **VM-tested preview**; the Nimo laptop remains untested.
+Partition changes require a verified backup receipt. The [qualification
+record](docs/iterations/installer-20260910/README.md) records the clean install,
+preserved files, offline boots, update/rollback checks and remaining limits.
+
 ## Build
 
 Build on a dedicated Linux VM with rootful Podman, Python 3, Git and QEMU tools. Image assembly needs privileged container access; use the isolated builder, not a production host or the development VM.

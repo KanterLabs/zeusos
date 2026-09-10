@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "vmid": 117,
+  "verified": true,
+  "verified_at": "2026-09-10T12:53:44Z",
+  "backup_target": "/mnt/pve/sata-ssd/dump/vzdump-qemu-117-2026_09_10-03_43_34.vma.zst",
+  "backup_sha256": "eb8cb5f68bd3833a43db0d147ecd347213cf6337a5c8615f7b3020130187fc5a",
+  "backup_bytes": 4888563990,
+  "verification": "zstd decompression piped to vma verify, both exit 0; independent dev copy SHA256 matches",
+  "fingerprint": "sha256:e6f08887d56f64f8f034672e52c44f9ea3aee52719f5762982d7d9c7a3821b87",
+  "disk_guid": "C7CA432A-3AA0-4C61-95C7-7C06037ADABF",
+  "table_fingerprint": "924b88a603e1065fae8f6ead2e6825e50b8300d914a98ab1750c2a1c94869709",
+  "snapshot": "Unavailable for this VM storage combination; complete independent VMA archives retained on PVE and dev"
+}

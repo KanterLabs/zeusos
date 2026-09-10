@@ -1,0 +1,20 @@
+{
+  "build_id": "git-f080c2d9bc53",
+  "elapsed_seconds": 1.843,
+  "result": {
+    "name": "zeusos-0.1.0-preview.2-git-f080c2d9bc53.oci",
+    "path": "out/iterations/git-f080c2d9bc53/zeusos-0.1.0-preview.2-git-f080c2d9bc53.oci",
+    "size": 2060534272,
+    "sha256": "5c6009b852caf7b2fa2285a7385f1819b98081502dc6e42636e582bfa493bcfd",
+    "manifest_digest": "sha256:8797860dc4c27c7e8e3f0034bfcf71f9876401df809509c6b49588752c9c1c18",
+    "architecture": "amd64",
+    "version": "0.1.0-preview.2",
+    "source_commit": "f080c2d9bc53fc8d8666c6fd8512225cd5e0de48",
+    "build_id": "git-f080c2d9bc53",
+    "sequence": 1788996337
+  },
+  "recorded_at": "2026-09-10T12:17:25.303653+00:00",
+  "network_metadata_signature_verified": true,
+  "archive_source": "Previously exported local OCI archive, verified against freshly fetched signed feed",
+  "disk_install_performed": false
+}

@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-10T13:24:19Z",
+  "vmid": 118,
+  "name": "zeusos-dualboot-clean-test",
+  "status": "running",
+  "host_config": {
+    "cores": 4,
+    "memory_mib": 8192,
+    "bios": "ovmf",
+    "secure_boot": false,
+    "boot_order": ["scsi0"],
+    "iso_attached": false,
+    "net0_mac": "BC:24:11:EC:C5:5D",
+    "dmi_uuid": "29f40b00-bc18-4ff3-82da-1d9006d7db4c",
+    "scsi0": "sata-ssd:118/vm-118-disk-1.qcow2 (953856M)",
+    "scsi1": "sata-ssd:118/vm-118-disk-2.qcow2 (1G)"
+  },
+  "guest": {
+    "hostname": "zeusos-dualboot-test",
+    "release": "Fedora release 43 (Forty Three)",
+    "ip": "10.0.0.118/24",
+    "interface": "ens18",
+    "ssh": "root public-key login verified",
+    "uefi": true,
+    "secure_boot": "disabled",
+    "fixture_marker": {
+      "path": "/etc/zeus-dualboot-fixture.json",
+      "value": {
+        "vmid": 117,
+        "purpose": "zeus-dualboot-rehearsal"
+      },
+      "owner_mode": "root:root 600",
+      "note": "Inherited unchanged from the VM117 baseline."
+    },
+    "etc_default_grub": "missing in the restored baseline; intentionally not repaired"
+  },
+  "baseline_files": {
+    "manifest": "/var/lib/zeus-fixture/baseline-files.json",
+    "expected_count": 16,
+    "sha256_check": "passed; all 16 files reported OK",
+    "changed_files": [],
+    "hashes": {
+      "/home/zeus-fixture-data.bin": {
+        "sha256": "539223ac55586887d82ee4e3baf7f5477f0e7716017e0bd0ed69f0a81edca9e7",
+        "bytes": 536870912
+      },
+      "/var/lib/zeus-fixture/root-data.bin": {
+        "sha256": "bd9e655a141fbfdafcd0133515caa96baf6344e9396b7312866218f6672cbba5",
+        "bytes": 134217728
+      },
+      "/var/lib/zeus-sentinel/data.bin": {
+        "sha256": "0a4a2e2918a0f745813c5650b211c39ca5a37e612b9977b2ca6a2d470c034a93",
+        "bytes": 33554432
+      },
+      "/boot/efi/EFI/BOOT/fbx64.efi": {
+        "sha256": "e6ac4f6428bfd524bba6ccf69bef22538c1114e9ae3be23e084a4304df51064b",
+        "bytes": 87816
+      },
+      "/boot/efi/EFI/BOOT/BOOTX64.EFI": {
+        "sha256": "4773d74d87c2371a25883b59a3b6d98d157de46933676706d215015b1130f2d1",
+        "bytes": 949424
+      },
+      "/boot/efi/EFI/fedora/mmx64.efi": {
+        "sha256": "83a49149f5a7060d0de43de3a0c683d99f3c58c418ab651ac9c254b4efaef0b8",
+        "bytes": 848080
+      },
+      "/boot/efi/EFI/fedora/shim.efi": {
+        "sha256": "4773d74d87c2371a25883b59a3b6d98d157de46933676706d215015b1130f2d1",
+        "bytes": 949424
+      },
+      "/boot/efi/EFI/fedora/shimx64.efi": {
+        "sha256": "4773d74d87c2371a25883b59a3b6d98d157de46933676706d215015b1130f2d1",
+        "bytes": 949424
+      },
+      "/boot/efi/EFI/fedora/grubx64.efi": {
+        "sha256": "9ffce1cb77733c4a24ef1bbb20ac5af38d3ccb2934b9fc1aea6027dd7817c864",
+        "bytes": 4046144
+      },
+      "/boot/efi/EFI/fedora/grub.cfg": {
+        "sha256": "56a2001d34187b587c3216eeef6b3119441cfee64f3c0805451f90ef7d9a0653",
+        "bytes": 159
+      },
+      "/boot/efi/EFI/fedora/BOOTX64.CSV": {
+        "sha256": "282a3b2872bebcf3d1ba42fe17c17ebe32a60759a20f058b5e960e542785fe82",
+        "bytes": 110
+      },
+      "/boot/loader/entries/ac3c15d81ce24f7499d42d0a980c4bcb-0-rescue.conf": {
+        "sha256": "eb4af7292999df8b27207b32529684f7a39916a3358a2c1ba94c5771b2763e06",
+        "bytes": 397
+      },
+      "/boot/loader/entries/ac3c15d81ce24f7499d42d0a980c4bcb-6.17.1-300.fc43.x86_64.conf": {
+        "sha256": "2238bd62ffd59aeb395599e63ee87f79499d5ab02eb649ee9993b501e4286e27",
+        "bytes": 321
+      },
+      "/var/lib/zeus-fixture/root-sentinel.txt": {
+        "sha256": "19db55e790d086d40871871dc5efa448b04b772004d17b7f7e1becccd874c27b",
+        "bytes": 65
+      },
+      "/home/zeus-fixture-home-sentinel.txt": {
+        "sha256": "0b2c97a680dfd29e32a1c4ff125ead76976f5e810cf97343e29a0bcd33eae1a9",
+        "bytes": 65
+      },
+      "/var/lib/zeus-sentinel/independent-disk-sentinel.txt": {
+        "sha256": "baf0bcf0f27de6aee3f22bcdabc7d6befa817ab53e9e49be4771973adb957841",
+        "bytes": 76
+      }
+    }
+  },
+  "gpt": {
+    "source_record": "docs/iterations/installer-20260910/vm117-preflight.json",
+    "exact_match": true,
+    "partition_count": 3,
+    "table_sha256": "924b88a603e1065fae8f6ead2e6825e50b8300d914a98ab1750c2a1c94869709",
+    "table": {
+      "label": "gpt",
+      "id": "C7CA432A-3AA0-4C61-95C7-7C06037ADABF",
+      "device": "/dev/sda",
+      "unit": "sectors",
+      "firstlba": 34,
+      "lastlba": 1953497054,
+      "sectorsize": 512,
+      "partitions": [
+        {
+          "node": "/dev/sda1",
+          "start": 2048,
+          "size": 1228800,
+          "type": "C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
+          "uuid": "770D74EF-4871-48C6-B087-DCBD81EB3E79"
+        },
+        {
+          "node": "/dev/sda2",
+          "start": 1230848,
+          "size": 2097152,
+          "type": "0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+          "uuid": "84E25A98-46FB-426E-B4F2-3C9EC9A77D0D"
+        },
+        {
+          "node": "/dev/sda3",
+          "start": 3328000,
+          "size": 1950167040,
+          "type": "0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+          "uuid": "EFB1F0E5-7E94-4168-BF1A-2118D90732C5"
+        }
+      ]
+    }
+  }
+}

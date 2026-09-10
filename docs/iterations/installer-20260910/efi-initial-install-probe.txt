@@ -1,0 +1,61 @@
+Checking that no-one is using this disk right now ... OK
+
+Disk efi-probe.img: 2 GiB, 2147483648 bytes, 4194304 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+>>> Script header accepted.
+>>> Created a new GPT disklabel (GUID: 03F6B94A-9C7B-43DE-9E3E-0032CBC507A1).
+efi-probe.img1: Created a new partition 1 of type 'EFI System' and of size 256 MiB.
+efi-probe.img2: Created a new partition 2 of type 'EFI System' and of size 256 MiB.
+efi-probe.img3: Created a new partition 3 of type 'Linux filesystem' and of size 256 MiB.
+efi-probe.img4: Created a new partition 4 of type 'Linux filesystem' and of size 1.2 GiB.
+efi-probe.img5: Done.
+
+New situation:
+Disklabel type: gpt
+Disk identifier: 03F6B94A-9C7B-43DE-9E3E-0032CBC507A1
+
+Device           Start     End Sectors  Size Type
+efi-probe.img1    2048  526335  524288  256M EFI System
+efi-probe.img2  526336 1050623  524288  256M EFI System
+efi-probe.img3 1050624 1574911  524288  256M Linux filesystem
+efi-probe.img4 1574912 4192255 2617344  1.2G Linux filesystem
+
+The partition table has been altered.
+mkfs.fat 4.2 (2021-01-31)
+mkfs.fat 4.2 (2021-01-31)
+Added 01_users.cfg
+Added 10_blscfg.cfg
+Added 14_menu_show_once.cfg
+Added 30_uefi-firmware.cfg
+Added 41_custom.cfg
+Installed: grub.cfg
+Installed: bootuuid.cfg
+Installed: "fedora/grub.cfg"
+Installed: "fedora/bootuuid.cfg"
+/fedora/EFI/fedora/shimx64.efi: OK
+/target/boot/bootupd-state.json
+/target/boot/efi/EFI/BOOT/BOOTX64.EFI
+/target/boot/efi/EFI/BOOT/fbx64.efi
+/target/boot/efi/EFI/fedora/BOOTX64.CSV
+/target/boot/efi/EFI/fedora/bootuuid.cfg
+/target/boot/efi/EFI/fedora/grub.cfg
+/target/boot/efi/EFI/fedora/grubx64.efi
+/target/boot/efi/EFI/fedora/mmx64.efi
+/target/boot/efi/EFI/fedora/shim.efi
+/target/boot/efi/EFI/fedora/shimx64.efi
+/target/boot/grub2/bootuuid.cfg
+/target/boot/grub2/grub.cfg
+/target/boot/grub2/grubenv
+{
+   "filesystems": [
+      {
+         "target": "/target/boot/efi",
+         "source": "/dev/loop0p2",
+         "fstype": "vfat",
+         "options": "rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=ascii,shortname=mixed,utf8,errors=remount-ro"
+      }
+   ]
+}

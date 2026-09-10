@@ -28,6 +28,10 @@ jobs:
         run: |
           python3 -m unittest discover -s tests -p 'test_codex*.py' -v
           python3 -m py_compile scripts/install-codex.py scripts/validate-codex.py
+      - name: Verify Fedora installer preflight and preservation boundaries
+        run: |
+          python3 -m unittest discover -s tests -p 'test_installer*.py' -v
+          python3 -m compileall -q installer/zeus_installer
       - name: Verify desktop interaction and battery measurement contracts
         run: |
           python3 -m unittest discover -s tests -p test_desktop_interactions.py -v

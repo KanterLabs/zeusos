@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Zeus Installer
+GenericName=Zeus OS dual-boot installer
+Comment=Review Fedora storage and prepare a qualified Zeus OS dual boot
+Exec=/usr/bin/zeus-installer gui
+Icon=drive-harddisk-symbolic
+Terminal=false
+Categories=GTK;GNOME;Settings;System;
+Keywords=Zeus;Fedora;dual-boot;installer;storage;
+StartupNotify=true

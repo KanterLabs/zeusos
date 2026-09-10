@@ -1,0 +1,63 @@
+{
+  "recorded_at": "2026-09-10T12:51:03Z",
+  "vmid": 117,
+  "source": "installed Fedora43 RPM with current preflight module",
+  "supported": true,
+  "blockers": [],
+  "target_fingerprint": "sha256:e6f08887d56f64f8f034672e52c44f9ea3aee52719f5762982d7d9c7a3821b87",
+  "memory": {
+    "available_bytes": 7711408128,
+    "available_gib": 7.181808,
+    "total_bytes": 8242708480,
+    "total_gib": 7.67662
+  },
+  "firmware": {
+    "efi_sysfs_path": "/sys/firmware/efi",
+    "secure_boot": {
+      "attributes": 6,
+      "enabled": false,
+      "path": "/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c",
+      "state": "disabled"
+    },
+    "uefi": true
+  },
+  "virtualization": {
+    "is_virtual": true,
+    "source": "systemd-detect-virt",
+    "technology": "kvm"
+  },
+  "disk": "/dev/sda",
+  "allocation_gib": 128,
+  "geometry": {
+    "device": "/dev/sda",
+    "firstlba": 34,
+    "id": "C7CA432A-3AA0-4C61-95C7-7C06037ADABF",
+    "label": "gpt",
+    "lastlba": 1953497054,
+    "partitions": [
+      {
+        "node": "/dev/sda1",
+        "size": 1228800,
+        "start": 2048,
+        "type": "C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
+        "uuid": "770D74EF-4871-48C6-B087-DCBD81EB3E79"
+      },
+      {
+        "node": "/dev/sda2",
+        "size": 2097152,
+        "start": 1230848,
+        "type": "0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+        "uuid": "84E25A98-46FB-426E-B4F2-3C9EC9A77D0D"
+      },
+      {
+        "node": "/dev/sda3",
+        "size": 1950167040,
+        "start": 3328000,
+        "type": "0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+        "uuid": "EFB1F0E5-7E94-4168-BF1A-2118D90732C5"
+      }
+    ],
+    "sectorsize": 512,
+    "unit": "sectors"
+  }
+}

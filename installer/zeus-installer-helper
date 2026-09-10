@@ -1,0 +1,25 @@
+#!/usr/bin/python3 -I
+"""Root-owned entry point for the narrowly scoped Zeus installer helper."""
+
+import sys
+
+
+# Set this before importing the installed package so a root-side helper call
+# never creates interpreter caches in the package tree.
+sys.dont_write_bytecode = True
+
+from pathlib import Path
+
+
+# Keep the privileged import rooted in the package installed by the RPM.  A
+# caller-controlled PYTHONPATH or a source checkout must never influence a
+# pkexec operation.
+PACKAGE_ROOT = Path("/usr/lib/zeus-installer")
+BACKEND = PACKAGE_ROOT / "zeus_installer" / "backend.py"
+if not BACKEND.is_file():
+    raise SystemExit("The installed Zeus installer backend is unavailable.")
+sys.path.insert(0, str(PACKAGE_ROOT))
+from zeus_installer.backend import helper_main
+
+
+raise SystemExit(helper_main())

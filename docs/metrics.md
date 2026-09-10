@@ -658,3 +658,66 @@ Status/caveats: retain every sample, outlier, regression, exclusion, and failure
 link raw JSON/log evidence here. Do not infer battery energy, wattage, runtime,
 or battery-hours from VM counters.
 ```
+
+
+### 2026-09-10 — Fedora dual-boot installer clean VM trial
+
+- Recorded at (UTC): `2026-09-10T14:02:57Z`.
+- Measurement interval: `2026-09-10T13:29:52Z` through
+  `2026-09-10T13:36:51Z`, from the installer journal. The interval includes
+  deliberate review and reboot time; it is not continuous installer runtime.
+- Product: `0.1.0-preview.2`; installed image `git-f080c2d9bc53`.
+- Environment: VM118, 4 vCPUs, 8192 MiB RAM, 931.5 GiB sparse disk,
+  UEFI/OVMF with Secure Boot disabled; Fedora43 Btrfs root/home. A second
+  1 GiB disk held a non-target sentinel. Total Zeus allocation: 128 GiB
+  (1 GiB EFI, 2 GiB boot, 125 GiB root including home).
+- Verified download: 2,060,534,272 bytes. Journal moved from downloading at
+  `13:29:52Z` to verification at `13:30:03Z`, then prepared at `13:30:05Z`.
+  These are one-second journal timestamps, not high-resolution throughput samples.
+- Stage1 Btrfs resize: 13 ms; Btrfs sync: 25 ms; end-only sfdisk write: 15 ms.
+  This lightly populated fixture did not reproduce the laptop's reported
+  328 GB occupancy, so these values do not predict laptop shrink time.
+- Stage2: `13:33:31Z` to `13:36:51Z` (200 s by journal timestamps).
+  Pinned bootc container command: 169,744 ms; EFI container command:
+  13,983 ms; Fedora GRUB regeneration: 2,267 ms. Container import and
+  installation are included in these command durations.
+- Preservation: all 16 baseline files totaling 712,474,577 bytes matched
+  after shrinking, after full installation, and after the default Fedora boot.
+  The set includes Fedora EFI/BLS entries and files on the non-target disk.
+  Original Fedora starts and identifiers were preserved; only its final
+  partition end changed. Fedora's saved boot default remained selected.
+- Both operating systems passed two offline boots. Zeus accepted the owner
+  login offline and ran Chrome153.0.8010.36 and Codex CLI0.154.0. Its scoped
+  bootloader-update service completed successfully; no systemd units failed.
+- A real Fedora kernel/GRUB update installed kernel7.2.4-100.fc43 and
+  GRUB2.12-43.fc43. The new Fedora kernel and Zeus both booted afterwards;
+  all nine Zeus EFI files and the six-partition table were unchanged.
+- Initial VM117 development failures are retained separately: an unsupported
+  sfdisk option needed an inspected fixture repair; default grub2-mkconfig
+  rewrote BLS option whitespace. The clean VM118 trial used `sfdisk -N 3`
+  and `grub2-mkconfig --no-grubenv-update` and required no manual disk repair.
+- Limits: no physical boot-time or battery claim; no 328 GB occupancy test,
+  laptop hardware qualification, or power-loss atomicity claim. Offline first
+  boot logged recoverable hostname warnings; the final installer writes
+  `/etc/hostname` in advance and uses `preserve_hostname: true`, validated
+  with the installed cloud-init schema and the subsequent Zeus boot.
+- Evidence: [installation journal extract](iterations/installer-20260910/vm118-installation.json),
+  [verified baseline backup](iterations/installer-20260910/vm117-backup-verification.json),
+  [Fedora-update EFI proof](iterations/installer-20260910/vm118-fedora-update-efi-proof.json).
+
+### 2026-09-10 14:22 UTC — installer lifecycle qualification
+
+- Product remains `0.1.0-preview.2`; installed payload remains `git-f080c2d9bc53`.
+- VM117 booted a marker-only synthetic update using the actual local-archive
+  switch path, then booted its retained original deployment. Four independently
+  copied user/config files retained their hashes through both transitions.
+  Fedora EFI/boot/BLS and Zeus ESP identity were preserved. This is an OS
+  deployment/rollback test; no released shim upgrade was qualified.
+- VM118 menu-only removal preserved the complete GPT, Fedora data sentinels,
+  defaults and grubenv. Repetition made no changes; restoring the exact saved
+  script reproduced the original generated menu hash. This does not measure
+  partition deletion or space reclamation.
+- Parent verification: 286 Python tests passed in 10.044 seconds. The launcher
+  packaging tests passed again after including the license in the source tar.
+- Evidence: [dated installer record](iterations/installer-20260910/README.md).
+  The idle VM116 builder was gracefully stopped after its probes finished.

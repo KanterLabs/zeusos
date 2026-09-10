@@ -1,0 +1,25 @@
+{
+  "date": "2026-09-10",
+  "environment": "VM116 dedicated builder; disposable 2GiB loop image in container mount namespace",
+  "source_build": "git-f080c2d9bc53",
+  "bootc": "1.16.10",
+  "bootupd": "0.2.35",
+  "layout": "first ESP Fedora sentinel; second ESP Zeus target; isolated boot and root",
+  "command": [
+    "bootupctl",
+    "backend",
+    "install",
+    "--component",
+    "EFI",
+    "--write-uuid",
+    "/target"
+  ],
+  "fedora_efi_sentinel_sha256_check": "passed",
+  "initial_zeus_efi_install": "passed",
+  "firmware_changes_requested": false,
+  "operating_system_boot_test": false,
+  "ongoing_efi_update_test": false,
+  "probe_exit_code": 0,
+  "zeus_esp_mount_source": "/dev/loop0p2",
+  "zeus_shim_grub_files_present": true
+}

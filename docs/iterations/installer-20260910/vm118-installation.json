@@ -1,0 +1,655 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-10T13:54:34.620180+00:00",
+  "vmid": 118,
+  "status": "clean VM installation and lifecycle checks accepted; physical laptop untested",
+  "manual_storage_repair": false,
+  "environment": {
+    "cpus": 4,
+    "ram_mib": 8192,
+    "disk_gib": 931.5,
+    "firmware": "UEFI OVMF Secure Boot disabled",
+    "root_filesystem": "Fedora43 Btrfs root and home, one device",
+    "sentinel_disk_gib": 1
+  },
+  "artifact": {
+    "build_id": "git-f080c2d9bc53",
+    "manifest_digest": "sha256:8797860dc4c27c7e8e3f0034bfcf71f9876401df809509c6b49588752c9c1c18",
+    "sha256": "5c6009b852caf7b2fa2285a7385f1819b98081502dc6e42636e582bfa493bcfd",
+    "size": 2060534272,
+    "version": "0.1.0-preview.2"
+  },
+  "backup_receipts": [
+    "vm117-backup-verification.json",
+    "vm118-preinstall-proof.json"
+  ],
+  "installation_history": [
+    {
+      "phase": "preparing",
+      "at": "2026-09-10T13:29:52Z",
+      "message": null
+    },
+    {
+      "phase": "preparing",
+      "at": "2026-09-10T13:29:52Z",
+      "message": null
+    },
+    {
+      "phase": "downloading",
+      "at": "2026-09-10T13:29:52Z",
+      "message": null
+    },
+    {
+      "phase": "downloading",
+      "at": "2026-09-10T13:29:52Z",
+      "message": null
+    },
+    {
+      "phase": "verifying",
+      "at": "2026-09-10T13:30:03Z",
+      "message": null
+    },
+    {
+      "phase": "prepared",
+      "at": "2026-09-10T13:30:05Z",
+      "message": null
+    },
+    {
+      "phase": "installing",
+      "at": "2026-09-10T13:30:46Z",
+      "message": null
+    },
+    {
+      "phase": "reboot_required",
+      "at": "2026-09-10T13:30:46Z",
+      "message": null
+    },
+    {
+      "phase": "installing",
+      "at": "2026-09-10T13:33:31Z",
+      "message": null
+    },
+    {
+      "phase": "installed",
+      "at": "2026-09-10T13:36:51Z",
+      "message": null
+    }
+  ],
+  "commands": [
+    {
+      "argv": [
+        "/usr/sbin/sfdisk",
+        "--json",
+        "/dev/sda"
+      ],
+      "duration_ms": 2,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/lsblk",
+        "--bytes",
+        "--json",
+        "--output",
+        "NAME,KNAME,PATH,TYPE,SIZE,UUID,PARTUUID,PARTTYPE,PTTYPE,PTUUID,START,PARTN,LOG-SEC,SERIAL,WWN"
+      ],
+      "duration_ms": 4,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/findmnt",
+        "--json",
+        "--target",
+        "/",
+        "--output",
+        "SOURCE,FSTYPE,UUID,PARTUUID"
+      ],
+      "duration_ms": 1,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/sbin/btrfs",
+        "filesystem",
+        "resize",
+        "861046571008",
+        "/"
+      ],
+      "duration_ms": 13,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/sbin/btrfs",
+        "filesystem",
+        "sync",
+        "/"
+      ],
+      "duration_ms": 25,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/sbin/btrfs",
+        "inspect-internal",
+        "dump-super",
+        "/dev/sda3"
+      ],
+      "duration_ms": 1,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/sbin/sfdisk",
+        "--no-reread",
+        "--no-tell-kernel",
+        "--lock",
+        "--wipe",
+        "never",
+        "--wipe-partitions",
+        "never",
+        "-N",
+        "3",
+        "/dev/sda"
+      ],
+      "duration_ms": 15,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/sbin/sfdisk",
+        "--json",
+        "/dev/sda"
+      ],
+      "duration_ms": 2,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/sbin/sfdisk",
+        "--json",
+        "/dev/sda"
+      ],
+      "duration_ms": 3,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/sbin/blockdev",
+        "--getsize64",
+        "/dev/sda3"
+      ],
+      "duration_ms": 1,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/lsblk",
+        "--bytes",
+        "--json",
+        "--output",
+        "NAME,KNAME,PATH,TYPE,SIZE,UUID,PARTUUID,PARTTYPE,PTTYPE,PTUUID,START,PARTN,LOG-SEC,SERIAL,WWN"
+      ],
+      "duration_ms": 4,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/findmnt",
+        "--json",
+        "--mountpoint",
+        "/target",
+        "--output",
+        "SOURCE,FSTYPE,UUID,PARTUUID"
+      ],
+      "duration_ms": 1,
+      "error": null,
+      "returncode": 1
+    },
+    {
+      "argv": [
+        "/usr/sbin/sfdisk",
+        "--append",
+        "--no-reread",
+        "--no-tell-kernel",
+        "--lock",
+        "--wipe",
+        "never",
+        "--wipe-partitions",
+        "never",
+        "/dev/sda"
+      ],
+      "duration_ms": 19,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/sbin/partx",
+        "--add",
+        "--nr",
+        "4:6",
+        "/dev/sda"
+      ],
+      "duration_ms": 7,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/sbin/udevadm",
+        "settle"
+      ],
+      "duration_ms": 7,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/sbin/sfdisk",
+        "--json",
+        "/dev/sda"
+      ],
+      "duration_ms": 3,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/sbin/blkid",
+        "--probe",
+        "--output",
+        "export",
+        "/dev/sda4"
+      ],
+      "duration_ms": 5,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/sbin/mkfs.fat",
+        "-F",
+        "32",
+        "-n",
+        "ZEUS-ESP",
+        "/dev/sda4"
+      ],
+      "duration_ms": 30,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/sbin/blkid",
+        "--probe",
+        "--output",
+        "export",
+        "/dev/sda4"
+      ],
+      "duration_ms": 7,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/sbin/blkid",
+        "--probe",
+        "--output",
+        "export",
+        "/dev/sda5"
+      ],
+      "duration_ms": 3,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/sbin/mkfs.ext4",
+        "-F",
+        "-L",
+        "ZEUS-BOOT",
+        "/dev/sda5"
+      ],
+      "duration_ms": 594,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/sbin/blkid",
+        "--probe",
+        "--output",
+        "export",
+        "/dev/sda5"
+      ],
+      "duration_ms": 8,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/sbin/blkid",
+        "--probe",
+        "--output",
+        "export",
+        "/dev/sda6"
+      ],
+      "duration_ms": 3,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/sbin/mkfs.ext4",
+        "-F",
+        "-L",
+        "ZEUS-ROOT",
+        "/dev/sda6"
+      ],
+      "duration_ms": 6127,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/sbin/blkid",
+        "--probe",
+        "--output",
+        "export",
+        "/dev/sda6"
+      ],
+      "duration_ms": 9,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/mount",
+        "/dev/sda6",
+        "/target"
+      ],
+      "duration_ms": 45,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/mount",
+        "/dev/sda5",
+        "/target/boot"
+      ],
+      "duration_ms": 25,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/mount",
+        "/dev/sda4",
+        "/target/boot/efi"
+      ],
+      "duration_ms": 13,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/findmnt",
+        "--json",
+        "--target",
+        "/target",
+        "--output",
+        "SOURCE,FSTYPE,UUID,PARTUUID"
+      ],
+      "duration_ms": 4,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/findmnt",
+        "--json",
+        "--target",
+        "/target/boot",
+        "--output",
+        "SOURCE,FSTYPE,UUID,PARTUUID"
+      ],
+      "duration_ms": 3,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/findmnt",
+        "--json",
+        "--target",
+        "/target/boot/efi",
+        "--output",
+        "SOURCE,FSTYPE,UUID,PARTUUID"
+      ],
+      "duration_ms": 3,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/podman",
+        "run",
+        "--rm",
+        "--privileged",
+        "--pid=host",
+        "--network=none",
+        "--security-opt",
+        "label=disable",
+        "--mount",
+        "type=bind,src=/target,dst=/target,rw,bind-propagation=rshared",
+        "--mount",
+        "type=bind,src=/var/lib/zeus/installer/artifacts/zeusos-0.1.0-preview.2-git-f080c2d9bc53.oci,dst=/run/zeus/source.oci,ro",
+        "--pull=never",
+        "--entrypoint",
+        "/usr/bin/bootc",
+        "oci-archive:/var/lib/zeus/installer/artifacts/zeusos-0.1.0-preview.2-git-f080c2d9bc53.oci",
+        "install",
+        "to-filesystem",
+        "--bootloader",
+        "none",
+        "--skip-finalize",
+        "--skip-fetch-check",
+        "--stateroot",
+        "default",
+        "--target-transport",
+        "oci-archive",
+        "--target-imgref",
+        "/var/lib/zeus/updater/downloads/zeusos-0.1.0-preview.2-git-f080c2d9bc53.oci",
+        "--source-imgref",
+        "oci-archive:/run/zeus/source.oci",
+        "/target"
+      ],
+      "duration_ms": 169744,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/podman",
+        "run",
+        "--rm",
+        "--privileged",
+        "--pid=host",
+        "--network=none",
+        "--security-opt",
+        "label=disable",
+        "--mount",
+        "type=bind,src=/target,dst=/target,rw,bind-propagation=rshared",
+        "--mount",
+        "type=bind,src=/var/lib/zeus/installer/artifacts/zeusos-0.1.0-preview.2-git-f080c2d9bc53.oci,dst=/run/zeus/source.oci,ro",
+        "--pull=never",
+        "--entrypoint",
+        "/usr/bin/bootupctl",
+        "oci-archive:/var/lib/zeus/installer/artifacts/zeusos-0.1.0-preview.2-git-f080c2d9bc53.oci",
+        "backend",
+        "install",
+        "--component",
+        "EFI",
+        "--write-uuid",
+        "/target"
+      ],
+      "duration_ms": 13983,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/mount",
+        "/dev/sda4",
+        "/target/boot/efi"
+      ],
+      "duration_ms": 10,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/findmnt",
+        "--json",
+        "--target",
+        "/target",
+        "--output",
+        "SOURCE,FSTYPE,UUID,PARTUUID"
+      ],
+      "duration_ms": 4,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/findmnt",
+        "--json",
+        "--target",
+        "/target/boot",
+        "--output",
+        "SOURCE,FSTYPE,UUID,PARTUUID"
+      ],
+      "duration_ms": 2,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/findmnt",
+        "--json",
+        "--target",
+        "/target/boot/efi",
+        "--output",
+        "SOURCE,FSTYPE,UUID,PARTUUID"
+      ],
+      "duration_ms": 2,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/findmnt",
+        "--json",
+        "--target",
+        "/target",
+        "--output",
+        "SOURCE,FSTYPE,UUID,PARTUUID"
+      ],
+      "duration_ms": 2,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/findmnt",
+        "--json",
+        "--target",
+        "/target/boot",
+        "--output",
+        "SOURCE,FSTYPE,UUID,PARTUUID"
+      ],
+      "duration_ms": 2,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/findmnt",
+        "--json",
+        "--target",
+        "/target/boot/efi",
+        "--output",
+        "SOURCE,FSTYPE,UUID,PARTUUID"
+      ],
+      "duration_ms": 3,
+      "error": null,
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/sbin/grub2-mkconfig",
+        "--no-grubenv-update",
+        "-o",
+        "/boot/grub2/grub.cfg"
+      ],
+      "duration_ms": 2267,
+      "error": null,
+      "returncode": 0
+    }
+  ],
+  "checks": {
+    "after_shrink_files": {
+      "passed": 16,
+      "changed": 0
+    },
+    "after_install_files_including_fedora_efi_and_bls": {
+      "passed": 16,
+      "changed": 0
+    },
+    "after_default_fedora_boot_files": {
+      "passed": 16,
+      "changed": 0
+    },
+    "fedora_gpt_start_uuid_preserved": true,
+    "fedora_saved_default_preserved": true,
+    "zeus_offline_boot": true,
+    "network_carrier_during_first_zeus_boot": 0,
+    "zeus_offline_login_user": "shane",
+    "zeus_home_separate": true,
+    "bootloader_update_service": "active; Result=success; ExecMainStatus=0",
+    "chrome_version": "153.0.8010.36",
+    "codex_version": "0.154.0",
+    "failed_systemd_units": 0,
+    "fedora_offline_boot_count": 2,
+    "zeus_offline_boot_count": 2,
+    "fedora_updated_kernel": "7.2.4-100.fc43",
+    "fedora_updated_grub": "2.12-43.fc43",
+    "both_os_booted_after_fedora_update": true,
+    "zeus_efi_unchanged_after_fedora_update": true
+  },
+  "limitations": [
+    "Fixture verifies 16 files totaling 712474577 bytes plus its installed Fedora system; it does not reproduce the laptop's reported 328 GB occupancy.",
+    "VM results do not qualify physical Wi-Fi, battery, suspend, firmware, or power-loss recovery.",
+    "The tested offline first boot logged recoverable hostname setup warnings. Final installer sets /etc/hostname before boot and preserve_hostname=true; revised cloud-init schema validated.",
+    "Initial VM117 development failure and inspected manual repair are excluded from clean-path qualification."
+  ],
+  "related_receipts": [
+    "vm118-fedora-update-efi-proof.json",
+    "vm117-update-rollback.json",
+    "vm118-menu-removal.json"
+  ]
+}

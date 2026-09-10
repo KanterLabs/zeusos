@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Launch the unprivileged Fedora GTK/CLI entry point.
+set -euo pipefail
+
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [[ -f "$script_dir/zeus_installer/__main__.py" ]]; then
+    package_root=$script_dir
+else
+    package_root=/usr/lib/zeus-installer
+fi
+
+# A bare launcher is the graphical entry point.  Explicit arguments are
+# passed unchanged so ``zeus-installer preflight --json`` remains scriptable.
+if (( $# == 0 )); then
+    set -- gui
+fi
+
+if [[ -n "${PYTHONPATH:-}" ]]; then
+    export PYTHONPATH="$package_root:$PYTHONPATH"
+else
+    export PYTHONPATH="$package_root"
+fi
+exec /usr/bin/python3 -m zeus_installer "$@"

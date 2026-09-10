@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-10T14:09:30.225249+00:00",
+  "vm": {
+    "vmid": 117,
+    "address": "10.0.0.153",
+    "bootc_version": "1.16.10",
+    "bootupd_version": "0.2.35",
+    "firmware_path": "Fedora default -> grub2-reboot zeusos-dualboot -> Zeus chainloader"
+  },
+  "candidate": {
+    "kind": "synthetic test fixture",
+    "base_image": "localhost/zeusos:0.1.0-preview.2",
+    "change": "one file /usr/share/zeus/installer-validation containing a test marker",
+    "marker_text": "VM117 synthetic OS update marker; not a release artifact",
+    "released_efi_artifact": false,
+    "source_archive_vm116": "/home/shane/vm117-update-rollback-20260910/zeusos-vm117-synthetic-update-20260910.oci",
+    "installed_archive_vm117": "/var/lib/zeus/updater/downloads/zeusos-vm117-synthetic-update-20260910.oci",
+    "archive_size_bytes": 2060536320,
+    "archive_sha256": "b53a708a3b2634f7406c9d52dee63399bbd149c914d270ee1dea0074d815e9a8",
+    "switch_command": [
+      "/usr/bin/bootc",
+      "switch",
+      "--transport",
+      "oci-archive",
+      "--retain",
+      "<candidate-archive>"
+    ]
+  },
+  "before_switch_backup": {
+    "independent_dev_copy_root": "/home/shane/projects/zeusos/out/installer/tmp/vm117-update-rollback-backup-20260910/vm117-update-rollback-export-20260910",
+    "files": [
+      {
+        "source": "/etc/zeus/efi_update.py",
+        "dev_copy": "/home/shane/projects/zeusos/out/installer/tmp/vm117-update-rollback-backup-20260910/vm117-update-rollback-export-20260910/backup/efi_update.py",
+        "sha256": "86034f553c140ff7c594834c10e8e0af86970d641326526d524d128a810f945c",
+        "baseline_record_sha256": "86034f553c140ff7c594834c10e8e0af86970d641326526d524d128a810f945c",
+        "uid_gid_mode": "0:0:755"
+      },
+      {
+        "source": "/etc/zeus/efi-update.json",
+        "dev_copy": "/home/shane/projects/zeusos/out/installer/tmp/vm117-update-rollback-backup-20260910/vm117-update-rollback-export-20260910/backup/efi-update.json",
+        "sha256": "39e7aa89e2ac93f31f9d2d37845321bc10500e3f3f70eede2510c6e1da0ad276",
+        "baseline_record_sha256": "39e7aa89e2ac93f31f9d2d37845321bc10500e3f3f70eede2510c6e1da0ad276",
+        "uid_gid_mode": "0:0:644"
+      },
+      {
+        "source": "/etc/systemd/system/bootloader-update.service.d/zeus-efi.conf",
+        "dev_copy": "/home/shane/projects/zeusos/out/installer/tmp/vm117-update-rollback-backup-20260910/vm117-update-rollback-export-20260910/backup/zeus-efi.conf",
+        "sha256": "088c9d4654926a92f9ece78cca19c9ee3c00c772a9dbe49259627a750191e6ea",
+        "baseline_record_sha256": "088c9d4654926a92f9ece78cca19c9ee3c00c772a9dbe49259627a750191e6ea",
+        "uid_gid_mode": "0:0:644"
+      },
+      {
+        "source": "/var/home/shane/vm117-update-rollback-user.txt",
+        "dev_copy": "/home/shane/projects/zeusos/out/installer/tmp/vm117-update-rollback-backup-20260910/vm117-update-rollback-export-20260910/backup/user-file",
+        "sha256": "25c3ea6994ed9c440c0e0f5fc388fccda124ec44bb8ff1a8903969fd4aae4c05",
+        "baseline_record_sha256": "25c3ea6994ed9c440c0e0f5fc388fccda124ec44bb8ff1a8903969fd4aae4c05",
+        "uid_gid_mode": "1000:1000:600"
+      }
+    ],
+    "bootc_status_json": {
+      "path": "/home/shane/projects/zeusos/out/installer/tmp/vm117-update-rollback-backup-20260910/vm117-update-rollback-export-20260910/bootc-status-before.json",
+      "sha256": "34519a0e88b75370ec4b865a628c7460089fcb83e5ad10b1a83b5f76f0877bee",
+      "summary": {
+        "status_json_valid": true,
+        "booted_present": true,
+        "staged_present": false,
+        "rollback_present": false,
+        "rollback_queued": false
+      }
+    },
+    "esp_uuid": "E04E-ACD2",
+    "efi_and_bls_tree_hashes": {
+      "zeus_esp_tree_sha256": "2a976ba0b57ac04aee172aae355dfb3b573b26cc4d86a98d68e8d976ce4a9b6f",
+      "zeus_boot_tree_sha256": "d4d0f0833d612941ab2f0507c3d7eddd6457e04fbd7ef5d09f16459924e45898",
+      "fedora_first_esp_tree_sha256": "ddaf93cd4d1df7ec7e419aa09c74d452d5dfd04a92bf14559a45fb00e183395b",
+      "fedora_boot_tree_sha256": "5828be22673d75d95217b4a9d462462a092b126be92cde2495584d94e86128f4",
+      "fedora_bls_tree_sha256": "43301a29f8fef7f38a80ab725c5dfc3f53ca2648d986136b17d7e09a986e05e5"
+    }
+  },
+  "observed_transitions": {
+    "stage": {
+      "switch_rc": 0,
+      "status_summary": {
+        "status_json_valid": true,
+        "booted_present": true,
+        "staged_present": true,
+        "rollback_present": false,
+        "rollback_queued": false
+      },
+      "scrubbed_output": "/home/shane/projects/zeusos/out/installer/tmp/vm117-update-rollback-final-export-20260910/vm117-update-rollback-export-20260910/switch-scrubbed.log"
+    },
+    "post_update": {
+      "bootc_status_json": {
+        "path": "/home/shane/projects/zeusos/out/installer/tmp/vm117-update-rollback-final-export-20260910/vm117-update-rollback-export-20260910/bootc-status-post-update.json",
+        "sha256": "c330b60046c29cad108a480bd6f6711fc9bf2d7e3d6480afdf4fa125b865b0bb",
+        "summary": {
+          "status_json_valid": true,
+          "booted_present": true,
+          "staged_present": false,
+          "rollback_present": true,
+          "rollback_queued": false
+        }
+      },
+      "booted_image_changed_from_baseline": true,
+      "result": {
+        "status_json_valid": true,
+        "rollback_present": true,
+        "staged_present": false,
+        "rollback_queued": false,
+        "synthetic_marker_present": true,
+        "scope_and_user_preserved": true,
+        "zeus_esp_mounted": true,
+        "fedora_esp_unchanged": true,
+        "fedora_boot_unchanged": true,
+        "fedora_bls_unchanged": true,
+        "bootloader_update_service_ok": true
+      },
+      "efi_and_bls_tree_hashes": {
+        "zeus_esp_tree_sha256": "2a976ba0b57ac04aee172aae355dfb3b573b26cc4d86a98d68e8d976ce4a9b6f",
+        "fedora_first_esp_tree_sha256": "ddaf93cd4d1df7ec7e419aa09c74d452d5dfd04a92bf14559a45fb00e183395b",
+        "fedora_boot_tree_sha256": "5828be22673d75d95217b4a9d462462a092b126be92cde2495584d94e86128f4",
+        "fedora_bls_tree_sha256": "43301a29f8fef7f38a80ab725c5dfc3f53ca2648d986136b17d7e09a986e05e5"
+      }
+    },
+    "rollback_queue": {
+      "status_summary": {
+        "status_json_valid": true,
+        "booted_present": true,
+        "staged_present": false,
+        "rollback_present": true,
+        "rollback_queued": true
+      },
+      "scrubbed_output": "/home/shane/projects/zeusos/out/installer/tmp/vm117-update-rollback-final-export-20260910/vm117-update-rollback-export-20260910/rollback-scrubbed.log"
+    },
+    "post_rollback": {
+      "bootc_status_json": {
+        "path": "/home/shane/projects/zeusos/out/installer/tmp/vm117-update-rollback-final-export-20260910/vm117-update-rollback-export-20260910/bootc-status-post-rollback.json",
+        "sha256": "ee0c8e8a3cd75149d0c8bb4bffe68d1ba60d91486b156f84133cbd858966aeb3",
+        "summary": {
+          "status_json_valid": true,
+          "booted_present": true,
+          "staged_present": false,
+          "rollback_present": true,
+          "rollback_queued": false
+        }
+      },
+      "booted_image_matches_baseline": true,
+      "rollback_slot_matches_update_slot": true,
+      "result": {
+        "status_json_valid": true,
+        "rollback_present": true,
+        "staged_present": false,
+        "rollback_queued": false,
+        "synthetic_marker_absent": true,
+        "scope_and_user_preserved": true,
+        "zeus_esp_mounted": true,
+        "fedora_esp_unchanged": true,
+        "fedora_boot_unchanged": true,
+        "fedora_bls_unchanged": true,
+        "bootloader_update_service_ok": true
+      },
+      "efi_and_bls_tree_hashes": {
+        "zeus_esp_tree_sha256": "2a976ba0b57ac04aee172aae355dfb3b573b26cc4d86a98d68e8d976ce4a9b6f",
+        "fedora_first_esp_tree_sha256": "ddaf93cd4d1df7ec7e419aa09c74d452d5dfd04a92bf14559a45fb00e183395b",
+        "fedora_boot_tree_sha256": "5828be22673d75d95217b4a9d462462a092b126be92cde2495584d94e86128f4",
+        "fedora_bls_tree_sha256": "43301a29f8fef7f38a80ab725c5dfc3f53ca2648d986136b17d7e09a986e05e5"
+      }
+    }
+  },
+  "qualification": {
+    "synthetic_update_booted": true,
+    "synthetic_rollback_booted": true,
+    "scope_and_user_preserved_update": true,
+    "scope_and_user_preserved_rollback": true,
+    "zeus_esp_identity_preserved_update": true,
+    "zeus_esp_identity_preserved_rollback": true,
+    "fedora_first_esp_unchanged_update": true,
+    "fedora_first_esp_unchanged_rollback": true,
+    "fedora_bls_unchanged_update": true,
+    "fedora_bls_unchanged_rollback": true,
+    "bootloader_update_service_ok_update": true,
+    "bootloader_update_service_ok_rollback": true
+  },
+  "cleanup": {
+    "synthetic_user_removed_vm117": true,
+    "candidate_removed_vm117": true,
+    "probe_state_removed_vm117": true,
+    "temporary_mounts_removed_vm117": true,
+    "synthetic_archive_retained_vm116_for_evidence": true
+  },
+  "raw_phase_logs": [
+    "/home/shane/projects/zeusos/out/installer/tmp/vm117-update-rollback-baseline.txt",
+    "/home/shane/projects/zeusos/out/installer/tmp/vm117-update-rollback-baseline-verification.txt",
+    "/home/shane/projects/zeusos/out/installer/tmp/vm117-update-rollback-stage.txt",
+    "/home/shane/projects/zeusos/out/installer/tmp/vm117-update-rollback-reboot-update.txt",
+    "/home/shane/projects/zeusos/out/installer/tmp/vm117-update-rollback-post-update.txt",
+    "/home/shane/projects/zeusos/out/installer/tmp/vm117-update-rollback-menu.txt",
+    "/home/shane/projects/zeusos/out/installer/tmp/vm117-update-rollback-queue-rollback.txt",
+    "/home/shane/projects/zeusos/out/installer/tmp/vm117-update-rollback-reboot-rollback-fedora.txt",
+    "/home/shane/projects/zeusos/out/installer/tmp/vm117-update-rollback-post-rollback.txt",
+    "/home/shane/projects/zeusos/out/installer/tmp/vm117-update-rollback-cleanup.txt"
+  ],
+  "limitations": [
+    "The candidate is a synthetic marker-only fixture derived from the pinned preview image; it is not a released OS or EFI payload upgrade.",
+    "The run qualifies bootc deployment update/rollback and scoped service execution in a booted VM, but does not qualify firmware behavior or bootability of a released shim/grub upgrade.",
+    "bootc upgrade --check cannot look up the local oci-archive transport; the updater switch path was exercised directly with --transport oci-archive --retain.",
+    "Because Fedora remains the firmware/default boot owner, each reboot first reached Fedora and used its existing one-shot grub2-reboot menu entry zeusos-dualboot to enter Zeus.",
+    "Status JSON and digest-bearing evidence are kept in the receipt and copied evidence tree; phase logs contain scrubbed command output and no credentials.",
+    "bootc rollback intentionally leaves the synthetic candidate in VM117's rollback deployment slot; the candidate archive, test fixture, probe state, and temporary mounts were removed."
+  ]
+}

@@ -1,0 +1,71 @@
+PROBE image=/work/efi-update-probe.img
+PROBE image_tag=localhost/zeusos:0.1.0-preview.2
+PROBE bootupd_expected=0.2.35
+Checking that no-one is using this disk right now ... OK
+
+Disk /work/efi-update-probe.img: 2 GiB, 2147483648 bytes, 4194304 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+>>> Script header accepted.
+>>> Created a new GPT disklabel (GUID: 72DFCD2A-E654-471C-BC23-F5AAB2A7ACBC).
+/work/efi-update-probe.img1: Created a new partition 1 of type 'EFI System' and of size 256 MiB.
+/work/efi-update-probe.img2: Created a new partition 2 of type 'EFI System' and of size 256 MiB.
+/work/efi-update-probe.img3: Created a new partition 3 of type 'Linux filesystem' and of size 256 MiB.
+/work/efi-update-probe.img4: Created a new partition 4 of type 'Linux filesystem' and of size 1.2 GiB.
+/work/efi-update-probe.img5: Done.
+
+New situation:
+Disklabel type: gpt
+Disk identifier: 72DFCD2A-E654-471C-BC23-F5AAB2A7ACBC
+
+Device                        Start     End Sectors  Size Type
+/work/efi-update-probe.img1    2048  526335  524288  256M EFI System
+/work/efi-update-probe.img2  526336 1050623  524288  256M EFI System
+/work/efi-update-probe.img3 1050624 1574911  524288  256M Linux filesystem
+/work/efi-update-probe.img4 1574912 4192255 2617344  1.2G Linux filesystem
+
+The partition table has been altered.
+PROBE loop=/dev/loop2
+mkfs.fat 4.2 (2021-01-31)
+mkfs.fat 4.2 (2021-01-31)
+MOUNT preflight target=/fedora state=unmounted
+MOUNT verified target=/fedora source=/dev/loop2p1 fstype=vfat
+MOUNT preflight target=/boot state=unmounted
+MOUNT verified target=/boot source=/dev/loop2p3 fstype=ext4
+MOUNT preflight target=/boot/efi state=unmounted
+MOUNT verified target=/boot/efi source=/dev/loop2p2 fstype=vfat
+MOUNT preflight all disposable mounts are loop-owned before bootupd install
+PROBE zeus_fat_uuid=9E48-7FEC
+STEP initial bootupd backend install against the mounted Zeus ESP
+Added 01_users.cfg
+Added 10_blscfg.cfg
+Added 14_menu_show_once.cfg
+Added 30_uefi-firmware.cfg
+Added 41_custom.cfg
+Installed: grub.cfg
+Installed: bootuuid.cfg
+Installed: "fedora/grub.cfg"
+Installed: "fedora/bootuuid.cfg"
+MOUNT verified target=/fedora source=/dev/loop2p1 fstype=vfat
+MOUNT verified target=/boot source=/dev/loop2p3 fstype=ext4
+MOUNT verified target=/boot/efi source=/dev/loop2p2 fstype=vfat
+PROBE initial Zeus payload and static UUID hashes captured
+PROBE image_etc_mode_before=775 image_etc_mode_after=755
+STEP create an update in the container overlay
+PROBE status before scoped update:
+{"components":["BIOS","EFI"]}MOUNT verified target=/fedora source=/dev/loop2p1 fstype=vfat
+MOUNT verified target=/boot source=/dev/loop2p3 fstype=ext4
+MOUNT verified target=/boot/efi source=/dev/loop2p2 fstype=vfat
+MOUNT preflight all disposable mounts are loop-owned before scoped update
+STEP run the UUID-scoped wrapper
+PROBE wrapper_rc=0
+MOUNT verified target=/fedora source=/dev/loop2p1 fstype=vfat
+MOUNT verified target=/boot source=/dev/loop2p3 fstype=ext4
+MOUNT verified target=/boot/efi source=/dev/loop2p2 fstype=vfat
+/fedora/EFI/fedora/shimx64.efi: OK
+/boot/efi/EFI/fedora/bootuuid.cfg: OK
+/boot/grub2/bootuuid.cfg: OK
+PROBE PASS Fedora sentinel and static UUID files unchanged; Zeus EFI payload changed
+CLEANUP unmount_and_detach_rc=0 loop_detached=true
