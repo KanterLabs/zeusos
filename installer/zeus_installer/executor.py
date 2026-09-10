@@ -110,6 +110,655 @@ _FINGERPRINT_RE = re.compile(r"\A(?:sha256:)?[0-9a-fA-F]{64}\Z")
 _MAX_JSON = 512 * 1024
 _MAX_OUTPUT = 8 * 1024 * 1024
 
+# The only post-stage-2 state that can be retried is the final Fedora menu
+# boundary.  Keep this allowlist explicit: every earlier stage can have
+# modified a disk, filesystem, mount, deployment, or EFI tree and therefore
+# remains permanently ambiguous after an interruption.
+_FINALIZATION_ERRORS = frozenset({"grub_invalid", "grub_conflict"})
+_FINALIZATION_ACTIONS = frozenset({"write_grub_entry", "grub_regenerate"})
+_FINALIZATION_COMPLETED_PREFIX = (
+    "btrfs_resize",
+    "btrfs_sync",
+    "partition_append",
+    "partition_reread",
+    "udev_settle",
+    "mkfs_esp",
+    "mkfs_boot",
+    "mkfs_root",
+    "mkdir_target",
+    "mount_zeus_root",
+    "mkdir_target_boot",
+    "mount_zeus_boot",
+    "mkdir_target_esp",
+    "mount_zeus_esp",
+    "bootc_install",
+    "copy_verified_payload",
+    "cloud_init_seed",
+    "efi_scope_config",
+    "efi_runtime_integration",
+    "efi_install",
+    "remount_zeus_esp",
+    "write_fstab",
+)
+
+
+def _finalization_saved_state(record: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
+    """Return an executor state from all journal layouts we have supported."""
+
+    if not isinstance(record, Mapping):
+        return None
+    for key in ("executor_state", "dualboot_state"):
+        value = record.get(key)
+        if isinstance(value, Mapping):
+            return value
+    result = record.get("executor_result")
+    if isinstance(result, Mapping):
+        for key in ("executor_state", "dualboot_state"):
+            value = result.get(key)
+            if isinstance(value, Mapping):
+                return value
+        if result.get("executor") == "zeus-dualboot" and isinstance(result.get("state"), Mapping):
+            return result["state"]
+    return None
+
+
+def _valid_finalization_uuid(value: Any) -> bool:
+    return isinstance(value, str) and _UUID_RE.fullmatch(value) is not None
+
+
+def _valid_finalization_fat_uuid(value: Any) -> bool:
+    return isinstance(value, str) and _FAT_UUID_RE.fullmatch(value) is not None
+
+
+def _valid_finalization_digest(value: Any) -> bool:
+    return isinstance(value, str) and re.fullmatch(r"[0-9a-fA-F]{64}", value) is not None
+
+
+def _valid_finalization_fingerprint(value: Any) -> bool:
+    return isinstance(value, str) and _FINGERPRINT_RE.fullmatch(value) is not None
+
+
+def _valid_finalization_disk(value: Any) -> bool:
+    return isinstance(value, str) and _DISK_RE.fullmatch(value) is not None
+
+
+def _valid_finalization_boot_id(value: Any) -> bool:
+    return isinstance(value, str) and _BOOT_ID_RE.fullmatch(value) is not None
+
+
+def _finalization_partition_node(disk: str, number: int) -> str:
+    return disk + ("p" if disk[-1].isdigit() else "") + str(number)
+
+
+def _valid_finalization_table(value: Any, partition_count: int) -> bool:
+    if not isinstance(value, Mapping):
+        return False
+    disk = value.get("device")
+    partitions = value.get("partitions")
+    if (
+        value.get("label") != "gpt"
+        or not _valid_finalization_disk(disk)
+        or not _valid_finalization_uuid(value.get("id"))
+        or value.get("unit") != "sectors"
+        or type(value.get("sectorsize")) is not int
+        or value.get("sectorsize") <= 0
+        or type(value.get("firstlba")) is not int
+        or value.get("firstlba") < 0
+        or type(value.get("lastlba")) is not int
+        or value.get("lastlba") < value.get("firstlba")
+        or not isinstance(partitions, list)
+        or len(partitions) != partition_count
+    ):
+        return False
+    for index, part in enumerate(partitions, start=1):
+        if not isinstance(part, Mapping):
+            return False
+        if part.get("node") != _finalization_partition_node(str(disk), index):
+            return False
+        if type(part.get("start")) is not int or part.get("start") < 0:
+            return False
+        if type(part.get("size")) is not int or part.get("size") <= 0:
+            return False
+        if not isinstance(part.get("type"), str) or not part.get("type"):
+            return False
+        if not _valid_finalization_uuid(part.get("uuid")):
+            return False
+    return True
+
+
+def _finalization_normalized_table(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Normalize UUID casing while retaining every other GPT field exactly."""
+
+    normalized = copy.deepcopy(dict(value))
+    normalized["id"] = str(normalized.get("id", "")).lower()
+    partitions = normalized.get("partitions")
+    if isinstance(partitions, list):
+        for part in partitions:
+            if isinstance(part, dict):
+                for key in ("uuid", "type"):
+                    if isinstance(part.get(key), str):
+                        part[key] = part[key].lower()
+    return normalized
+
+
+def _finalization_tables_equal(left: Any, right: Any) -> bool:
+    return (
+        isinstance(left, Mapping)
+        and isinstance(right, Mapping)
+        and _finalization_normalized_table(left) == _finalization_normalized_table(right)
+    )
+
+
+def _finalization_backup_choice_shape(state: Mapping[str, Any]) -> bool:
+    """Validate the persisted owner choice without inspecting the target."""
+
+    choices: list[bool] = []
+    if "backup_decision" in state:
+        candidate = state.get("backup_decision")
+        if (
+            not isinstance(candidate, Mapping)
+            or set(candidate) != {"without_backup", "verified", "fingerprint"}
+            or candidate.get("without_backup") is not True
+            or candidate.get("verified") is not False
+            or not _valid_finalization_fingerprint(candidate.get("fingerprint"))
+        ):
+            return False
+        choices.append(True)
+    if state.get("backup") not in (None, {}, []):
+        receipt = state.get("backup")
+        if not isinstance(receipt, Mapping) or receipt.get("verified") is not True:
+            return False
+        choices.append(False)
+    return len(choices) == 1
+
+
+def _valid_finalization_proposal(
+    proposal: Any,
+    original: Mapping[str, Any],
+    expected: Mapping[str, Any],
+    new_guids: Sequence[str],
+) -> bool:
+    if not isinstance(proposal, Mapping):
+        return False
+    disk = original.get("device")
+    if (
+        proposal.get("schema_version") != SCHEMA_VERSION
+        or proposal.get("disk") != disk
+        or str(proposal.get("disk_guid", "")).lower() != str(original.get("id", "")).lower()
+        or proposal.get("sector_size") != original.get("sectorsize")
+        or proposal.get("fedora_partition") != _finalization_partition_node(str(disk), 3)
+        or proposal.get("fedora_start") != original["partitions"][2].get("start")
+        or proposal.get("fedora_original_size") != original["partitions"][2].get("size")
+        or proposal.get("fedora_new_size") != expected["partitions"][2].get("size")
+        or type(proposal.get("fedora_filesystem_limit_bytes")) is not int
+        or proposal.get("fedora_filesystem_limit_bytes") <= 0
+        or not _valid_finalization_digest(proposal.get("table_fingerprint"))
+    ):
+        return False
+    partitions = proposal.get("partitions")
+    if not isinstance(partitions, list) or len(partitions) != 3:
+        return False
+    for index, (part, guid) in enumerate(zip(partitions, new_guids), start=4):
+        if not isinstance(part, Mapping):
+            return False
+        if (
+            part.get("number") != index
+            or part.get("node") != _finalization_partition_node(str(disk), index)
+            or type(part.get("start")) is not int
+            or part.get("start") < 0
+            or type(part.get("size")) is not int
+            or part.get("size") <= 0
+            or not isinstance(part.get("type"), str)
+            or not part.get("type")
+            or str(part.get("uuid", guid)).lower() != str(guid).lower()
+        ):
+            return False
+    return True
+
+
+def _finalization_expected_table_relation(
+    original: Mapping[str, Any], expected: Mapping[str, Any]
+) -> bool:
+    if not _valid_finalization_table(original, 3) or not _valid_finalization_table(expected, 3):
+        return False
+    left = copy.deepcopy(dict(original))
+    right = copy.deepcopy(dict(expected))
+    left_parts = left["partitions"]
+    right_parts = right["partitions"]
+    if type(left_parts[2].get("size")) is not int or type(right_parts[2].get("size")) is not int:
+        return False
+    if left_parts[2]["size"] <= right_parts[2]["size"]:
+        return False
+    left_parts[2]["size"] = right_parts[2]["size"]
+    return _finalization_tables_equal(left, right)
+
+
+def _finalization_state_shape(record: Mapping[str, Any]) -> bool:
+    state = _finalization_saved_state(record)
+    if not isinstance(state, Mapping):
+        return False
+    phase = record.get("phase")
+    error = record.get("error")
+    if phase == "error":
+        if error not in _FINALIZATION_ERRORS:
+            return False
+    elif phase == "installing":
+        if error not in (None, ""):
+            return False
+    else:
+        return False
+    if (
+        state.get("schema_version") != SCHEMA_VERSION
+        or state.get("executor") != "zeus-dualboot"
+        or state.get("stage") != 2
+        or state.get("phase") != "mounted"
+        or state.get("status") != "in_progress"
+        or state.get("action") not in _FINALIZATION_ACTIONS
+        or state.get("reboot_required") is not True
+        or not _finalization_backup_choice_shape(state)
+    ):
+        return False
+    completed = state.get("completed_actions")
+    expected_completed = list(_FINALIZATION_COMPLETED_PREFIX)
+    if state.get("action") == "grub_regenerate":
+        expected_completed.append("write_grub_entry")
+    if completed != expected_completed:
+        return False
+    if not _valid_finalization_disk(state.get("disk")):
+        return False
+    original = state.get("original_table")
+    expected = state.get("expected_table")
+    allocated = state.get("allocated_table")
+    proposal = state.get("proposal")
+    if not _valid_finalization_table(original, 3) or not _valid_finalization_table(expected, 3):
+        return False
+    if not _valid_finalization_table(allocated, 6):
+        return False
+    if original.get("device") != state.get("disk") or expected.get("device") != state.get("disk") or allocated.get("device") != state.get("disk"):
+        return False
+    if not _finalization_expected_table_relation(original, expected):
+        return False
+    guids = state.get("new_guids")
+    if (
+        not isinstance(guids, list)
+        or len(guids) != 3
+        or len(set(str(item).lower() for item in guids)) != 3
+        or not all(_valid_finalization_uuid(item) for item in guids)
+    ):
+        return False
+    allocated_parts = allocated.get("partitions")
+    expected_parts = expected.get("partitions")
+    if not isinstance(allocated_parts, list) or not isinstance(expected_parts, list):
+        return False
+    if allocated_parts[:3] != expected_parts:
+        return False
+    for index, (part, guid) in enumerate(zip(allocated_parts[3:], guids), start=4):
+        proposal_parts = proposal.get("partitions") if isinstance(proposal, Mapping) else None
+        proposal_part = proposal_parts[index - 4] if isinstance(proposal_parts, list) and len(proposal_parts) == 3 else None
+        if (
+            not isinstance(part, Mapping)
+            or not isinstance(proposal_part, Mapping)
+            or part.get("node") != _finalization_partition_node(str(state["disk"]), index)
+            or part.get("start") != proposal_part.get("start")
+            or part.get("size") != proposal_part.get("size")
+            or str(part.get("type", "")).lower() != str(proposal_part.get("type", "")).lower()
+            or str(part.get("uuid", "")).lower() != str(guid).lower()
+        ):
+            return False
+    if not _valid_finalization_proposal(proposal, original, expected, guids):
+        return False
+    if not _finalization_backup_choice_shape(state):
+        return False
+    filesystem_uuids = state.get("filesystem_uuids")
+    if (
+        not isinstance(filesystem_uuids, Mapping)
+        or set(filesystem_uuids) != {"root", "boot", "esp"}
+        or not _valid_finalization_uuid(filesystem_uuids.get("root"))
+        or not _valid_finalization_uuid(filesystem_uuids.get("boot"))
+        or not _valid_finalization_fat_uuid(filesystem_uuids.get("esp"))
+        or str(state.get("efi_scope_uuid", "")).upper() != str(filesystem_uuids.get("esp", "")).upper()
+    ):
+        return False
+    if (
+        not _valid_finalization_digest(state.get("bootmenu_hash"))
+        or not _valid_finalization_digest(state.get("efi_wrapper_sha256"))
+        or not isinstance(state.get("deployment_root"), str)
+        or not state.get("deployment_root", "").startswith("/target/ostree/deploy/default/deploy/")
+        or re.fullmatch(r"[0-9a-f]{64}\.[0-9]+", Path(state["deployment_root"]).name) is None
+    ):
+        return False
+    old_boot = state.get("old_boot_id")
+    current_boot = state.get("current_boot_id")
+    if (
+        not _valid_finalization_boot_id(old_boot)
+        or not _valid_finalization_boot_id(current_boot)
+        or old_boot == current_boot
+    ):
+        return False
+    for key in (
+        "actual_filesystem_bytes_before",
+        "actual_filesystem_bytes",
+        "minimum_filesystem_bytes",
+        "filesystem_limit_bytes",
+        "kernel_partition_bytes",
+    ):
+        if type(state.get(key)) is not int or state.get(key) <= 0:
+            return False
+    if (
+        state["actual_filesystem_bytes"] < state["minimum_filesystem_bytes"]
+        or state["actual_filesystem_bytes"] > state["filesystem_limit_bytes"]
+        or state["kernel_partition_bytes"] != proposal["fedora_new_size"] * proposal["sector_size"]
+    ):
+        return False
+    top_boot = record.get("boot_id")
+    if top_boot is not None and (not _valid_finalization_boot_id(top_boot) or top_boot != current_boot):
+        return False
+    fingerprint = record.get("fingerprint")
+    for choice_key in ("backup_decision",):
+        choice = state.get(choice_key)
+        if isinstance(choice, Mapping) and isinstance(fingerprint, str) and choice.get("fingerprint") != fingerprint:
+            return False
+    return True
+
+
+def can_resume_finalization(record: Mapping[str, Any] | None) -> bool:
+    """Return whether a journal is exactly at the retryable GRUB boundary.
+
+    This is deliberately a pure structural predicate.  It never reads the
+    target, artifact, or host and therefore is safe for status/UI callers.
+    The companion :func:`verify_finalization_resume` proves current target
+    evidence before an installation phase transition.
+    """
+
+    try:
+        return isinstance(record, Mapping) and _finalization_state_shape(record)
+    except (AttributeError, KeyError, TypeError, ValueError, OSError):
+        return False
+
+
+def _finalization_inventory_table(value: Any) -> Mapping[str, Any] | None:
+    """Find a complete six-partition GPT table in current inventory evidence."""
+
+    seen: set[int] = set()
+    pending: list[Any] = [value]
+    while pending:
+        candidate = pending.pop(0)
+        if isinstance(candidate, Mapping):
+            marker = id(candidate)
+            if marker in seen:
+                continue
+            seen.add(marker)
+            if _valid_finalization_table(candidate, 6):
+                return candidate
+            for key in (
+                "partition_table",
+                "sfdisk_table",
+                "partitiontable",
+                "sfdisk",
+                "storage",
+                "target",
+                "inventory",
+                "current_inventory",
+                "current",
+                "table",
+                "blockdevices",
+                "block_devices",
+            ):
+                nested = candidate.get(key)
+                if nested is not None:
+                    pending.append(nested)
+        elif isinstance(candidate, (list, tuple)):
+            pending.extend(candidate)
+    return None
+
+
+def _finalization_inventory_mounts(value: Any) -> list[Mapping[str, Any]]:
+    """Extract flat mount records from preflight's mounts/findmnt shapes."""
+
+    if not isinstance(value, Mapping):
+        return []
+
+    def collect(candidates: Sequence[Any]) -> list[Mapping[str, Any]]:
+        result: list[Mapping[str, Any]] = []
+        pending = list(candidates)
+        seen: set[int] = set()
+        while pending:
+            candidate = pending.pop(0)
+            if isinstance(candidate, Mapping):
+                marker = id(candidate)
+                if marker in seen:
+                    continue
+                seen.add(marker)
+                target = candidate.get("target", candidate.get("mountpoint"))
+                if isinstance(target, str):
+                    result.append(candidate)
+                for key in ("filesystems", "mounts", "children"):
+                    nested = candidate.get(key)
+                    if nested is not None:
+                        pending.append(nested)
+            elif isinstance(candidate, (list, tuple)):
+                pending.extend(candidate)
+        return result
+
+    # ``preflight.collect`` intentionally exposes both a canonical flattened
+    # ``mounts`` list and the raw ``findmnt`` tree.  Prefer the canonical list
+    # so each target is represented once; otherwise the two aliases would
+    # look like duplicate mounts and make a valid resume fail closed.
+    canonical = value.get("mounts")
+    if canonical is not None:
+        result = collect([canonical])
+        if result:
+            return result
+    for key in ("inventory", "current_inventory", "current"):
+        nested = value.get(key)
+        if isinstance(nested, Mapping):
+            result = _finalization_inventory_mounts(nested)
+            if result:
+                return result
+    candidates = [value[key] for key in ("findmnt", "filesystems") if value.get(key) is not None]
+    result = collect(candidates)
+    # Keep a deterministic de-duplicated fallback for inventories assembled
+    # from more than one raw findmnt alias.
+    unique: list[Mapping[str, Any]] = []
+    keys: set[tuple[Any, ...]] = set()
+    for item in result:
+        marker = tuple(item.get(key) for key in ("target", "mountpoint", "source", "fstype", "uuid", "partuuid"))
+        if marker in keys:
+            continue
+        keys.add(marker)
+        unique.append(item)
+    return unique
+
+
+def _finalization_inventory_devices(value: Any) -> list[Mapping[str, Any]]:
+    """Flatten only block-device records used for stable-ID evidence."""
+
+    if not isinstance(value, Mapping):
+        return []
+
+    def collect(candidates: Sequence[Any]) -> list[Mapping[str, Any]]:
+        result: list[Mapping[str, Any]] = []
+        pending: list[Any] = list(candidates)
+        seen: set[int] = set()
+        while pending:
+            candidate = pending.pop(0)
+            if isinstance(candidate, Mapping):
+                marker = id(candidate)
+                if marker in seen:
+                    continue
+                seen.add(marker)
+                if any(key in candidate for key in ("path", "name", "kname", "type", "serial", "wwn")):
+                    result.append(candidate)
+                for key in ("block_devices", "blockdevices", "devices", "children", "lsblk"):
+                    nested = candidate.get(key)
+                    if nested is not None:
+                        pending.append(nested)
+            elif isinstance(candidate, (list, tuple)):
+                pending.extend(candidate)
+        return result
+
+    # As with mounts, preflight retains both the flattened block_devices list
+    # and raw lsblk output.  The flattened list is canonical and avoids
+    # treating one disk record as two conflicting stable-ID observations.
+    canonical = value.get("block_devices")
+    if canonical is not None:
+        result = collect([canonical])
+        if result:
+            return result
+    for key in ("inventory", "current_inventory", "current"):
+        nested = value.get(key)
+        if isinstance(nested, Mapping):
+            result = _finalization_inventory_devices(nested)
+            if result:
+                return result
+    return collect([value[key] for key in ("lsblk", "blockdevices", "devices") if value.get(key) is not None])
+
+
+def _finalization_device_path(value: Mapping[str, Any]) -> str | None:
+    candidate = value.get("path", value.get("device_path", value.get("devpath")))
+    if candidate is None:
+        candidate = value.get("name", value.get("kname", value.get("device")))
+    if candidate is None:
+        return None
+    text = str(candidate)
+    return text if text.startswith("/") else "/dev/" + text
+
+
+def _finalization_device_identity(value: Mapping[str, Any]) -> str | None:
+    for key in ("stable_id", "stableid", "serial", "wwn", "eui", "disk_id", "by_id", "identity", "id"):
+        candidate = value.get(key)
+        if candidate is None:
+            continue
+        text = str(candidate).strip()
+        if text and not text.startswith("/dev/") and text.lower() not in {"unknown", "none", "null", "-"}:
+            return text
+    return None
+
+
+def _finalization_inventory_boot_id(inventory: Mapping[str, Any]) -> str | None:
+    for owner in (inventory, inventory.get("kernel"), inventory.get("host"), inventory.get("boot")):
+        if not isinstance(owner, Mapping):
+            continue
+        for key in ("boot_id", "bootid", "current_boot_id"):
+            value = owner.get(key)
+            if _valid_finalization_boot_id(value):
+                return value
+    return None
+
+
+def verify_finalization_resume(
+    *,
+    plan: Mapping[str, Any],
+    record: Mapping[str, Any],
+    inventory: Mapping[str, Any],
+) -> bool:
+    """Prove current six-partition and mount evidence for GRUB-only retry.
+
+    The function is intentionally read-only.  It consumes the fresh
+    inventory supplied by the backend and checks every durable identity needed
+    by the finalizer.  A runner-backed instance check repeats these proofs
+    immediately before the two final menu writes.
+    """
+
+    try:
+        if not can_resume_finalization(record) or not isinstance(plan, Mapping) or not isinstance(inventory, Mapping):
+            return False
+        state = _finalization_saved_state(record)
+        if not isinstance(state, Mapping):
+            return False
+        fingerprint = plan.get("fingerprint")
+        if not _valid_finalization_fingerprint(fingerprint):
+            return False
+        backup = state.get("backup_decision")
+        if isinstance(backup, Mapping):
+            if backup.get("fingerprint") != fingerprint:
+                return False
+        checker = DualBootExecutor(require_root=False)
+        original = state.get("original_table")
+        expected = state.get("expected_table")
+        allocated = state.get("allocated_table")
+        proposal = state.get("proposal")
+        guids = state.get("new_guids")
+        if not isinstance(original, Mapping) or not isinstance(expected, Mapping) or not isinstance(allocated, Mapping) or not isinstance(proposal, Mapping) or not isinstance(guids, list):
+            return False
+        plan_table = checker._plan_table(plan)
+        if plan_table is not None and not _finalization_tables_equal(plan_table, original):
+            return False
+        plan_proposal = checker._find_proposal(plan)
+        if isinstance(plan_proposal, Mapping):
+            if not _valid_finalization_proposal(plan_proposal, original, expected, guids):
+                return False
+            if not _valid_finalization_proposal(proposal, original, expected, guids):
+                return False
+            # Compare the durable proposal to all geometry fields exposed by
+            # preflight.  The state itself remains the source of the full
+            # append identities.
+            checker._compare_proposal(proposal, plan_proposal)
+        table = _finalization_inventory_table(inventory)
+        if table is None or not _finalization_tables_equal(table, allocated):
+            return False
+
+        # Stable disk and Fedora source identities are checked from the fresh
+        # block-device inventory where those records are available.  The GPT
+        # and partition UUIDs above are mandatory; a missing serial is not
+        # silently substituted for a different serial.
+        expected_disk = checker._expected_disk_identity(plan, plan.get("inventory"))
+        devices = _finalization_inventory_devices(inventory)
+        disk_devices = [
+            item for item in devices
+            if _finalization_device_path(item) == state.get("disk")
+            and str(item.get("type", "")).lower() in {"disk", "nvme", "mmc"}
+        ]
+        if expected_disk is not None:
+            if len(disk_devices) != 1 or _finalization_device_identity(disk_devices[0]) != str(expected_disk):
+                return False
+        expected_source = checker._expected_source_identity(plan, plan.get("inventory"))
+        allocated_parts = allocated.get("partitions")
+        if not isinstance(allocated_parts, list) or len(allocated_parts) != 6:
+            return False
+        source_uuid = str(allocated_parts[2].get("uuid", "")).lower() if isinstance(allocated_parts[2], Mapping) else ""
+        if expected_source is not None and source_uuid != str(expected_source).lower():
+            return False
+
+        filesystems = state.get("filesystem_uuids")
+        if not isinstance(filesystems, Mapping):
+            return False
+        expected_mounts = {
+            "/target": (allocated_parts[5], filesystems.get("root"), {"ext4"}),
+            "/target/boot": (allocated_parts[4], filesystems.get("boot"), {"ext4"}),
+            "/target/boot/efi": (allocated_parts[3], filesystems.get("esp"), {"vfat", "fat", "fat32"}),
+        }
+        mounts = _finalization_inventory_mounts(inventory)
+        for target, (part, fs_uuid, types) in expected_mounts.items():
+            matches = [
+                item for item in mounts
+                if item.get("target", item.get("mountpoint")) == target
+            ]
+            if len(matches) != 1 or not isinstance(part, Mapping) or not isinstance(fs_uuid, str):
+                return False
+            item = matches[0]
+            source = str(item.get("source", item.get("device", ""))).split("[", 1)[0]
+            fstype = str(item.get("fstype", item.get("FSTYPE", ""))).lower()
+            observed_uuid = item.get("uuid", item.get("UUID"))
+            observed_partuuid = item.get("partuuid", item.get("PARTUUID"))
+            if (
+                source != part.get("node")
+                or fstype not in types
+                or not isinstance(observed_uuid, str)
+                or observed_uuid.lower() != fs_uuid.lower()
+                or not isinstance(observed_partuuid, str)
+                or observed_partuuid.lower() != str(part.get("uuid", "")).lower()
+            ):
+                return False
+
+        observed_boot = _finalization_inventory_boot_id(inventory)
+        if observed_boot is not None and observed_boot != state.get("current_boot_id"):
+            return False
+        checker._check_dynamic_resources(inventory)
+        return True
+    except (AttributeError, ExecutorError, OSError, TypeError, ValueError, KeyError, RuntimeError):
+        return False
+
 
 class ExecutorError(InstallError):
     """Stable, user-safe failure raised by the executor."""
@@ -258,6 +907,21 @@ class DualBootExecutor:
                 # authoritative for stage two and must not be replaced by a
                 # fresh default.
                 effective_without_backup = persisted_choice
+            # A stage-two command may have completed every operation through
+            # fstab and stopped only while writing Fedora's final menu entry
+            # (or regenerating its menu).  This is the one narrowly bounded
+            # retry that is safe after an ambiguous marker.  Detect it before
+            # the generic ambiguity rejection; all other in-progress state
+            # remains fail-closed below.
+            if state_record is not None and self.can_resume_finalization(state_record):
+                return self._resume_finalization(
+                    plan,
+                    artifact,
+                    runner,
+                    journal,
+                    state_record,
+                    saved,
+                )
             self._reject_ambiguous(saved)
             stage = saved.get("stage")
             if stage == 1 and saved.get("phase") == "reboot_required":
@@ -305,6 +969,12 @@ class DualBootExecutor:
         )
 
     @staticmethod
+    def can_resume_finalization(record: Mapping[str, Any] | None) -> bool:
+        """Expose the pure structural GRUB-finalization resume predicate."""
+
+        return can_resume_finalization(record)
+
+    @staticmethod
     def _validate_execution_plan(plan: Mapping[str, Any]) -> None:
         """Reject an unvalidated or already blocked preflight plan.
 
@@ -323,6 +993,36 @@ class DualBootExecutor:
         fingerprint = plan.get("fingerprint")
         if not isinstance(fingerprint, str) or _FINGERPRINT_RE.fullmatch(fingerprint) is None:
             raise ExecutorError("invalid_plan", "The installer plan has no valid target fingerprint.")
+
+    def verify_finalization_resume(
+        self,
+        *,
+        plan: Mapping[str, Any],
+        record: Mapping[str, Any],
+        inventory: Mapping[str, Any],
+    ) -> bool:
+        """Prove a current target before allowing GRUB-only finalization."""
+
+        if self.qualified is not True or not self._valid_qualification_receipt(self.qualification_receipt):
+            return False
+        if not verify_finalization_resume(plan=plan, record=record, inventory=inventory):
+            return False
+        try:
+            state = self._saved_state(record)
+            if not isinstance(state, Mapping):
+                return False
+            old_boot = self._safe_boot_id(state.get("old_boot_id"))
+            current_boot = self._safe_boot_id(self.boot_id())
+            saved_boot = self._safe_boot_id(state.get("current_boot_id"))
+            return (
+                old_boot is not None
+                and current_boot is not None
+                and saved_boot is not None
+                and old_boot != current_boot
+                and current_boot == saved_boot
+            )
+        except (ExecutorError, OSError, TypeError, ValueError, AttributeError):
+            return False
 
     # Backend's optional resume hook.  It is deliberately read-only.
     def verify_resume(
@@ -862,6 +1562,334 @@ class DualBootExecutor:
     # ------------------------------------------------------------------
     # Stage 2: append, format, install, EFI, and Fedora menu entry
     # ------------------------------------------------------------------
+
+    def _resume_finalization(
+        self,
+        plan: Mapping[str, Any],
+        artifact: Mapping[str, Any],
+        runner: Any,
+        journal: Any,
+        record: Mapping[str, Any],
+        saved: Mapping[str, Any],
+    ) -> Mapping[str, Any]:
+        """Retry only the two Fedora GRUB operations at the saved boundary."""
+
+        state = copy.deepcopy(dict(saved))
+        rendered = self._verify_finalization_runtime(
+            plan=plan,
+            artifact=artifact,
+            runner=runner,
+            journal=journal,
+            record=record,
+            state=state,
+        )
+        with self._write_inhibitor():
+            # Repeat the read-only target proof after acquiring the inhibitor
+            # and immediately before the first write.  This closes the gap
+            # between backend preflight and the final Fedora file mutation.
+            rendered = self._verify_finalization_runtime(
+                plan=plan,
+                artifact=artifact,
+                runner=runner,
+                journal=journal,
+                record=record,
+                state=state,
+            )
+            self._before_mutation(journal, state, "write_grub_entry")
+            self._write_fedora_grub(rendered)
+            self._after_mutation(journal, state, "write_grub_entry")
+            self._before_mutation(journal, state, "grub_regenerate")
+            self._run_checked(
+                runner,
+                [GRUB2_MKCONFIG, "--no-grubenv-update", "-o", str(FEDORA_GRUB_CONFIG)],
+                action="Regenerate Fedora GRUB menu",
+            )
+            self._after_mutation(journal, state, "grub_regenerate")
+            state["phase"] = "installed"
+            state["status"] = "complete"
+            state["action"] = None
+            state["reboot_required"] = False
+            state["zeus_esp_uuid"] = state["filesystem_uuids"]["esp"]
+            state["result"] = self._installed_result(state)
+            self._persist_state(journal, state)
+        return self._installed_result(state)
+
+    def _verify_finalization_runtime(
+        self,
+        *,
+        plan: Mapping[str, Any],
+        artifact: Mapping[str, Any],
+        runner: Any,
+        journal: Any,
+        record: Mapping[str, Any],
+        state: Mapping[str, Any],
+    ) -> str:
+        """Run all finalization checks without changing host or journal state."""
+
+        candidate = dict(record)
+        candidate["executor_state"] = dict(state)
+        if not can_resume_finalization(candidate):
+            raise ExecutorError(
+                "interrupted",
+                "The saved state is not the qualified Fedora GRUB finalization boundary.",
+            )
+        if self._saved_backup_choice(state, plan) is None:
+            raise ExecutorError("invalid_state", "The saved backup choice is incomplete.")
+        self._verify_qualified_artifact(artifact)
+        saved_artifact = record.get("artifact")
+        if not isinstance(saved_artifact, Mapping):
+            raise ExecutorError("artifact_invalid", "The saved qualified OCI archive is unavailable.")
+        for key in ("path", "build_id", "manifest_digest"):
+            if key in saved_artifact and saved_artifact.get(key) != artifact.get(key):
+                raise ExecutorError("artifact_invalid", "The saved qualified OCI archive changed.")
+        # This is a read-only ownership and mode check.  The artifact is not
+        # used by the GRUB retry, but retaining the original verified source
+        # as a prerequisite prevents a fabricated finalization request.
+        self._artifact_source(artifact, journal)
+        self._refresh_prewrite_guard(plan, runner, require_supported=False)
+        old_boot = self._require_boot_id(
+            state.get("old_boot_id"), "The recorded boot identity is invalid."
+        )
+        current_boot = self._require_boot_id(
+            self.boot_id(), "The current boot identity is unavailable."
+        )
+        saved_boot = self._require_boot_id(
+            state.get("current_boot_id"), "The recorded current boot identity is invalid."
+        )
+        if old_boot == current_boot or current_boot != saved_boot:
+            raise ExecutorError(
+                "target_mismatch",
+                "The current boot identity does not match the saved finalization boundary.",
+            )
+        self._verify_finalization_target(plan, runner, state)
+        return self._finalization_rendered(state)
+
+    def _verify_finalization_target(
+        self,
+        plan: Mapping[str, Any],
+        runner: Any,
+        state: Mapping[str, Any],
+    ) -> None:
+        original = state.get("original_table")
+        expected = state.get("expected_table")
+        allocated = state.get("allocated_table")
+        proposal = state.get("proposal")
+        guids = state.get("new_guids")
+        if (
+            not isinstance(original, Mapping)
+            or not isinstance(expected, Mapping)
+            or not isinstance(allocated, Mapping)
+            or not isinstance(proposal, Mapping)
+            or not isinstance(guids, list)
+        ):
+            raise ExecutorError("invalid_state", "The saved finalization layout is incomplete.")
+        plan_table = self._plan_table(plan)
+        if plan_table is not None and not _finalization_tables_equal(plan_table, original):
+            raise ExecutorError("target_mismatch", "The saved Fedora GPT table belongs to another target.")
+        plan_proposal = self._find_proposal(plan)
+        if isinstance(plan_proposal, Mapping):
+            if not _valid_finalization_proposal(plan_proposal, original, expected, guids):
+                raise ExecutorError("target_mismatch", "The saved GPT proposal is no longer valid.")
+            try:
+                self._compare_proposal(proposal, plan_proposal)
+            except ExecutorError:
+                raise
+            except (TypeError, ValueError, KeyError) as error:
+                raise ExecutorError("target_mismatch", "The saved GPT proposal is no longer valid.") from error
+
+        disk = self._disk(state.get("disk"))
+        current = self._sfdisk_table(runner, disk)
+        if not _valid_finalization_table(current, 6) or not _finalization_tables_equal(current, allocated):
+            raise ExecutorError("target_mismatch", "The current GPT table no longer matches the saved allocation.")
+        try:
+            self._verify_allocated_table(current, expected, proposal, guids)
+        except ExecutorError:
+            raise
+        except (TypeError, ValueError, KeyError) as error:
+            raise ExecutorError("target_mismatch", "The current GPT allocation is invalid.") from error
+        self._verify_finalization_stable_ids(plan, current, runner)
+        self._verify_finalization_mounts(runner, state, current)
+        self.deployment_root = self._verify_finalization_deployment(state)
+        self._verify_finalization_efi_files(state)
+
+    def _verify_finalization_stable_ids(
+        self,
+        plan: Mapping[str, Any],
+        table: Mapping[str, Any],
+        runner: Any,
+    ) -> None:
+        """Recheck the disk and Fedora partition identities on the full GPT."""
+
+        inventory = plan.get("inventory") if isinstance(plan, Mapping) else None
+        expected_ptuuid = self._expected_value(
+            plan, inventory, ("partition_table_uuid", "gpt_uuid", "ptuuid", "table_uuid")
+        )
+        if expected_ptuuid is not None and str(table.get("id", "")).lower() != str(expected_ptuuid).lower():
+            raise ExecutorError("target_mismatch", "The GPT table identity changed before finalization.")
+        expected_partuuid = self._expected_source_identity(plan, inventory)
+        parts = table.get("partitions")
+        if expected_partuuid is not None and (
+            not isinstance(parts, list)
+            or len(parts) < 3
+            or not isinstance(parts[2], Mapping)
+            or str(parts[2].get("uuid", "")).lower() != str(expected_partuuid).lower()
+        ):
+            raise ExecutorError("target_mismatch", "The Fedora partition identity changed before finalization.")
+        expected_disk_id = self._expected_disk_identity(plan, inventory)
+        if expected_disk_id is not None:
+            current = self._lsblk_disk(runner, str(table.get("device", "")))
+            observed = self._disk_identity(current)
+            if observed is None or str(observed) != str(expected_disk_id):
+                raise ExecutorError("target_mismatch", "The target disk stable identity changed before finalization.")
+
+    def _verify_finalization_mounts(
+        self,
+        runner: Any,
+        state: Mapping[str, Any],
+        table: Mapping[str, Any],
+    ) -> None:
+        filesystem_uuids = state.get("filesystem_uuids")
+        parts = table.get("partitions")
+        if not isinstance(filesystem_uuids, Mapping) or not isinstance(parts, list) or len(parts) != 6:
+            raise ExecutorError("invalid_state", "The saved filesystem identities are incomplete.")
+        expected = (
+            (TARGET_ROOT, parts[5], filesystem_uuids.get("root"), {"ext4"}),
+            (TARGET_BOOT, parts[4], filesystem_uuids.get("boot"), {"ext4"}),
+            (TARGET_ESP, parts[3], filesystem_uuids.get("esp"), {"vfat", "fat", "fat32"}),
+        )
+        for target, part, fs_uuid, types in expected:
+            if not isinstance(part, Mapping) or not isinstance(fs_uuid, str):
+                raise ExecutorError("invalid_state", "The saved filesystem identities are invalid.")
+            result = self._run_checked(
+                runner,
+                [FINDMNT, "--json", "--target", str(target), "--output", "SOURCE,FSTYPE,UUID,PARTUUID"],
+                action="Verify Zeus finalization mount",
+            )
+            value = self._json_payload(result)
+            item: Mapping[str, Any] | None = None
+            if isinstance(value, Mapping):
+                filesystems = value.get("filesystems")
+                if isinstance(filesystems, list) and len(filesystems) == 1 and isinstance(filesystems[0], Mapping):
+                    item = filesystems[0]
+                elif "source" in value or "SOURCE" in value:
+                    item = value
+            if item is None:
+                raise ExecutorError("mount_invalid", "A Zeus finalization mount could not be verified.")
+            source = str(item.get("source", item.get("SOURCE", ""))).split("[", 1)[0]
+            fstype = str(item.get("fstype", item.get("FSTYPE", ""))).lower()
+            observed_uuid = item.get("uuid", item.get("UUID"))
+            observed_partuuid = item.get("partuuid", item.get("PARTUUID"))
+            if (
+                source != part.get("node")
+                or fstype not in types
+                or not isinstance(observed_uuid, str)
+                or observed_uuid.lower() != fs_uuid.lower()
+                or not isinstance(observed_partuuid, str)
+                or observed_partuuid.lower() != str(part.get("uuid", "")).lower()
+            ):
+                raise ExecutorError("mount_invalid", "A Zeus finalization mount identity changed.")
+
+    def _verify_finalization_deployment(self, state: Mapping[str, Any]) -> Path:
+        value = state.get("deployment_root")
+        if not isinstance(value, str):
+            raise ExecutorError("target_unverified", "The saved deployment identity is unavailable.")
+        expected = Path(value)
+        if (
+            not expected.is_absolute()
+            or expected.name == ""
+            or re.fullmatch(r"[0-9a-f]{64}\.[0-9]+", expected.name) is None
+            or expected.parent != TARGET_ROOT / "ostree/deploy/default/deploy"
+        ):
+            raise ExecutorError("target_unverified", "The saved deployment identity is invalid.")
+        resolved = self._resolve_deployment_root()
+        if resolved != expected:
+            raise ExecutorError("target_mismatch", "The installed deployment identity changed before finalization.")
+        return resolved
+
+    @staticmethod
+    def _efi_dropin_bytes() -> bytes:
+        return (
+            "[Unit]\n"
+            "RequiresMountsFor=/boot/efi\n"
+            "After=boot-efi.mount\n\n"
+            "[Service]\n"
+            "ExecStart=\n"
+            "ExecStart=/usr/bin/python3 -I /etc/zeus/efi_update.py --config /etc/zeus/efi-update.json\n"
+            "PrivateNetwork=yes\n"
+            "ProtectHome=yes\n"
+            "KillMode=mixed\n"
+            "MountFlags=slave\n"
+        ).encode("utf-8")
+
+    def _verify_finalization_efi_files(self, state: Mapping[str, Any]) -> None:
+        """Verify the already-installed scoped EFI integration read-only."""
+
+        source = Path(__file__).with_name("efi_update.py").resolve()
+        try:
+            metadata = os.lstat(source)
+            if (
+                stat.S_ISLNK(metadata.st_mode)
+                or not stat.S_ISREG(metadata.st_mode)
+                or (self.require_root and (metadata.st_uid != 0 or metadata.st_mode & 0o022))
+                or metadata.st_size > 512 * 1024
+            ):
+                raise OSError("EFI worker source is not protected")
+            source_data = source.read_bytes()
+        except OSError as error:
+            raise ExecutorError("efi_scope_failed", "The scoped EFI worker source is unavailable.") from error
+        wrapper_path = self._target_etc_path(f"zeus/{EFI_WRAPPER_NAME}")
+        config_path = self._target_etc_path("zeus/efi-update.json")
+        dropin_path = self._target_etc_path(EFI_DROPIN_NAME)
+        wrapper = self._read_file(
+            wrapper_path,
+            limit=512 * 1024,
+            code="efi_scope_failed",
+            missing_code="file_missing",
+        )
+        if hashlib.sha256(source_data).hexdigest() != str(state.get("efi_wrapper_sha256", "")).lower():
+            raise ExecutorError("efi_scope_failed", "The saved EFI worker identity is invalid.")
+        if hashlib.sha256(wrapper.encode("utf-8")).hexdigest() != str(state.get("efi_wrapper_sha256", "")).lower():
+            raise ExecutorError("efi_scope_failed", "The installed EFI worker changed before finalization.")
+        config_raw = self._read_file(
+            config_path,
+            limit=64 * 1024,
+            code="efi_scope_failed",
+            missing_code="file_missing",
+        )
+        try:
+            config = json.loads(config_raw)
+        except (TypeError, ValueError, json.JSONDecodeError) as error:
+            raise ExecutorError("efi_scope_failed", "The installed EFI scope configuration is invalid.") from error
+        filesystem_uuids = state.get("filesystem_uuids")
+        if (
+            not isinstance(config, Mapping)
+            or config.get("schema_version") != SCHEMA_VERSION
+            or str(config.get("esp_uuid", "")).upper() != str(filesystem_uuids.get("esp", "")).upper()
+            or config.get("mountpoint") != "/boot/efi"
+        ):
+            raise ExecutorError("efi_scope_failed", "The installed EFI scope configuration changed before finalization.")
+        dropin = self._read_file(
+            dropin_path,
+            limit=64 * 1024,
+            code="efi_scope_failed",
+            missing_code="file_missing",
+        )
+        if dropin.encode("utf-8") != self._efi_dropin_bytes():
+            raise ExecutorError("efi_scope_failed", "The installed EFI service scope changed before finalization.")
+
+    def _finalization_rendered(self, state: Mapping[str, Any]) -> str:
+        filesystem_uuids = state.get("filesystem_uuids")
+        if not isinstance(filesystem_uuids, Mapping):
+            raise ExecutorError("invalid_state", "The saved filesystem identities are incomplete.")
+        esp_uuid = filesystem_uuids.get("esp")
+        try:
+            rendered = bootmenu.render(esp_uuid)
+        except (TypeError, ValueError) as error:
+            raise ExecutorError("invalid_state", "The saved Zeus ESP identity is invalid.") from error
+        digest = hashlib.sha256(rendered.encode("utf-8")).hexdigest()
+        if digest.lower() != str(state.get("bootmenu_hash", "")).lower():
+            raise ExecutorError("target_mismatch", "The saved Fedora GRUB entry identity changed before finalization.")
+        return rendered
 
     def _stage2(
         self,
@@ -2322,7 +3350,7 @@ class DualBootExecutor:
         expected_owner = 0 if self.require_root else os.geteuid()
         forbidden_mode = 0o077 if private else 0o022
         if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != expected_owner or metadata.st_mode & forbidden_mode:
-            raise ExecutorError(code, "The required installer file is not protected.")
+            raise ExecutorError(code, f"The required installer file is not protected: {path}.")
         if metadata.st_size > limit:
             raise ExecutorError(code, "The required installer file is too large.")
         try:
@@ -2483,19 +3511,7 @@ class DualBootExecutor:
         wrapper_path = self._target_etc_path(f"zeus/{EFI_WRAPPER_NAME}")
         dropin_path = self._target_etc_path(EFI_DROPIN_NAME)
         self._write_file(wrapper_path, source_data, 0o755)
-        dropin = (
-            "[Unit]\n"
-            "RequiresMountsFor=/boot/efi\n"
-            "After=boot-efi.mount\n\n"
-            "[Service]\n"
-            "ExecStart=\n"
-            "ExecStart=/usr/bin/python3 -I /etc/zeus/efi_update.py --config /etc/zeus/efi-update.json\n"
-            "PrivateNetwork=yes\n"
-            "ProtectHome=yes\n"
-            "KillMode=mixed\n"
-            "MountFlags=slave\n"
-        ).encode("utf-8")
-        self._write_file(dropin_path, dropin, 0o644)
+        self._write_file(dropin_path, self._efi_dropin_bytes(), 0o644)
         return hashlib.sha256(source_data).hexdigest()
 
     def _write_fstab(self, filesystem_uuids: Mapping[str, str]) -> None:
@@ -2889,6 +3905,7 @@ class DualBootExecutor:
 __all__ = [
     "BACKUP_RECEIPT_PATH",
     "CAT",
+    "can_resume_finalization",
     "DualBootExecutor",
     "EFI_DROPIN_NAME",
     "EFI_WRAPPER_NAME",
@@ -2904,4 +3921,5 @@ __all__ = [
     "TARGET_IMAGE_REF",
     "TARGET_PAYLOAD",
     "TARGET_ROOT",
+    "verify_finalization_resume",
 ]

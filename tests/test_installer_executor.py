@@ -147,6 +147,14 @@ class FixtureRunner:
         else:
             source, fstype = self.mounts.get(target, ("", ""))
             item = {"source": source, "fstype": fstype}
+            if source:
+                formatted = self.formatted.get(source)
+                if formatted is not None:
+                    item["uuid"] = formatted[0]
+                for partition in self.table.get("partitions", []):
+                    if isinstance(partition, dict) and partition.get("node") == source:
+                        item["partuuid"] = partition.get("uuid")
+                        break
         return Result(stdout=json.dumps({"filesystems": [item] if item["source"] else []}))
 
     def run(self, argv: list[str], **kwargs: object) -> Result:
@@ -197,7 +205,10 @@ class FixtureRunner:
                 name = re.search(r'name="([^"]+)"', line).group(1)
                 additions.append(
                     {
-                        "node": self._node(self.table["device"], len(self.table["partitions"]) + 1),
+                        "node": self._node(
+                            self.table["device"],
+                            len(self.table["partitions"]) + len(additions) + 1,
+                        ),
                         "start": start,
                         "size": size,
                         "type": kind,
@@ -730,6 +741,166 @@ class ExecutorFixtureTests(unittest.TestCase):
             self.executor.execute(plan=self.plan, artifact=self.artifact, runner=self.runner, journal=self.journal)
         self.assertEqual(context.exception.code, "ac_required")
         self.assertEqual(self.runner.calls, [])
+
+    def test_protected_grub_file_error_names_exact_path(self) -> None:
+        path = Path(self.temp.name) / "grub-defaults"
+        path.write_text("GRUB_TIMEOUT=5\n", encoding="utf-8")
+        path.chmod(0o664)
+        reader = self.executor.reader
+        self.executor.reader = None
+        try:
+            with self.assertRaises(installer_executor.ExecutorError) as error:
+                self.executor._read_file(path, limit=64 * 1024, code="grub_invalid")
+        finally:
+            self.executor.reader = reader
+        self.assertEqual(error.exception.code, "grub_invalid")
+        self.assertIn(str(path), str(error.exception))
+
+    def _finalization_inventory(self) -> dict[str, object]:
+        inventory = copy.deepcopy(self.plan["inventory"])
+        inventory["partition_table"] = copy.deepcopy(self.runner.table)
+        inventory["sfdisk"] = {"partitiontable": copy.deepcopy(self.runner.table)}
+        mounts = []
+        for target, node in (
+            ("/target", "/dev/nvme0n1p6"),
+            ("/target/boot", "/dev/nvme0n1p5"),
+            ("/target/boot/efi", "/dev/nvme0n1p4"),
+        ):
+            fs_uuid, fs_type = self.runner.formatted[node]
+            part = next(item for item in self.runner.table["partitions"] if item["node"] == node)
+            mounts.append(
+                {
+                    "target": target,
+                    "source": node,
+                    "fstype": fs_type,
+                    "uuid": fs_uuid,
+                    "partuuid": part["uuid"],
+                }
+            )
+        inventory["mounts"] = mounts
+        inventory["memory"] = {"available_bytes": 4 * 1024**3}
+        inventory["power"] = {"ac_online": True}
+        inventory["staging"] = {"free_bytes": 16 * 1024**3}
+        return inventory
+
+    def _prepare_grub_failure_boundary(self) -> dict[str, object]:
+        self.execute_stage1()
+        self.boot["id"] = "feedface"
+        with mock.patch.object(
+            self.executor,
+            "_write_fedora_grub",
+            side_effect=installer_executor.ExecutorError("grub_invalid", "protected GRUB defaults"),
+        ):
+            with self.assertRaises(installer_executor.ExecutorError) as error:
+                self.executor.execute(
+                    plan=self.plan,
+                    artifact=self.artifact,
+                    runner=self.runner,
+                    journal=self.journal,
+                )
+        self.assertEqual(error.exception.code, "grub_invalid")
+        record = self.journal.load()
+        self.assertIsInstance(record, dict)
+        record["phase"] = "error"
+        record["error"] = "grub_invalid"
+        record["boot_id"] = self.boot["id"]
+        record["artifact"] = copy.deepcopy(self.artifact)
+        self.journal.write(record)
+
+        def reader(path: Path) -> str | bytes | None:
+            if path == self.executor.backup_receipt_path:
+                return json.dumps(self.receipt)
+            return self.files.get(path)
+
+        self.executor.reader = reader
+        return self.journal.load()
+
+    def test_grub_boundary_resumes_only_final_menu_actions(self) -> None:
+        record = self._prepare_grub_failure_boundary()
+        inventory = self._finalization_inventory()
+        self.assertTrue(installer_executor.can_resume_finalization(record))
+        self.assertTrue(
+            self.executor.verify_finalization_resume(
+                plan=self.plan,
+                record=record,
+                inventory=inventory,
+            )
+        )
+        before_calls = len(self.runner.calls)
+        result = self.executor.execute(
+            plan=self.plan,
+            artifact=self.artifact,
+            runner=self.runner,
+            journal=self.journal,
+        )
+        self.assertEqual(result["phase"], "installed")
+        delta = self.runner.calls[before_calls:]
+        self.assertTrue(any(argv[0] == installer_executor.GRUB2_MKCONFIG for argv, _ in delta))
+        forbidden = {
+            installer_executor.BTRFS,
+            installer_executor.MKFS_FAT,
+            installer_executor.MKFS_EXT4,
+            installer_executor.PARTX,
+            installer_executor.PODMAN,
+            installer_executor.MOUNT,
+        }
+        self.assertFalse(any(argv[0] in forbidden for argv, _ in delta))
+        state = self.journal.load()["executor_state"]
+        self.assertEqual(state["phase"], "installed")
+        self.assertEqual(state["status"], "complete")
+        self.assertFalse(state["reboot_required"])
+
+    def test_grub_boundary_evidence_changes_are_refused_before_writes(self) -> None:
+        self._prepare_grub_failure_boundary()
+        baseline_calls = len(self.runner.calls)
+        baseline_files = copy.deepcopy(self.files)
+        baseline_state = copy.deepcopy(self.journal.load()["executor_state"])
+
+        def execute_again() -> installer_executor.ExecutorError:
+            with self.assertRaises(installer_executor.ExecutorError) as error:
+                self.executor.execute(
+                    plan=self.plan,
+                    artifact=self.artifact,
+                    runner=self.runner,
+                    journal=self.journal,
+                )
+            delta = self.runner.calls[baseline_calls:]
+            self.assertFalse(any(self._is_mutating_command(argv) for argv, _ in delta))
+            self.assertEqual(self.files, baseline_files)
+            return error.exception
+
+        root_part = self.runner.table["partitions"][5]
+        original_root_size = root_part["size"]
+        root_part["size"] += 1
+        self.assertEqual(execute_again().code, "target_mismatch")
+        root_part["size"] = original_root_size
+
+        original_uuid = self.runner.formatted["/dev/nvme0n1p4"]
+        self.runner.formatted["/dev/nvme0n1p4"] = ("DEAD-BEEF", original_uuid[1])
+        self.assertEqual(execute_again().code, "mount_invalid")
+        self.runner.formatted["/dev/nvme0n1p4"] = original_uuid
+
+        self.boot["id"] = "cafebabe"
+        self.assertEqual(execute_again().code, "target_mismatch")
+        self.boot["id"] = "feedface"
+
+        record = self.journal.load()
+        state = copy.deepcopy(record["executor_state"])
+        state["bootmenu_hash"] = "0" * 64
+        record["executor_state"] = state
+        self.journal.write(record)
+        self.assertEqual(execute_again().code, "target_mismatch")
+        record = self.journal.load()
+        record["executor_state"] = copy.deepcopy(baseline_state)
+        self.journal.write(record)
+
+        record = self.journal.load()
+        malformed = copy.deepcopy(baseline_state)
+        malformed["deployment_root"] = "/target/invalid"
+        record["executor_state"] = malformed
+        self.journal.write(record)
+        self.assertFalse(installer_executor.can_resume_finalization(record))
+        self.assertEqual(execute_again().code, "interrupted")
 
 
 if __name__ == "__main__":  # pragma: no cover
