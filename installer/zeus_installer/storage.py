@@ -15,6 +15,7 @@ GIB = 1024 ** 3
 MIB = 1024 ** 2
 EFI = 'C12A7328-F81F-11D2-BA4B-00A0C93EC93B'
 LINUX = '0FC63DAF-8483-4772-8E79-3D69D8477DE4'
+XBOOTLDR = 'BC13C2FF-59E6-4262-A352-B275FD6F7172'
 
 
 class StorageError(ValueError):
@@ -56,6 +57,9 @@ def layout(table, allocation_gib=128):
         raise StorageError('Expected precisely ESP, Fedora boot and Fedora root')
     suffix = 'p' if device[-1].isdigit() else ''
     previous_end = first
+    # Fedora may mark its ext4 /boot as Linux data or extended boot. Accept
+    # either only in that slot; retain the original type in all identity checks.
+    accepted_types = ((EFI,), (LINUX, XBOOTLDR), (LINUX,))
     for index, part in enumerate(parts, 1):
         start = integer(part.get('start'), 'partition start')
         size = integer(part.get('size'), 'partition size')
@@ -65,8 +69,7 @@ def layout(table, allocation_gib=128):
             uuid.UUID(part['uuid'])
         except (KeyError, ValueError, AttributeError):
             raise StorageError('Missing partition identity') from None
-        expected_type = EFI if index == 1 else LINUX
-        if str(part.get('type', '')).upper() != expected_type:
+        if str(part.get('type', '')).upper() not in accepted_types[index - 1]:
             raise StorageError('Unexpected partition type')
         previous_end = start + size
     allocation = integer(allocation_gib, 'allocation') * GIB

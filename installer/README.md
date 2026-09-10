@@ -28,6 +28,9 @@ This preview targets Fedora 43 on x86_64 with UEFI, Secure Boot disabled, a
 separate FAT EFI partition and ext4 `/boot`, followed by one unencrypted Btrfs
 partition containing Fedora root and home. It checks actual identities and
 shrinkable space before proceeding. Other layouts produce a refusal report.
+Fedora's ext4 `/boot` may use either the generic Linux data or Linux extended
+boot (XBOOTLDR) GPT type. The original type, names, attributes and identifiers
+are retained; accepting XBOOTLDR does not change the supported partition order.
 
 The disk-writing path requires a verified pre-change backup under this
 session's data-preservation policy. The root executor reads the protected

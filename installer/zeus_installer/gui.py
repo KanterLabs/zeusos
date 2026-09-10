@@ -13,6 +13,7 @@ from __future__ import annotations
 import concurrent.futures
 import importlib
 import inspect
+import math
 import os
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -607,29 +608,126 @@ class InstallerController:
         return result
 
 
+def _disk_path(value: Mapping[str, Any] | None) -> str:
+    if not isinstance(value, Mapping):
+        return ""
+    for key in ("path", "device", "devpath", "device_path"):
+        path = _safe_text(value.get(key))
+        if path:
+            return path
+    return ""
+
+
+def _target_disk_path(plan: Mapping[str, Any], inventory: Mapping[str, Any]) -> tuple[str | None, bool]:
+    """Return the one path the plan authoritatively identifies as its target."""
+
+    target_values = (plan.get("target"), plan.get("proposed_target_layout"))
+    source_path = ""
+    for target in target_values:
+        if not isinstance(target, Mapping):
+            continue
+        source_disk = target.get("source_disk")
+        if isinstance(source_disk, Mapping):
+            source_path = _disk_path(source_disk)
+        else:
+            source_path = _safe_text(source_disk)
+        if not source_path:
+            target_disk = target.get("disk")
+            if isinstance(target_disk, Mapping):
+                source_path = _disk_path(target_disk)
+            else:
+                source_path = _safe_text(target_disk)
+        if source_path:
+            break
+
+    partition_table = inventory.get("partition_table")
+    table_path = _disk_path(partition_table) if isinstance(partition_table, Mapping) else ""
+    if source_path and table_path and source_path != table_path:
+        return None, True
+    return source_path or table_path or None, False
+
+
+def _disk_records(inventory: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    candidates: Any = (
+        inventory.get("block_devices")
+        or inventory.get("devices")
+        or inventory.get("lsblk")
+    )
+    while isinstance(candidates, Mapping):
+        nested = None
+        for key in ("blockdevices", "block_devices", "devices"):
+            nested = candidates.get(key)
+            if nested is not None:
+                break
+        if nested is None:
+            return []
+        candidates = nested
+    if not isinstance(candidates, Sequence) or isinstance(candidates, (str, bytes)):
+        return []
+    return [
+        candidate
+        for candidate in candidates
+        if isinstance(candidate, Mapping)
+        and _safe_text(candidate.get("type")).lower() in {"disk", "nvme", "drive"}
+    ]
+
+
+def _format_derived_size_gib(disk: Mapping[str, Any]) -> str | None:
+    for key in ("size_bytes", "size", "capacity_bytes", "capacity", "bytes"):
+        raw_size = disk.get(key)
+        if raw_size in (None, "") or isinstance(raw_size, bool):
+            continue
+        try:
+            size_bytes = float(raw_size)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if not math.isfinite(size_bytes) or size_bytes < 0:
+            continue
+        size_gib = round(size_bytes / (1024**3), 1)
+        return str(int(size_gib)) if size_gib.is_integer() else f"{size_gib:.1f}"
+    return None
+
+
 def _format_disk(plan: Mapping[str, Any] | None) -> str:
     inventory = plan.get("inventory") if isinstance(plan, Mapping) else None
     if not isinstance(inventory, Mapping):
         return "Disk details will appear after read-only preflight."
-    disk = inventory.get("disk") or inventory.get("target_disk")
-    if not isinstance(disk, Mapping):
-        candidates = inventory.get("block_devices") or inventory.get("devices")
-        if isinstance(candidates, Mapping):
-            candidates = candidates.get("blockdevices") or candidates.get("devices")
-        if isinstance(candidates, Sequence) and not isinstance(candidates, (str, bytes)):
-            disks = [
-                candidate
-                for candidate in candidates
-                if isinstance(candidate, Mapping)
-                and _safe_text(candidate.get("type")).lower() in {"disk", "nvme", "drive"}
-            ]
-            if len(disks) == 1:
-                disk = disks[0]
-    if not isinstance(disk, Mapping):
+
+    direct_disk = inventory.get("disk") or inventory.get("target_disk")
+    if not isinstance(direct_disk, Mapping):
+        direct_disk = None
+
+    target_path, path_conflict = _target_disk_path(plan, inventory) if isinstance(plan, Mapping) else (None, False)
+    if path_conflict:
         return "The preflight worker did not provide a target disk identity."
+    disk: Mapping[str, Any] | None = None
+    if target_path:
+        matching = [candidate for candidate in _disk_records(inventory) if _disk_path(candidate) == target_path]
+        if len(matching) == 1:
+            disk = matching[0]
+        elif direct_disk is not None and _disk_path(direct_disk) == target_path:
+            disk = direct_disk
+        else:
+            # A path was provided, but no unique inventory record proves it.
+            # Never substitute another disk merely to populate the card.
+            return "The preflight worker did not provide a target disk identity."
+    elif target_path is None and direct_disk is not None:
+        # ``disk``/``target_disk`` are explicit legacy target shapes.  The
+        # block-device list alone is intentionally not treated as a target.
+        disk = direct_disk
+
+    if disk is None:
+        return "The preflight worker did not provide a target disk identity."
+
+    display_disk = dict(disk)
+    if display_disk.get("size_gib") in (None, "") and display_disk.get("capacity_gib") in (None, ""):
+        derived_size = _format_derived_size_gib(display_disk)
+        if derived_size is not None:
+            display_disk["size_gib"] = derived_size
+
     fields: list[str] = []
     for key in ("model", "device", "path", "size_gib", "capacity_gib", "serial", "id"):
-        value = disk.get(key)
+        value = display_disk.get(key)
         if value not in (None, ""):
             fields.append(f"{key.replace('_', ' ').title()}: {_safe_text(value)}")
     return " · ".join(fields) if fields else "Disk identity was not reported by preflight."
@@ -657,12 +755,22 @@ def _format_target(plan: Mapping[str, Any] | None) -> str:
     # Zeus home is normally a directory/subvolume inside the root partition;
     # an ESP's one-GiB size must never be presented as a separate home.
     parts = target.get("new_partitions") or target.get("partitions")
+    sector_size: int | None
+    try:
+        sector_size = int(target.get("sector_size", target.get("sectorsize")))
+    except (TypeError, ValueError, OverflowError):
+        sector_size = None
+    if sector_size not in {512, 4096}:
+        sector_size = None
+    canonical_roles = {"4": "esp", "5": "boot", "6": "root"}
     role_sizes: dict[str, Any] = {}
     if isinstance(parts, Sequence) and not isinstance(parts, (str, bytes)):
         for part in parts:
             if not isinstance(part, Mapping):
                 continue
             role = _safe_text(part.get("role") or part.get("purpose")).lower().replace("_", "-")
+            if not role:
+                role = canonical_roles.get(_safe_text(part.get("number")), "")
             if role in {"efi", "esp", "boot-efi"}:
                 role = "esp"
             elif role in {"boot", "root", "home", "var-home"}:
@@ -676,6 +784,12 @@ def _format_target(plan: Mapping[str, Any] | None) -> str:
                 raw_bytes = part.get("size_bytes")
                 try:
                     size = float(raw_bytes) / (1024**3) if raw_bytes is not None else None
+                except (TypeError, ValueError, OverflowError):
+                    size = None
+            if size in (None, "") and sector_size is not None:
+                raw_sectors = part.get("size")
+                try:
+                    size = float(raw_sectors) * sector_size / (1024**3)
                 except (TypeError, ValueError, OverflowError):
                     size = None
             if size not in (None, "") and role not in role_sizes:

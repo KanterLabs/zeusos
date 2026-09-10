@@ -87,6 +87,26 @@ class LauncherPlanTests(unittest.TestCase):
         )
         self.assertNotIn("Home:", rendered)
 
+    def test_target_summary_formats_storage_partition_sectors(self):
+        for sector_size in (512, 4096):
+            with self.subTest(sector_size=sector_size):
+                target = {
+                    "allocation_gib": 128,
+                    "sector_size": sector_size,
+                    "home_gib": 1,
+                    "partitions": [
+                        {"number": 4, "name": "Zeus EFI", "size": 1024**3 // sector_size},
+                        {"number": 5, "name": "Zeus boot", "size": 2 * 1024**3 // sector_size},
+                        {"number": 6, "name": "Zeus root", "size": 125 * 1024**3 // sector_size},
+                    ],
+                }
+                rendered = gui._format_target({"target": target})
+                self.assertEqual(
+                    rendered,
+                    "Allocation: 128 GiB · ESP: 1 GiB · Boot: 2 GiB · Root: 125 GiB",
+                )
+                self.assertNotIn("Home:", rendered)
+
     def test_disk_summary_keeps_identity_without_internal_fingerprint(self):
         rendered = gui._format_disk(
             {
@@ -96,6 +116,85 @@ class LauncherPlanTests(unittest.TestCase):
         )
         self.assertEqual(rendered, "Device: /dev/sda · Size Gib: 931.5")
         self.assertNotIn("fingerprint", rendered.lower())
+
+    def test_disk_summary_matches_authoritative_target_when_zram_is_present(self):
+        rendered = gui._format_disk(
+            {
+                "target": {"source_disk": {"path": "/dev/nvme0n1"}},
+                "inventory": {
+                    "partition_table": {"device": "/dev/nvme0n1"},
+                    "block_devices": [
+                        {
+                            "path": "/dev/zram0",
+                            "type": "disk",
+                            "model": "zram",
+                            "size": 8 * 1024**3,
+                        },
+                        {
+                            "path": "/dev/nvme0n1",
+                            "type": "disk",
+                            "model": "Fixture NVMe",
+                            "size": int(931.5 * 1024**3),
+                        },
+                    ],
+                },
+            }
+        )
+        self.assertIn("Model: Fixture NVMe", rendered)
+        self.assertIn("Path: /dev/nvme0n1", rendered)
+        self.assertIn("Size Gib: 931.5", rendered)
+        self.assertNotIn("zram", rendered.lower())
+
+    def test_disk_summary_matches_storage_target_disk_shape(self):
+        rendered = gui._format_disk(
+            {
+                "target": {"disk": "/dev/nvme0n1"},
+                "inventory": {
+                    "partition_table": {"device": "/dev/nvme0n1"},
+                    "block_devices": [
+                        {"path": "/dev/zram0", "type": "disk", "model": "zram"},
+                        {
+                            "path": "/dev/nvme0n1",
+                            "type": "disk",
+                            "model": "Fixture NVMe",
+                            "size_bytes": 931 * 1024**3,
+                        },
+                    ],
+                },
+            }
+        )
+        self.assertIn("Model: Fixture NVMe", rendered)
+        self.assertIn("Path: /dev/nvme0n1", rendered)
+        self.assertIn("Size Gib: 931", rendered)
+        self.assertNotIn("zram", rendered.lower())
+
+    def test_disk_summary_does_not_guess_without_authoritative_target(self):
+        rendered = gui._format_disk(
+            {
+                "inventory": {
+                    "block_devices": [
+                        {"path": "/dev/sda", "type": "disk", "model": "Unrelated"}
+                    ]
+                }
+            }
+        )
+        self.assertEqual(rendered, "The preflight worker did not provide a target disk identity.")
+
+    def test_disk_summary_rejects_conflicting_target_and_partition_paths(self):
+        rendered = gui._format_disk(
+            {
+                "target": {"source_disk": {"path": "/dev/nvme0n1"}},
+                "inventory": {
+                    "disk": {"path": "/dev/sdb", "model": "Unrelated direct shape"},
+                    "partition_table": {"device": "/dev/sda"},
+                    "block_devices": [
+                        {"path": "/dev/sda", "type": "disk", "model": "Unrelated"},
+                        {"path": "/dev/nvme0n1", "type": "disk", "model": "Another"},
+                    ],
+                },
+            }
+        )
+        self.assertEqual(rendered, "The preflight worker did not provide a target disk identity.")
 
 
 class LauncherCliTests(unittest.TestCase):

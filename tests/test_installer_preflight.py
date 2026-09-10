@@ -32,7 +32,7 @@ FS_GUIDS = (
 )
 
 
-def _fixture() -> dict[str, object]:
+def _fixture(boot_type: str = storage.LINUX) -> dict[str, object]:
     """Return the reported N154G 600 MiB ESP/1 GiB boot layout."""
 
     disk_sectors = int(931.5 * GIB // SECTOR)
@@ -61,7 +61,7 @@ def _fixture() -> dict[str, object]:
                 "node": f"{DISK_PATH}p2",
                 "start": 2048 + esp_sectors,
                 "size": boot_sectors,
-                "type": storage.LINUX,
+                "type": boot_type,
                 "uuid": PART_GUIDS[1],
                 "name": "Fedora boot",
             },
@@ -92,7 +92,7 @@ def _fixture() -> dict[str, object]:
         }
         for number, size, start, partuuid, parttype, fstype, fsuuid in (
             (1, esp_sectors, 2048, PART_GUIDS[0], storage.EFI, "vfat", FS_GUIDS[0]),
-            (2, boot_sectors, 2048 + esp_sectors, PART_GUIDS[1], storage.LINUX, "ext4", FS_GUIDS[1]),
+            (2, boot_sectors, 2048 + esp_sectors, PART_GUIDS[1], boot_type, "ext4", FS_GUIDS[1]),
             (3, root_sectors, root_start, PART_GUIDS[2], storage.LINUX, "btrfs", FS_GUIDS[2]),
         )
     ]
@@ -246,6 +246,35 @@ def _write_sysfs_fixture(root: Path) -> tuple[Path, Path, Path]:
 
 
 class PreflightTests(unittest.TestCase):
+    def test_extended_boot_layout_passes_without_relaxing_power_guard(self) -> None:
+        fixture = _fixture(boot_type="BC13C2FF-59E6-4262-A352-B275FD6F7172")
+        runner = FixtureRunner(fixture)
+        with tempfile.TemporaryDirectory() as directory:
+            sysfs, proc, etc = _write_sysfs_fixture(Path(directory))
+            with mock.patch.object(preflight.os, "geteuid", return_value=0):
+                inventory = preflight.collect(
+                    runner=runner, sysfs_root=sysfs, proc_root=proc,
+                    etc_root=etc, staging_paths=[ROOT],
+                )
+        before = copy.deepcopy(inventory)
+        calls_before = copy.deepcopy(runner.calls)
+        result = preflight.plan(inventory, allocation_gib=128)
+        self.assertTrue(result["supported"], result["blocker_details"])
+        self.assertEqual([], result["blockers"])
+        self.assertEqual(DISK_PATH, result["target"]["disk"])
+        self.assertEqual(inventory, before)
+        self.assertEqual(runner.calls, calls_before)
+        self.assertEqual(fixture["table"], inventory["partition_table"])
+
+        battery = copy.deepcopy(inventory)
+        battery["power"] = {"ac_online": False, "sources": [
+            {"type": "Mains", "online": False},
+            {"type": "Battery", "capacity": 38, "status": "Discharging"},
+        ]}
+        result = preflight.plan(battery, allocation_gib=128)
+        self.assertFalse(result["supported"])
+        self.assertEqual(["ac_required"], result["blockers"])
+
     def test_collect_and_plan_report_n154g_without_writes(self) -> None:
         fixture = _fixture()
         runner = FixtureRunner(fixture)

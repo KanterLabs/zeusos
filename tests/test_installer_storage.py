@@ -47,6 +47,39 @@ class StorageTests(unittest.TestCase):
                 if change == 'four_partitions': value['partitions'].append(value['partitions'][2])
                 storage.layout(value, 900 if change == 'allocation' else 128)
 
+    def test_extended_boot_partition_preserves_original_metadata(self):
+        for boot_type in ('BC13C2FF-59E6-4262-A352-B275FD6F7172',
+                          'bc13c2ff-59e6-4262-a352-b275fd6f7172'):
+            with self.subTest(boot_type=boot_type):
+                original = table()
+                original['partitions'][1].update(
+                    type=boot_type, name='Fedora boot', attrs='GUID:63')
+                before = copy.deepcopy(original)
+                plan = storage.layout(original)
+                self.assertEqual(original, before)
+                self.assertEqual(plan['table_fingerprint'], storage.canonical_hash(before))
+                current = copy.deepcopy(original)
+                current['partitions'][2]['size'] = plan['fedora_new_size']
+                storage.verify_after_reboot(original, current, plan, 'before', 'after',
+                                           plan['fedora_filesystem_limit_bytes'])
+                # Replacing the source boot type is not part of an end-only change.
+                current['partitions'][1]['type'] = storage.LINUX
+                with self.assertRaises(storage.StorageError):
+                    storage.verify_after_reboot(original, current, plan, 'before', 'after',
+                                               plan['fedora_filesystem_limit_bytes'])
+
+    def test_partition_types_remain_restricted_to_their_roles(self):
+        for index, kind in ((0, 'BC13C2FF-59E6-4262-A352-B275FD6F7172'),
+                            (2, 'BC13C2FF-59E6-4262-A352-B275FD6F7172'),
+                            (1, storage.EFI),
+                            (1, '0657FD6D-A4AB-43C4-84E5-0933C84B4F4F'),
+                            (1, 'EBD0A0A2-B9E5-4433-87C0-68B6B72699C7')):
+            with self.subTest(partition=index + 1, kind=kind):
+                original = table()
+                original['partitions'][index]['type'] = kind
+                with self.assertRaisesRegex(storage.StorageError, 'Unexpected partition type'):
+                    storage.layout(original)
+
     def test_shrink_requires_real_filesystem_boundary(self):
         plan = storage.layout(table())
         with self.assertRaises(storage.StorageError):
@@ -60,6 +93,11 @@ class StorageTests(unittest.TestCase):
     @unittest.skipUnless(Path('/usr/sbin/sfdisk').exists(), 'util-linux sfdisk is required')
     def test_real_sfdisk_changes_only_end_and_preserves_partition_data(self):
         """Use the real binary against a sparse file, with no root or loop device."""
+        for boot_type in (storage.LINUX, 'BC13C2FF-59E6-4262-A352-B275FD6F7172'):
+            with self.subTest(boot_type=boot_type):
+                self._assert_real_sfdisk_preserves_partition_data(boot_type)
+
+    def _assert_real_sfdisk_preserves_partition_data(self, boot_type):
         with tempfile.TemporaryDirectory() as folder:
             image = Path(folder) / 'disk.img'
             with image.open('xb') as stream:
@@ -67,7 +105,7 @@ class StorageTests(unittest.TestCase):
             subprocess.run(['/usr/sbin/sfdisk', str(image)], input=(
                 'label: gpt\n'
                 'size=4M,type=U,name="Fedora EFI"\n'
-                'size=4M,type=L,name="Fedora boot"\n'
+                f'size=4M,type={boot_type},name="Fedora boot",attrs="GUID:63"\n'
                 'type=L,name="Fedora root",attrs="LegacyBIOSBootable"\n'
             ), text=True, capture_output=True, check=True)
             def inspect():

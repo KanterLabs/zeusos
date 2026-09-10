@@ -733,3 +733,25 @@ or battery-hours from VM counters.
   reads the completed journal and verifies the installed GPT before restart.
   Distribution uses detached SSH-signed checksums and an independent public
   download check. This does not add native RPM OpenPGP signing.
+
+### 2026-09-10 15:14 UTC — Fedora installer preflight compatibility
+
+- Product remains `0.1.0-preview.2`; the OS image is unchanged. The installer
+  accepts Fedora's extended-boot GPT type for its existing ext4 `/boot` and
+  correctly selects the NVMe disk when zram is also present.
+- Report replay: blockers decreased from two to one; the erroneous partition
+  type rejection is gone, while `ac_required` remains. A copied AC-connected
+  simulation has zero blockers. No laptop command or disk write was executed.
+- Parent verification: 131 installer tests passed in 6.551 seconds. Real
+  `sfdisk` regular-file tests preserved all GPT metadata except the intended
+  root-size change and retained seeded data for both accepted `/boot` types.
+- Native GTK and formatter checks cover the NVMe identity/capacity and all
+  three proposed Zeus partition sizes. The reported 128 GiB allocation
+  displays 1 GiB EFI, 2 GiB boot and 125 GiB root; home stays inside root.
+- Before the Fedora RPM upgrade trial, 14 existing boot/configuration/journal
+  files were independently copied and each digest verified. The archive is
+  2,908,966 bytes; subsequent package verification is recorded in the signed
+  build-specific release receipt. No storage or journal migration is added.
+- Evidence and limits: [preflight correction record](iterations/installer-20260910/xbootldr-fix.md).
+  These are compatibility checks, with no new physical battery or boot-time
+  measurement.
