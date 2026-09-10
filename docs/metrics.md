@@ -755,3 +755,26 @@ or battery-hours from VM counters.
 - Evidence and limits: [preflight correction record](iterations/installer-20260910/xbootldr-fix.md).
   These are compatibility checks, with no new physical battery or boot-time
   measurement.
+
+### 2026-09-10 15:55 UTC — Installer preparation feedback
+
+- Product stays `0.1.0-preview.2`; no OS image, boot or battery tuning changes.
+- Launch plus Download and prepare now invokes two privileged helper actions
+  (`review`, `prepare`) instead of five (`status`, `preflight`, repeated
+  `status`, `preflight`, then `prepare`). Actual password dialogs depend on
+  Fedora authorization policy. Both initial and preparation-time root target
+  checks remain; a changed fingerprint blocks downloading.
+- Parent validation: 149 installer tests passed in 7.124 seconds. Coverage
+  includes active journals, unavailable/authentication helpers, changed
+  allocation and target, and bounded stage feedback through a simulated
+  30-minute byte stream.
+- Native GTK success and error journeys exercise delayed checking, connection,
+  byte progress and verification. Download completion remains distinct from
+  verified readiness. The main loop remains responsive; inactive timers and
+  stale callbacks are checked. These use a synthetic backend, not laptop
+  installation or real authorization dialogs.
+- Fedora VM118's populated journal, receipt and boot configuration have an
+  independently verified 14-file pre-upgrade copy. Full GPT and file digest
+  comparisons accompany the package upgrade in the signed release receipt.
+  Existing journal format and retained rollback build remain unchanged.
+- Evidence: [preparation feedback record](iterations/installer-20260910/preparation-ux.md).

@@ -67,6 +67,11 @@ _HELPER_OUTPUT_LIMIT = 512 * 1024
 _HELPER_PROGRESS_LIMIT = _HELPER_OUTPUT_LIMIT // 4
 _HELPER_TIMEOUTS = {
     "preflight": 180.0,
+    # Review first reads the local journal and only then runs the same
+    # read-only preflight used by the standalone action.  Give the combined
+    # root call room for both bounded operations while keeping it distinct
+    # from the much longer archive preparation timeout.
+    "review": 210.0,
     "status": 30.0,
     "prepare": 1800.0,
     "retry_prepare": 1800.0,
@@ -74,6 +79,26 @@ _HELPER_TIMEOUTS = {
     "continue": 3600.0,
     "restart": 30.0,
 }
+
+# Advisory progress stages are deliberately separate from byte progress.  A
+# stage is a hint for the desktop UI and never becomes journal state, so a
+# callback or transport failure cannot alter the operation's safety boundary.
+_ADVISORY_STAGE_IDS = frozenset(
+    {
+        "checking_target",
+        "waiting_for_operation",
+        "checking_release",
+        "connecting",
+        "downloading",
+        "verifying",
+    }
+)
+_HELPER_STAGE_RESERVE = 16 * 1024
+_HELPER_FINAL_PROGRESS_RESERVE = 4 * 1024
+_HELPER_BYTE_PROGRESS_LIMIT = (
+    _HELPER_PROGRESS_LIMIT - _HELPER_STAGE_RESERVE - _HELPER_FINAL_PROGRESS_RESERVE
+)
+_BYTE_PROGRESS_INTERVAL = 2.0
 
 # The pinned installation route passed the disposable VM118 clean install and
 # VM117 update/rollback checks. This is software qualification for a preview,
@@ -143,6 +168,22 @@ class InstallError(RuntimeError):
     def __init__(self, code: str, message: str):
         self.code = str(code)
         super().__init__(str(message))
+
+
+def _emit_stage(
+    progress: Callable[[Mapping[str, Any]], Any] | None,
+    stage: str,
+) -> None:
+    """Deliver one advisory stage without making it part of operation state."""
+
+    if progress is None or stage not in _ADVISORY_STAGE_IDS:
+        return
+    try:
+        progress({"stage": stage})
+    except Exception:
+        # Stage updates are UX hints.  A broken callback must never interrupt
+        # the lock, download, verification, or their durable journal writes.
+        pass
 
 
 class MaintenanceExecutor(Protocol):
@@ -1166,15 +1207,20 @@ class InstallerBackend:
         self,
         record: dict[str, Any],
         manifest: Mapping[str, Any],
-        external: Callable[[Mapping[str, int]], Any] | None = None,
+        external: Callable[[Mapping[str, Any]], Any] | None = None,
     ):
         expected = manifest["archive"]["size"]
+        downloading_announced = False
 
         def callback(done: Any, total: Any) -> None:
+            nonlocal downloading_announced
             if type(done) is not int or type(total) is not int or total != expected:
                 raise InstallError("download_invalid", "The release download progress is invalid.")
             if done < 0 or done > total:
                 raise InstallError("download_invalid", "The release download progress is invalid.")
+            if done > 0 and not downloading_announced:
+                downloading_announced = True
+                _emit_stage(external, "downloading")
             self._current_record = record
             self._current_record = self.journal.transition(
                 record,
@@ -1541,7 +1587,7 @@ class InstallerBackend:
     def prepare(
         self,
         plan: Mapping[str, Any],
-        progress: Callable[[Mapping[str, int]], Any] | None = None,
+        progress: Callable[[Mapping[str, Any]], Any] | None = None,
     ) -> dict[str, Any]:
         """Download and stage one verified signed artifact for a plan."""
 
@@ -1553,7 +1599,9 @@ class InstallerBackend:
             raise InstallError(
                 "unsupported_plan", "The preflight plan contains blockers and cannot be prepared."
             )
+        _emit_stage(progress, "waiting_for_operation")
         with self._operation(wait=True):
+            _emit_stage(progress, "checking_target")
             record = self.journal.load()
             self._check_record_binding(record, validated)
             self._refuse_interrupted(record)
@@ -1580,6 +1628,7 @@ class InstallerBackend:
                 if path != expected:
                     raise InstallError("artifact_tampered", "The prepared archive path is not owned by the installer.")
                 try:
+                    _emit_stage(progress, "verifying")
                     verified = self._verify_path(path, release)
                 except (artifacts.ArtifactError, InstallError) as error:
                     raise InstallError("artifact_tampered", "The prepared archive no longer matches its signed identity.") from error
@@ -1591,6 +1640,7 @@ class InstallerBackend:
             record = self.journal.begin(validated)
             self._current_record = record
             try:
+                _emit_stage(progress, "checking_release")
                 manifest = self._load_release()
                 record = self.journal.transition(
                     record,
@@ -1623,6 +1673,7 @@ class InstallerBackend:
                         raise InstallError("interrupted", "A partial release archive requires explicit review before retrying.")
                     callback = self._progress_callback(record, manifest, progress)
                     try:
+                        _emit_stage(progress, "connecting")
                         self.artifact_download(manifest, partial, progress=callback)
                     except artifacts.ArtifactError:
                         raise
@@ -1643,6 +1694,7 @@ class InstallerBackend:
                     progress=None,
                 )
                 self._current_record = record
+                _emit_stage(progress, "verifying")
                 verified = self._verify_path(final, manifest)
                 record = self.journal.transition(
                     record,
@@ -1697,7 +1749,7 @@ class InstallerBackend:
     def retry_prepare(
         self,
         plan: Mapping[str, Any] | None = None,
-        progress: Callable[[Mapping[str, int]], Any] | None = None,
+        progress: Callable[[Mapping[str, Any]], Any] | None = None,
     ) -> dict[str, Any]:
         """Retry a pre-executor preparation after clearing owned staging.
 
@@ -1711,13 +1763,17 @@ class InstallerBackend:
 
         self._require_privilege()
         validated: dict[str, Any] | None = None
+        if progress is not None and not callable(progress):
+            raise InstallError("download_invalid", "The release progress callback is invalid.")
         if plan is not None:
             validated = validate_plan(plan)
             if not validated["supported"] or validated["blockers"]:
                 raise InstallError(
                     "unsupported_plan", "The preflight plan contains blockers and cannot be prepared."
                 )
+        _emit_stage(progress, "waiting_for_operation")
         with self._operation(wait=True):
+            _emit_stage(progress, "checking_target")
             record = self.journal.load()
             if record is None:
                 raise InstallError(
@@ -2201,7 +2257,7 @@ def _consume_helper_line(
     line: Any,
     *,
     final: dict[str, Any] | None,
-    progress: Callable[[Mapping[str, int]], Any] | None,
+    progress: Callable[[Mapping[str, Any]], Any] | None,
 ) -> dict[str, Any] | None:
     """Parse one complete helper protocol line and return its final result.
 
@@ -2235,6 +2291,20 @@ def _consume_helper_line(
         raise InstallError(
             "helper_invalid_response", "The privileged installer returned an invalid response."
         )
+    if value.get("event") == "stage":
+        stage = value.get("stage")
+        if type(stage) is not str or stage not in _ADVISORY_STAGE_IDS:
+            raise InstallError(
+                "helper_invalid_response", "The privileged installer returned an invalid stage."
+            )
+        if progress is not None:
+            try:
+                progress({"stage": stage})
+            except Exception:
+                # Stage is advisory UI state.  A broken callback must not
+                # change the operation result or interrupt the helper.
+                pass
+        return final
     if value.get("event") == "progress":
         update = value.get("progress", value)
         if (
@@ -2276,7 +2346,7 @@ def _helper_json_result(
     stdout: Any,
     *,
     action: str,
-    progress: Callable[[Mapping[str, int]], Any] | None = None,
+    progress: Callable[[Mapping[str, Any]], Any] | None = None,
 ) -> dict[str, Any]:
     """Decode one bounded helper response, including optional progress lines.
 
@@ -2341,7 +2411,7 @@ def _invoke_helper_stream(
     argv: list[str],
     *,
     action: str,
-    progress: Callable[[Mapping[str, int]], Any],
+    progress: Callable[[Mapping[str, Any]], Any],
 ) -> dict[str, Any]:
     """Run a progress-enabled helper with a bounded, timeout-aware pipe.
 
@@ -2485,7 +2555,7 @@ def _invoke_helper(
     *,
     allocation_gib: int | None = None,
     expected_fingerprint: str | None = None,
-    progress: Callable[[Mapping[str, int]], Any] | None = None,
+    progress: Callable[[Mapping[str, Any]], Any] | None = None,
 ) -> dict[str, Any]:
     """Invoke the fixed root helper with no caller-selected path or command."""
 
@@ -2500,7 +2570,7 @@ def _invoke_helper(
             raise InstallError("download_invalid", "The release progress callback is invalid.")
     if allocation_gib is not None:
         allocation_gib = _helper_allocation(allocation_gib)
-        if action not in {"preflight", "prepare"}:
+        if action not in {"preflight", "review", "prepare"}:
             raise InstallError("invalid_action", "This installer action does not accept an allocation.")
     if expected_fingerprint is not None:
         expected_fingerprint = _fingerprint_text(expected_fingerprint)
@@ -2578,9 +2648,15 @@ def preflight(*, allocation_gib: int = DEFAULT_ALLOCATION_GIB) -> dict[str, Any]
     return _invoke_helper("preflight", allocation_gib=_helper_allocation(allocation_gib))
 
 
+def review(*, allocation_gib: int = DEFAULT_ALLOCATION_GIB) -> dict[str, Any]:
+    """Read current installer state, then preflight only while the target is idle."""
+
+    return _invoke_helper("review", allocation_gib=_helper_allocation(allocation_gib))
+
+
 def prepare(
     plan: Mapping[str, Any],
-    progress: Callable[[Mapping[str, int]], Any] | None = None,
+    progress: Callable[[Mapping[str, Any]], Any] | None = None,
 ) -> dict[str, Any]:
     """Stage a signed release through the root helper using fixed scalars.
 
@@ -2612,7 +2688,7 @@ def status() -> dict[str, Any]:
 
 
 def retry_prepare(
-    progress: Callable[[Mapping[str, int]], Any] | None = None,
+    progress: Callable[[Mapping[str, Any]], Any] | None = None,
 ) -> dict[str, Any]:
     """Retry only the root journal's pre-executor download staging."""
 
@@ -2850,7 +2926,7 @@ def helper_main(
     parser = argparse.ArgumentParser(description="Journaled Zeus dual-boot installer helper")
     parser.add_argument(
         "action",
-        choices=("preflight", "status", "prepare", "retry_prepare", "install", "continue", "restart"),
+        choices=("preflight", "review", "status", "prepare", "retry_prepare", "install", "continue", "restart"),
     )
     parser.add_argument(
         "--allocation-gib",
@@ -2870,7 +2946,7 @@ def helper_main(
     parser.add_argument(
         "--progress-json",
         action="store_true",
-        help="stream bounded JSON byte-progress events (prepare/retry_prepare only)",
+        help="stream bounded JSON stage and byte-progress events (prepare/retry_prepare only)",
     )
     args = parser.parse_args(argv)
     try:
@@ -2883,33 +2959,64 @@ def helper_main(
                 "invalid_action", "Progress streaming is supported only for preparation."
             )
 
-        progress_callback: Callable[[Mapping[str, int]], Any] | None = None
+        progress_callback: Callable[[Mapping[str, Any]], Any] | None = None
         if args.progress_json:
             progress_output_size = 0
+            stage_output_size = 0
+            byte_progress_size = 0
+            last_byte_progress_at: float | None = None
 
-            def emit_progress(update: Mapping[str, int]) -> None:
-                """Write only validated, bounded progress events to stdout."""
+            def emit_progress(update: Mapping[str, Any]) -> None:
+                """Write only validated, bounded advisory events to stdout."""
 
-                nonlocal progress_output_size
-                if (
-                    not isinstance(update, Mapping)
-                    or type(update.get("bytes")) is not int
-                    or type(update.get("total")) is not int
-                    or update["total"] <= 0
-                    or update["bytes"] < 0
-                    or update["bytes"] > update["total"]
-                ):
+                nonlocal progress_output_size, stage_output_size, byte_progress_size
+                nonlocal last_byte_progress_at
+                if not isinstance(update, Mapping):
                     return
+                is_stage = "stage" in update
+                if is_stage:
+                    stage = update.get("stage")
+                    if type(stage) is not str or stage not in _ADVISORY_STAGE_IDS:
+                        return
+                else:
+                    if (
+                        type(update.get("bytes")) is not int
+                        or type(update.get("total")) is not int
+                        or update["total"] <= 0
+                        or update["bytes"] < 0
+                        or update["bytes"] > update["total"]
+                    ):
+                        return
+                    # Download helpers can report roughly once per second for
+                    # a long archive.  Coalesce intermediate byte events so a
+                    # bounded stream still has room for late bytes and stage
+                    # events; the initial and terminal byte values are always
+                    # retained.
+                    now = time.monotonic()
+                    done = update["bytes"]
+                    total = update["total"]
+                    terminal = done in {0, total}
+                    if (
+                        last_byte_progress_at is not None
+                        and not terminal
+                        and now - last_byte_progress_at < _BYTE_PROGRESS_INTERVAL
+                    ):
+                        return
                 try:
+                    event = (
+                        {"event": "stage", "stage": update["stage"]}
+                        if is_stage
+                        else {
+                            "event": "progress",
+                            "progress": {
+                                "bytes": update["bytes"],
+                                "total": update["total"],
+                            },
+                        }
+                    )
                     line = (
                         json.dumps(
-                            {
-                                "event": "progress",
-                                "progress": {
-                                    "bytes": update["bytes"],
-                                    "total": update["total"],
-                                },
-                            },
+                            event,
                             ensure_ascii=False,
                             sort_keys=True,
                             separators=(",", ":"),
@@ -2919,6 +3026,14 @@ def helper_main(
                     )
                 except (TypeError, ValueError, OverflowError, UnicodeError, MemoryError):
                     return
+                if is_stage:
+                    # Reserve a separate advisory budget so a long stream of
+                    # byte events cannot suppress the important stage near
+                    # archive verification.
+                    if stage_output_size + len(line) > _HELPER_STAGE_RESERVE:
+                        return
+                elif not terminal and byte_progress_size + len(line) > _HELPER_BYTE_PROGRESS_LIMIT:
+                    return
                 # Keep enough headroom for the final structured journal result.
                 if progress_output_size + len(line) > _HELPER_PROGRESS_LIMIT:
                     return
@@ -2927,9 +3042,34 @@ def helper_main(
                 except (OSError, ValueError):
                     return
                 progress_output_size += len(line)
+                if is_stage:
+                    stage_output_size += len(line)
+                else:
+                    byte_progress_size += len(line)
+                    last_byte_progress_at = now
 
             progress_callback = emit_progress
-        selected = _root_preflight_plan(args.allocation_gib) if args.action == "prepare" else None
+        if args.action == "prepare":
+            if progress_callback is not None:
+                progress_callback({"stage": "checking_target"})
+            selected = _root_preflight_plan(args.allocation_gib)
+        elif args.action == "review":
+            service = backend if backend is not None else make_service()
+            # Review is one fixed privileged boundary for the launcher: read
+            # the durable local state first, and only collect fresh target
+            # geometry while the journal is truly idle.  Active, prepared,
+            # failed, or interrupted records are returned unchanged so a
+            # refresh cannot silently replace their authoritative state with a
+            # new preflight plan.
+            status_result = service.status()
+            if status_result.get("ok") is True and status_result.get("phase") == PHASE_IDLE:
+                result = dict(_root_preflight_plan(args.allocation_gib))
+                result["ok"] = True
+                result["state"] = "preflight"
+            else:
+                result = status_result
+        else:
+            selected = None
         if args.action == "preflight":
             result = dict(_root_preflight_plan(args.allocation_gib))
             result["ok"] = True
@@ -2967,6 +3107,8 @@ def helper_main(
                     result = service.prepare(selected)
                 else:
                     result = service.prepare(selected, progress=progress_callback)
+        elif args.action == "review":
+            pass
         else:
             # A default helper backend always re-collects through the installed
             # preflight worker before target validation.  Injected fixture
@@ -3065,6 +3207,7 @@ __all__ = [
     "preflight",
     "prepare",
     "qualification",
+    "review",
     "restart",
     "retry_prepare",
     "status",

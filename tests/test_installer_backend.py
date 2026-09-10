@@ -164,19 +164,88 @@ class BackendTests(TempRootMixin, unittest.TestCase):
         )
 
     def test_prepare_stages_verified_release_and_reports_progress(self) -> None:
-        updates: list[dict[str, int]] = []
+        updates: list[dict[str, object]] = []
         service = self._backend()
         result = service.prepare(plan(), progress=updates.append)
         self.assertTrue(result["ok"])
         self.assertEqual(result["state"], installer_backend.PHASE_PREPARED)
-        self.assertEqual(updates[0], {"bytes": 0, "total": len(b"archive")})
-        self.assertEqual(updates[-1], {"bytes": len(b"archive"), "total": len(b"archive")})
+        self.assertEqual(updates[0], {"stage": "waiting_for_operation"})
+        byte_updates = [update for update in updates if "bytes" in update]
+        self.assertEqual(byte_updates[0], {"bytes": 0, "total": len(b"archive")})
+        self.assertEqual(byte_updates[-1], {"bytes": len(b"archive"), "total": len(b"archive")})
+        self.assertEqual(
+            [update["stage"] for update in updates if "stage" in update],
+            [
+                "waiting_for_operation",
+                "checking_target",
+                "checking_release",
+                "connecting",
+                "downloading",
+                "verifying",
+            ],
+        )
+        downloading_index = updates.index({"stage": "downloading"})
+        positive_index = next(index for index, update in enumerate(updates) if update.get("bytes") == len(b"archive"))
+        self.assertLess(downloading_index, positive_index)
         record = service.journal.load()
         assert record is not None
         self.assertEqual(record["phase"], installer_backend.PHASE_PREPARED)
         artifact = record["artifact"]
         assert isinstance(artifact, dict)
         self.assertTrue(Path(str(artifact["path"])).is_file())
+
+    def test_advisory_stage_callback_failure_preserves_prepared_journal_and_payload(self) -> None:
+        service = self._backend()
+
+        def progress(update: dict[str, object]) -> None:
+            if "stage" in update:
+                raise RuntimeError("UI callback failed")
+
+        result = service.prepare(plan(), progress=progress)
+        self.assertEqual(result["state"], installer_backend.PHASE_PREPARED)
+        record = service.journal.load()
+        assert record is not None
+        self.assertEqual(record["phase"], installer_backend.PHASE_PREPARED)
+        artifact = record["artifact"]
+        assert isinstance(artifact, dict)
+        self.assertEqual(Path(str(artifact["path"])).read_bytes(), b"archive")
+
+    def test_stage_events_precede_slow_release_download_and_verify_calls(self) -> None:
+        service = self._backend()
+        timeline: list[object] = []
+        manifest = make_manifest()
+
+        def release_fetch() -> dict[str, object]:
+            timeline.append("release_fetch")
+            return manifest
+
+        def download(_manifest: object, destination: Path, *, progress: object = None) -> None:
+            timeline.append("artifact_download")
+            if callable(progress):
+                progress(0, len(b"archive"))
+            destination.write_bytes(b"archive")
+            destination.chmod(0o600)
+            if callable(progress):
+                progress(len(b"archive"), len(b"archive"))
+
+        def verify(path: Path, _manifest: object) -> dict[str, object]:
+            timeline.append("artifact_verify")
+            self.assertEqual(path.read_bytes(), b"archive")
+            return {
+                "name": ARCHIVE_NAME,
+                "path": str(path),
+                "size": len(b"archive"),
+                "sha256": hashlib.sha256(b"archive").hexdigest(),
+                "manifest_digest": "sha256:" + "b" * 64,
+            }
+
+        service.release_fetch = release_fetch
+        service.artifact_download = download
+        service.artifact_verify = verify
+        service.prepare(plan(), progress=timeline.append)
+        self.assertLess(timeline.index({"stage": "checking_release"}), timeline.index("release_fetch"))
+        self.assertLess(timeline.index({"stage": "connecting"}), timeline.index("artifact_download"))
+        self.assertLess(timeline.index({"stage": "verifying"}), timeline.index("artifact_verify"))
 
     def test_status_without_plan_uses_original_journal_plan(self) -> None:
         service = self._backend()
@@ -285,8 +354,10 @@ class BackendTests(TempRootMixin, unittest.TestCase):
         self.assertEqual(failed.journal.load()["phase"], installer_backend.PHASE_ERROR)
 
         retried = self._backend()
-        result = retried.retry_prepare()
+        updates: list[dict[str, object]] = []
+        result = retried.retry_prepare(progress=updates.append)
         self.assertEqual(result["state"], installer_backend.PHASE_PREPARED)
+        self.assertEqual(updates[:2], [{"stage": "waiting_for_operation"}, {"stage": "checking_target"}])
         self.assertFalse(partial.exists())
         artifact = retried.journal.load()["artifact"]
         assert isinstance(artifact, dict)
@@ -835,6 +906,35 @@ class HelperCliTests(unittest.TestCase):
         self.assertFalse(kwargs["shell"])
         self.assertTrue(kwargs["capture_output"])
 
+    def test_module_facade_review_uses_one_fixed_privileged_call(self) -> None:
+        payload = json.dumps(
+            {
+                "ok": True,
+                "state": "preflight",
+                "phase": "preflight",
+                "supported": True,
+                "blockers": [],
+                "fingerprint": "target-a",
+            }
+        )
+        result = type("Result", (), {"returncode": 0, "stdout": payload})()
+        with mock.patch.object(installer_backend.subprocess, "run", return_value=result) as run:
+            value = installer_backend.review(allocation_gib=160)
+        self.assertEqual(value["state"], "preflight")
+        args, kwargs = run.call_args
+        self.assertEqual(
+            args[0],
+            [
+                installer_backend.PKEXEC_COMMAND,
+                installer_backend.HELPER_COMMAND,
+                "review",
+                "--allocation-gib",
+                "160",
+            ],
+        )
+        self.assertEqual(kwargs["timeout"], installer_backend._HELPER_TIMEOUTS["review"])
+        self.assertFalse(kwargs["shell"])
+
     def test_module_facade_prepare_forwards_allocation_and_review_fingerprint(self) -> None:
         payload = json.dumps({"ok": True, "state": "prepared", "prepared": True})
         result = type("Result", (), {"returncode": 0, "stdout": payload})()
@@ -921,6 +1021,23 @@ class HelperCliTests(unittest.TestCase):
                 )
         self.assertEqual(context.exception.code, "helper_invalid_response")
 
+    def test_module_facade_invalid_stage_stream_fails_closed(self) -> None:
+        script = "import json\nprint(json.dumps({'event':'stage','stage':'unknown'}), flush=True)\n"
+        real_popen = installer_backend.subprocess.Popen
+
+        def launch(_argv: list[str], **kwargs: object) -> object:
+            return real_popen([sys.executable, "-c", script], **kwargs)
+
+        with mock.patch.object(installer_backend.subprocess, "Popen", side_effect=launch):
+            with self.assertRaises(installer_backend.InstallError) as context:
+                installer_backend._invoke_helper(
+                    "prepare",
+                    allocation_gib=128,
+                    expected_fingerprint="target-a",
+                    progress=lambda _update: None,
+                )
+        self.assertEqual(context.exception.code, "helper_invalid_response")
+
     def test_module_facade_stream_output_bound_fails_closed(self) -> None:
         script = (
             "import sys\n"
@@ -968,10 +1085,104 @@ class HelperCliTests(unittest.TestCase):
                 )
         lines = output.getvalue().splitlines()
         self.assertEqual(status, 0)
-        self.assertEqual(len(lines), 2)
-        self.assertEqual(json.loads(lines[0])["progress"], {"bytes": 1, "total": 2})
-        self.assertTrue(json.loads(lines[1])["ok"])
+        self.assertEqual(len(lines), 3)
+        self.assertEqual(json.loads(lines[0]), {"event": "stage", "stage": "checking_target"})
+        self.assertEqual(json.loads(lines[1])["progress"], {"bytes": 1, "total": 2})
+        self.assertTrue(json.loads(lines[2])["ok"])
         self.assertEqual(len(calls), 1)
+
+    def test_root_helper_review_preflights_only_after_idle_status(self) -> None:
+        calls: list[str] = []
+
+        class Service:
+            def status(self) -> dict[str, object]:
+                calls.append("status")
+                return {"ok": True, "state": "idle", "phase": "idle", "marker": "status"}
+
+        def root_plan(allocation: int) -> dict[str, object]:
+            calls.append(f"preflight:{allocation}")
+            return plan(f"target-{allocation}")
+
+        with mock.patch.object(installer_backend.os, "geteuid", return_value=0), mock.patch.object(
+            installer_backend, "_root_preflight_plan", side_effect=root_plan
+        ):
+            output = io.StringIO()
+            with redirect_stdout(output):
+                status = installer_backend.helper_main(
+                    ["review", "--allocation-gib", "160"], backend=Service()
+                )
+        result = json.loads(output.getvalue())
+        self.assertEqual(status, 0)
+        self.assertEqual(calls, ["status", "preflight:160"])
+        self.assertEqual(result["state"], "preflight")
+        self.assertEqual(result["fingerprint"], "target-160")
+
+    def test_root_helper_review_returns_non_idle_status_without_fallback_preflight(self) -> None:
+        status_values = (
+            {"ok": True, "state": "preparing", "phase": "preparing", "marker": "active"},
+            {"ok": True, "state": "prepared", "phase": "prepared", "marker": "ready"},
+            {"ok": False, "state": "error", "phase": "error", "marker": "failed"},
+        )
+        for status_value in status_values:
+            with self.subTest(phase=status_value["phase"]):
+                class Service:
+                    def status(self) -> dict[str, object]:
+                        return status_value
+
+                with mock.patch.object(installer_backend.os, "geteuid", return_value=0), mock.patch.object(
+                    installer_backend,
+                    "_root_preflight_plan",
+                    side_effect=AssertionError("non-idle review must not preflight"),
+                ):
+                    output = io.StringIO()
+                    with redirect_stdout(output):
+                        code = installer_backend.helper_main(["review"], backend=Service())
+                self.assertEqual(code, 0 if status_value["ok"] else 1)
+                self.assertEqual(json.loads(output.getvalue()), status_value)
+
+    def test_root_helper_long_stream_preserves_late_bytes_and_verifying_stage(self) -> None:
+        total = 4000
+
+        class Service:
+            def prepare(
+                self,
+                _value: dict[str, object],
+                *,
+                progress: object = None,
+            ) -> dict[str, object]:
+                assert callable(progress)
+                for done in range(total + 1):
+                    progress({"bytes": done, "total": total})
+                progress({"stage": "verifying"})
+                return {"ok": True, "state": "prepared"}
+
+        clock = [0.0]
+
+        def monotonic() -> float:
+            value = clock[0]
+            clock[0] += 1.0
+            return value
+
+        with mock.patch.object(installer_backend.os, "geteuid", return_value=0), mock.patch.object(
+            installer_backend, "_root_preflight_plan", return_value=plan()
+        ), mock.patch.object(installer_backend.time, "monotonic", side_effect=monotonic):
+            output = io.StringIO()
+            with redirect_stdout(output):
+                code = installer_backend.helper_main(
+                    ["prepare", "--progress-json", "--expected-fingerprint", "target-a"],
+                    backend=Service(),
+                )
+        raw = output.getvalue().encode("utf-8")
+        events = [json.loads(line) for line in output.getvalue().splitlines()]
+        byte_events = [event["progress"] for event in events if event.get("event") == "progress"]
+        stages = [event["stage"] for event in events if event.get("event") == "stage"]
+        self.assertEqual(code, 0)
+        self.assertLess(len(raw), installer_backend._HELPER_OUTPUT_LIMIT)
+        self.assertLessEqual(len(raw), installer_backend._HELPER_PROGRESS_LIMIT + 1024)
+        self.assertGreater(len(byte_events), 10)
+        self.assertEqual(byte_events[-1], {"bytes": total, "total": total})
+        self.assertIn("verifying", stages)
+        self.assertTrue(events[-1]["ok"])
 
     def test_root_helper_rejects_progress_flag_for_other_actions(self) -> None:
         output = io.StringIO()

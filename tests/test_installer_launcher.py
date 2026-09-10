@@ -107,6 +107,18 @@ class LauncherPlanTests(unittest.TestCase):
                 )
                 self.assertNotIn("Home:", rendered)
 
+    def test_progress_copy_distinguishes_stages_and_measured_bytes(self):
+        self.assertEqual(gui._progress_stage_text("checking_target"), "Checking Fedora…")
+        self.assertEqual(
+            gui._progress_stage_text("waiting_for_operation"),
+            "Waiting for another installer operation…",
+        )
+        self.assertEqual(gui._progress_stage_text("verifying"), "Verifying download…")
+        self.assertEqual(gui._format_progress_bytes(0), "0 B")
+        self.assertEqual(gui._format_progress_bytes(8 * 1024**2), "8.0 MiB")
+        self.assertEqual(gui._format_progress_bytes(-1), "unknown size")
+        self.assertEqual(gui._format_elapsed(65), "Elapsed: 1m 05s")
+
     def test_disk_summary_keeps_identity_without_internal_fingerprint(self):
         rendered = gui._format_disk(
             {
@@ -347,6 +359,200 @@ class ControllerGateTests(unittest.TestCase):
         self.assertEqual(calls, [160])
         self.assertEqual(plan["target"]["allocation_gib"], 160)
         self.assertEqual(plan["blockers"], ["fixture_blocked"])
+
+    def test_refresh_prefers_one_combined_review_call(self):
+        calls: list[object] = []
+
+        def review(*, allocation_gib):
+            calls.append(allocation_gib)
+            return {
+                "ok": True,
+                "state": "preflight",
+                "supported": True,
+                "blockers": [],
+                "inventory": {"fixture": "review"},
+                "target": {"allocation_gib": allocation_gib},
+                "fingerprint": "sha256:" + "7" * 64,
+            }
+
+        def unexpected(*_args, **_kwargs):
+            raise AssertionError("review must replace the legacy calls")
+
+        backend = types.SimpleNamespace(
+            review=review,
+            status=unexpected,
+            preflight=unexpected,
+        )
+        controller = gui.InstallerController(allocation_gib=160, backend_module=backend)
+        plan = controller.refresh()
+        self.assertEqual(calls, [160])
+        self.assertEqual(plan["fingerprint"], "sha256:" + "7" * 64)
+        self.assertEqual(plan["target"]["allocation_gib"], 160)
+
+    def test_bad_combined_review_is_not_replaced_by_legacy_preflight(self):
+        def unexpected(*_args, **_kwargs):
+            raise AssertionError("a bad review must not fall through")
+
+        backend = types.SimpleNamespace(
+            review=lambda *, allocation_gib: {
+                "ok": False,
+                "state": "preflight",
+                "error": "helper_timeout",
+                "message": "The privileged installer did not finish safely.",
+            },
+            status=unexpected,
+            preflight=unexpected,
+        )
+        controller = gui.InstallerController(backend_module=backend)
+        with self.assertRaisesRegex(InstallerError, "finish safely"):
+            controller.refresh()
+
+    def test_unavailable_combined_review_allows_legacy_source_fallback(self):
+        calls: list[str] = []
+
+        class BackendFailure(RuntimeError):
+            code = "helper_unavailable"
+
+        plan = {
+            "supported": True,
+            "blockers": [],
+            "target": {"allocation_gib": 128},
+            "fingerprint": "sha256:" + "6" * 64,
+        }
+
+        def review(*, allocation_gib):
+            calls.append("review")
+            raise BackendFailure("helper fixture unavailable")
+
+        def preflight(*, allocation_gib):
+            calls.append("preflight")
+            return plan
+
+        controller = gui.InstallerController(
+            backend_module=types.SimpleNamespace(review=review, preflight=preflight)
+        )
+        result = controller.refresh()
+        self.assertEqual(calls, ["review", "preflight"])
+        self.assertEqual(result["fingerprint"], plan["fingerprint"])
+
+    def test_active_combined_review_status_blocks_fresh_plan_collection(self):
+        calls: list[str] = []
+
+        def review(*, allocation_gib):
+            calls.append("review")
+            return {
+                "ok": True,
+                "state": "downloading",
+                "phase": "downloading",
+                "progress": {"bytes": 4, "total": 8},
+                "allocation_gib": allocation_gib,
+                "target": {"allocation_gib": allocation_gib},
+                "fingerprint": "sha256:" + "8" * 64,
+            }
+
+        backend = types.SimpleNamespace(
+            review=review,
+            status=lambda: calls.append("status"),
+            preflight=lambda **_kwargs: calls.append("preflight"),
+        )
+        controller = gui.InstallerController(backend_module=backend)
+        plan = controller.refresh()
+        self.assertEqual(calls, ["review"])
+        self.assertTrue(controller.operation_pending)
+        self.assertTrue(controller.operation_blocked)
+        self.assertEqual(controller.resume_status["progress"], {"bytes": 4, "total": 8})
+        self.assertEqual(plan["fingerprint"], "sha256:" + "8" * 64)
+
+    def test_prepare_uses_exact_reviewed_plan_without_refreshing(self):
+        calls: list[str] = []
+        reviewed_fingerprint = "sha256:" + "9" * 64
+        reviewed_plan = {
+            "ok": True,
+            "state": "preflight",
+            "supported": True,
+            "blockers": [],
+            "inventory": {"fixture": "review"},
+            "target": {"allocation_gib": 128, "disk": "/dev/nvme0n1"},
+            "fingerprint": reviewed_fingerprint,
+        }
+
+        def prepare(plan, progress=None):
+            calls.append("prepare")
+            self.assertIs(plan, controller.plan)
+            self.assertEqual(plan["fingerprint"], reviewed_fingerprint)
+            self.assertIsNone(progress)
+            return {"ok": True, "state": "ready", "prepared": True}
+
+        backend = types.SimpleNamespace(
+            review=lambda *, allocation_gib: calls.append("review") or dict(reviewed_plan),
+            status=lambda: calls.append("status"),
+            preflight=lambda **_kwargs: calls.append("preflight"),
+            prepare=prepare,
+        )
+        controller = gui.InstallerController(allocation_gib=128, backend_module=backend)
+        controller.refresh()
+        result = controller.prepare(allocation_gib=128)
+        self.assertEqual(calls, ["review", "prepare"])
+        self.assertTrue(result["prepared"])
+        self.assertTrue(controller.prepared)
+
+    def test_prepare_rejects_allocation_that_was_not_reviewed(self):
+        calls: list[str] = []
+        plan = {
+            "supported": True,
+            "blockers": [],
+            "target": {"allocation_gib": 128},
+            "fingerprint": "sha256:" + "a" * 64,
+        }
+        backend = types.SimpleNamespace(
+            preflight=lambda **_kwargs: plan,
+            prepare=lambda *_args, **_kwargs: calls.append("prepare"),
+        )
+        controller = gui.InstallerController(backend_module=backend)
+        controller.refresh()
+        with self.assertRaisesRegex(InstallerError, "Review the updated allocation first"):
+            controller.prepare(allocation_gib=160)
+        self.assertEqual(calls, [])
+
+    def test_prepare_preserves_known_backend_transport_errors(self):
+        class BackendFailure(RuntimeError):
+            def __init__(self, code):
+                self.code = code
+                super().__init__("backend fixture failure")
+
+        plan = {
+            "supported": True,
+            "blockers": [],
+            "target": {"allocation_gib": 128},
+            "fingerprint": "sha256:" + "b" * 64,
+        }
+        for code, expected in (
+            ("authorization_required", "Administrator approval"),
+            ("authorization_denied", "approval was denied"),
+            ("auth_canceled", "approval was canceled"),
+            ("helper_timeout", "timed out"),
+            ("helper_unavailable", "unavailable"),
+        ):
+            with self.subTest(code=code):
+                backend = types.SimpleNamespace(
+                    preflight=lambda **_kwargs: plan,
+                    prepare=lambda *_args, _code=code, **_kwargs: (_ for _ in ()).throw(
+                        BackendFailure(_code)
+                    ),
+                )
+                controller = gui.InstallerController(backend_module=backend)
+                controller.refresh()
+                with self.assertRaisesRegex(InstallerError, expected):
+                    controller.prepare()
+
+        backend = types.SimpleNamespace(
+            preflight=lambda **_kwargs: plan,
+            prepare=lambda *_args, **_kwargs: (_ for _ in ()).throw(BackendFailure("other")),
+        )
+        controller = gui.InstallerController(backend_module=backend)
+        controller.refresh()
+        with self.assertRaisesRegex(InstallerError, "verified Zeus payload"):
+            controller.prepare()
 
     def test_reboot_resume_uses_status_journal_without_new_plan(self):
         calls: list[str] = []

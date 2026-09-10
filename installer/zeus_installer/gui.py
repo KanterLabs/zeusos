@@ -15,6 +15,7 @@ import importlib
 import inspect
 import math
 import os
+import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -29,6 +30,15 @@ PREPARED_STATES = frozenset({"ready", "prepared", "staged"})
 JOURNAL_PHASES = frozenset(
     {"preparing", "downloading", "verifying", "prepared", "installing", "error", "interrupted"}
 )
+PROGRESS_STAGE_LABELS = {
+    "checking_target": "Checking Fedora…",
+    "waiting_for_operation": "Waiting for another installer operation…",
+    "checking_release": "Checking the Zeus release…",
+    "connecting": "Connecting to the Zeus release service…",
+    "downloading": "Downloading Zeus…",
+    "verifying": "Verifying download…",
+}
+WAITING_FOR_REVIEW = "Waiting for administrator approval or installer response…"
 
 
 class BackendUnavailableError(InstallerError):
@@ -244,10 +254,53 @@ def _invoke_status(function: Callable[..., Any]) -> Any:
     return function()
 
 
+def _review_plan(value: Any, allocation_gib: int) -> dict[str, Any]:
+    """Extract the reviewed plan from the combined privileged review result."""
+
+    if not isinstance(value, Mapping) or not _result_ok(value):
+        message = value.get("message") if isinstance(value, Mapping) else None
+        raise InstallerError(_safe_text(message, "The installer review could not complete safely."))
+    state = _safe_text(value.get("state") or value.get("phase")).lower()
+    if state != "preflight":
+        raise InstallerError("The installer review returned an unexpected state.")
+    candidate = value.get("plan")
+    if not isinstance(candidate, Mapping) and "supported" in value:
+        candidate = value
+    if not isinstance(candidate, Mapping):
+        raise InstallerError("The installer review returned no installation plan.")
+    return _normalise_plan(candidate, allocation_gib)
+
+
 def _facade_unavailable(error: Exception) -> bool:
     """Identify an absent installed helper so source fallback can run."""
 
     return getattr(error, "code", None) in {"helper_unavailable", "preflight_unavailable"}
+
+
+_PREPARE_TRANSPORT_MESSAGES = {
+    "authorization_required": "Administrator approval was not completed. Try again and approve the installer request.",
+    "authentication_required": "Administrator approval was not completed. Try again and approve the installer request.",
+    "authorization_denied": "Administrator approval was denied. Try again when ready.",
+    "authorization_canceled": "Administrator approval was canceled. Try again when ready.",
+    "authorization_cancelled": "Administrator approval was canceled. Try again when ready.",
+    "auth_canceled": "Administrator approval was canceled. Try again when ready.",
+    "auth_cancelled": "Administrator approval was canceled. Try again when ready.",
+    "helper_timeout": "The privileged installer timed out. Try again.",
+    "helper_unavailable": "The privileged installer is unavailable. Check the installer service and try again.",
+}
+
+
+def _transport_error_message(error: Exception, fallback: str) -> str:
+    code = _safe_text(getattr(error, "code", "")).lower().replace("-", "_")
+    return _PREPARE_TRANSPORT_MESSAGES.get(code, fallback)
+
+
+def _prepare_error_message(error: Exception) -> str:
+    return _transport_error_message(error, "The verified Zeus payload could not be prepared safely.")
+
+
+def _review_error_message(error: Exception) -> str:
+    return _transport_error_message(error, "The installer review could not complete safely.")
 
 
 def _normalise_plan(value: Any, allocation_gib: int) -> dict[str, Any]:
@@ -264,6 +317,21 @@ def _normalise_plan(value: Any, allocation_gib: int) -> dict[str, Any]:
             plan["blockers"] = [diagnostic]
     plan.setdefault("allocation_gib", allocation_gib)
     return plan
+
+
+def _plan_allocation(plan: Mapping[str, Any] | None, fallback: int) -> int:
+    if isinstance(plan, Mapping):
+        for owner in (plan, plan.get("target")):
+            if not isinstance(owner, Mapping):
+                continue
+            value = owner.get("allocation_gib", owner.get("zeus_allocation_gib"))
+            if value in (None, ""):
+                continue
+            try:
+                return validate_allocation(value)
+            except (TypeError, ValueError):
+                continue
+    return fallback
 
 
 def _result_ok(result: Any) -> bool:
@@ -384,6 +452,51 @@ class InstallerController:
     def qualification(self) -> dict[str, Any]:
         return backend_qualification(self.backend_module)
 
+    def _consume_status(self, status: Any) -> bool:
+        """Apply a durable status snapshot without starting another review."""
+
+        phase = _status_phase(status)
+        if not phase and isinstance(status, Mapping):
+            # Preserve structured error phases even when the status marks the
+            # operation unsuccessful; these snapshots are still authoritative.
+            phase = (_safe_text(status.get("phase")) or _safe_text(status.get("state"))).lower()
+        if (
+            phase in {"reboot_required", "installed"}
+            and isinstance(status, Mapping)
+            and _result_ok(status)
+        ):
+            self.resume_status = dict(status)
+            self.resume_blocked = phase == "reboot_required" and _status_resume_invalid(status)
+            self.resume_pending = (
+                phase == "reboot_required"
+                and _status_boot_changed(status)
+                and not self.resume_blocked
+            )
+            self.terminal = phase == "installed"
+            self.plan = _status_display_plan(status, self.allocation_gib, phase)
+            self.preparation = status
+            self.prepared = False
+            self.installation = None if self.resume_pending else status
+            self.reboot_ready = (
+                phase == "reboot_required"
+                and not self.resume_pending
+                and not self.resume_blocked
+            )
+            return True
+        if isinstance(status, Mapping) and phase in JOURNAL_PHASES:
+            # A prepared or interrupted journal is already authoritative.
+            # Recollecting here could offer a second allocation while a
+            # root-owned operation is still bound to the first one.
+            self.resume_status = dict(status)
+            self.operation_pending = True
+            self.operation_blocked = phase != "prepared" or not _result_ok(status)
+            self.plan = _status_display_plan(status, self.allocation_gib, phase)
+            self.preparation = status
+            self.prepared = phase == "prepared" and _result_ok(status)
+            self.last_error = _status_error_message(status)
+            return True
+        return False
+
     def refresh(self, allocation_gib: int | None = None) -> dict[str, Any]:
         if allocation_gib is not None:
             self.allocation_gib = validate_allocation(allocation_gib)
@@ -400,6 +513,24 @@ class InstallerController:
         self.operation_pending = False
         self.operation_blocked = False
         self.terminal = False
+        review_function = _backend_function(backend, ("review",)) if backend is not None else None
+        if review_function is not None:
+            try:
+                reviewed = _invoke_preflight(review_function, self.allocation_gib)
+            except Exception as error:  # pragma: no cover - backend-specific failures
+                if not _facade_unavailable(error):
+                    raise InstallerError(_review_error_message(error)) from error
+                review_function = None
+            if review_function is not None:
+                if isinstance(reviewed, Mapping):
+                    state = _safe_text(reviewed.get("state") or reviewed.get("phase")).lower()
+                    if state == "preflight":
+                        self.plan = _review_plan(reviewed, self.allocation_gib)
+                        return self.plan
+                    if self._consume_status(reviewed):
+                        return self.plan or {}
+                raise InstallerError("The installer review returned an unexpected state.")
+
         status_function = _backend_function(
             backend, ("status", "get_status", "operation_status")
         ) if backend is not None else None
@@ -410,46 +541,8 @@ class InstallerController:
             except Exception as error:  # pragma: no cover - backend-specific failures
                 if not _facade_unavailable(error):
                     raise InstallerError("The existing installer operation could not be read safely.") from error
-            phase = _status_phase(status)
-            if not phase and isinstance(status, Mapping):
-                # Keep a failed helper response visible instead of silently
-                # replacing its durable error with a newly collected plan.
-                phase = (_safe_text(status.get("phase")) or _safe_text(status.get("state"))).lower()
-            if (
-                phase in {"reboot_required", "installed"}
-                and isinstance(status, Mapping)
-                and _result_ok(status)
-            ):
-                self.resume_status = dict(status)
-                self.resume_blocked = phase == "reboot_required" and _status_resume_invalid(status)
-                self.resume_pending = (
-                    phase == "reboot_required"
-                    and _status_boot_changed(status)
-                    and not self.resume_blocked
-                )
-                self.terminal = phase == "installed"
-                self.plan = _status_display_plan(status, self.allocation_gib, phase)
-                self.preparation = status
-                self.prepared = False
-                self.installation = None if self.resume_pending else status
-                self.reboot_ready = (
-                    phase == "reboot_required"
-                    and not self.resume_pending
-                    and not self.resume_blocked
-                )
-                return self.plan
-            if isinstance(status, Mapping) and phase in JOURNAL_PHASES:
-                # A prepared or interrupted journal is already authoritative.
-                # Recollecting here could offer a second allocation while a
-                # root-owned operation is still bound to the first one.
-                self.resume_status = dict(status)
-                self.operation_pending = True
-                self.operation_blocked = phase != "prepared" or not _result_ok(status)
-                self.plan = _status_display_plan(status, self.allocation_gib, phase)
-                self.preparation = status
-                self.prepared = phase == "prepared" and _result_ok(status)
-                self.last_error = _status_error_message(status)
-                return self.plan
+            if self._consume_status(status):
+                return self.plan or {}
         privileged_preflight = _backend_function(
             backend,
             ("preflight", "privileged_preflight", "read_only_preflight", "collect_preflight"),
@@ -505,7 +598,16 @@ class InstallerController:
             and self.qualification.get("qualified") is True
         )
 
-    def prepare(self, progress: Callable[[Any], None] | None = None) -> Any:
+    def prepare(
+        self,
+        progress: Callable[[Any], None] | None = None,
+        *,
+        allocation_gib: int | None = None,
+    ) -> Any:
+        if allocation_gib is not None and validate_allocation(allocation_gib) != _plan_allocation(
+            self.plan, self.allocation_gib
+        ):
+            raise BackendUnavailableError("Review the updated allocation first.")
         if not self.can_prepare():
             raise BackendUnavailableError(
                 "Preparation is disabled until Fedora preflight passes and a preparation backend is available."
@@ -521,7 +623,7 @@ class InstallerController:
         except BackendUnavailableError:
             raise
         except Exception as error:  # pragma: no cover - backend-specific failures
-            raise InstallerError("The verified Zeus payload could not be prepared safely.") from error
+            raise InstallerError(_prepare_error_message(error)) from error
         if not _result_ok(result):
             message = result.get("message") if isinstance(result, Mapping) else None
             raise InstallerError(_safe_text(message, "The backend refused to prepare this plan."))
@@ -808,6 +910,35 @@ def _format_target(plan: Mapping[str, Any] | None) -> str:
     return " · ".join(values) if values else "Preflight will identify newly allocated Zeus space."
 
 
+def _progress_stage_text(stage: Any) -> str:
+    return PROGRESS_STAGE_LABELS.get(_safe_text(stage).lower(), "Working on the reviewed plan…")
+
+
+def _format_progress_bytes(value: Any) -> str:
+    try:
+        numeric = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return "unknown size"
+    if numeric < 0:
+        return "unknown size"
+    if numeric < 1024:
+        return f"{numeric} B"
+    amount = float(numeric)
+    for unit in ("KiB", "MiB", "GiB", "TiB"):
+        amount /= 1024
+        if amount < 1024 or unit == "TiB":
+            return f"{amount:.1f} {unit}"
+    return f"{numeric} B"
+
+
+def _format_elapsed(seconds: float) -> str:
+    total = max(0, int(seconds))
+    minutes, remainder = divmod(total, 60)
+    if minutes:
+        return f"Elapsed: {minutes}m {remainder:02d}s"
+    return f"Elapsed: {remainder}s"
+
+
 def _format_fedora(plan: Mapping[str, Any] | None) -> str:
     """Describe the Fedora resources carried through the review plan."""
 
@@ -908,7 +1039,18 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
             self.set_default_size(900, 760)
             self.set_size_request(680, 600)
             self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+            self._closed = False
             self._busy = False
+            self._operation_generation = 0
+            self._active_operation: int | None = None
+            self._timer_id = 0
+            self._busy_started: float | None = None
+            self._progress_determinate = False
+            self._progress_stage = ""
+            self._progress_detail = ""
+            self._progress_last_bytes: int | None = None
+            self._progress_last_time: float | None = None
+            self.connect("close-request", self._close_request)
 
             toolbar = Adw.ToolbarView() if Adw is not None else Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
             header = Adw.HeaderBar() if Adw is not None else Gtk.HeaderBar()
@@ -933,7 +1075,8 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
                 toolbar.append(scroller)
                 self.set_child(toolbar)
 
-            self._set_busy(True, "Running read-only Fedora preflight…")
+            self._set_busy(True, WAITING_FOR_REVIEW)
+            self._footer.set_text(WAITING_FOR_REVIEW)
             self._submit(self._refresh_worker, self._apply_refresh)
 
         def _content(self) -> Any:
@@ -974,16 +1117,17 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
             self._blockers = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
             content.append(self._blockers)
 
-            self._status = label("Preflight has not run yet.")
-            self._status.add_css_class("dim-label")
+            self._status = label("Preflight has not run yet.", css="body")
             content.append(self._status)
             self._progress = Gtk.ProgressBar()
             self._progress.set_show_text(True)
-            self._progress.set_text("Waiting for preflight")
+            self._progress.set_text(WAITING_FOR_REVIEW)
             content.append(self._progress)
+            self._activity = label("Elapsed: 0s", css="caption")
+            content.append(self._activity)
 
             buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-            self._refresh_button = Gtk.Button(label="Refresh preflight")
+            self._refresh_button = Gtk.Button(label="Check again")
             self._refresh_button.connect("clicked", self._refresh_clicked)
             buttons.append(self._refresh_button)
             self._prepare_button = Gtk.Button(label="Download and prepare")
@@ -1022,9 +1166,58 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
             self._prepare_button.set_sensitive(False)
             self._install_button.set_sensitive(False)
             self._restart_button.set_sensitive(False)
-            self._status.set_text("Allocation changed. Refresh preflight to review this plan.")
+            self._status.set_text("Allocation changed. Check again to review this plan.")
+            self._footer.set_text("Check again before downloading so the selected allocation is reviewed.")
+
+        def _stop_activity_timer(self) -> None:
+            if self._timer_id:
+                try:
+                    GLib.source_remove(self._timer_id)
+                except (AttributeError, RuntimeError, TypeError):
+                    pass
+                self._timer_id = 0
+
+        def _update_activity(self) -> None:
+            if self._busy_started is None:
+                return
+            text = _format_elapsed(time.monotonic() - self._busy_started)
+            if self._progress_detail:
+                text += f" · {self._progress_detail}"
+            self._activity.set_text(text)
+
+        def _activity_tick(self) -> bool:
+            if self._closed or not self._busy:
+                self._timer_id = 0
+                return False
+            if not self._progress_determinate:
+                self._progress.pulse()
+            self._update_activity()
+            return True
+
+        def _finish_operation(self) -> None:
+            self._active_operation = None
+            self._operation_generation += 1
+
+        def _close_request(self, *_args: Any) -> bool:
+            self._closed = True
+            self._finish_operation()
+            self._stop_activity_timer()
+            self._busy = False
+            self._executor.shutdown(wait=False, cancel_futures=True)
+            return False
 
         def _set_busy(self, busy: bool, status: str | None = None) -> None:
+            if busy and not self._busy:
+                self._busy_started = time.monotonic()
+                self._progress_stage = ""
+                self._progress_detail = ""
+                self._progress_last_bytes = None
+                self._progress_last_time = None
+                if self._timer_id == 0:
+                    self._timer_id = GLib.timeout_add(1000, self._activity_tick)
+            elif not busy:
+                self._finish_operation()
+                self._stop_activity_timer()
             self._busy = busy
             self._refresh_button.set_sensitive(not busy)
             self._allocation_spin.set_sensitive(
@@ -1055,12 +1248,21 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
             )
             if status:
                 self._status.set_text(status)
+            if busy:
+                self._footer.set_text("Please wait for this step to finish.")
+                self._update_activity()
+            else:
+                self._busy_started = None
+                self._progress_detail = ""
 
         def _refresh_worker(self, allocation_gib: int | None = None) -> dict[str, Any]:
             allocation = controller.allocation_gib if allocation_gib is None else allocation_gib
             return controller.refresh(allocation)
 
-        def _submit(self, function: Callable[[], Any], callback: Callable[[Any, Exception | None], None]) -> None:
+        def _submit(self, function: Callable[[], Any], callback: Callable[[Any, Exception | None], bool]) -> None:
+            self._operation_generation += 1
+            token = self._operation_generation
+            self._active_operation = token
             future = self._executor.submit(function)
 
             def done(completed: concurrent.futures.Future[Any]) -> None:
@@ -1070,18 +1272,30 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
                 except Exception as caught:  # pragma: no cover - GTK runtime path
                     result = None
                     error = caught
-                GLib.idle_add(callback, result, error)
+                def deliver() -> bool:
+                    if self._closed or self._active_operation != token:
+                        return False
+                    return callback(result, error)
+
+                GLib.idle_add(deliver)
 
             future.add_done_callback(done)
 
         def _refresh_clicked(self, _button: Any) -> None:
             allocation = int(self._allocation_spin.get_value())
-            self._set_busy(True, "Running read-only Fedora preflight…")
+            self._set_busy(True, WAITING_FOR_REVIEW)
+            self._progress_determinate = False
+            self._progress.set_fraction(0.0)
+            self._progress.set_text(WAITING_FOR_REVIEW)
+            self._footer.set_text(WAITING_FOR_REVIEW)
             self._submit(lambda: self._refresh_worker(allocation), self._apply_refresh)
 
         def _apply_refresh(self, plan: Any, error: Exception | None) -> bool:
             if error is not None:
-                self._set_busy(False, f"Preflight unavailable: {error}")
+                self._progress.set_fraction(0.0)
+                self._progress.set_text("Review failed")
+                self._set_busy(False, f"Review failed: {error}")
+                self._footer.set_text("Review the error above before trying again.")
                 self._render_blockers([str(error)])
                 return False
             self._render_plan(plan)
@@ -1100,6 +1314,36 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
                 row.set_wrap(True)
                 row.add_css_class("error")
                 self._blockers.append(row)
+
+        def _render_recorded_progress(self) -> None:
+            status = controller.resume_status or {}
+            phase = _safe_text(status.get("phase") or status.get("state")).lower()
+            progress = status.get("progress")
+            done = progress.get("bytes") if isinstance(progress, Mapping) else None
+            total = progress.get("total") if isinstance(progress, Mapping) else None
+            if type(done) is int and type(total) is int and total > 0 and 0 <= done <= total:
+                fraction = done / total
+                label = {
+                    "downloading": "Downloading Zeus…",
+                    "verifying": "Verifying download…",
+                }.get(phase, "Working on the reviewed plan…")
+                self._progress.set_fraction(fraction)
+                self._progress.set_text(
+                    f"Last reported progress: {label} {int(fraction * 100)}% · "
+                    f"{_format_progress_bytes(done)}/{_format_progress_bytes(total)}"
+                )
+            else:
+                label = {
+                    "preparing": "Checking the reviewed plan…",
+                    "downloading": "Downloading Zeus…",
+                    "verifying": "Verifying download…",
+                    "installing": "Installing Zeus…",
+                    "error": "Review needed",
+                    "interrupted": "Review needed",
+                }.get(phase, "Working on the reviewed plan…")
+                self._progress.set_fraction(0.0)
+                self._progress.set_text(f"Last reported stage: {label}")
+            self._activity.set_text("Last reported progress; this window is not monitoring the operation.")
 
         def _render_plan(self, plan: Mapping[str, Any]) -> None:
             self._disk.set_text(_format_disk(plan))
@@ -1171,70 +1415,160 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
                 self._status.set_text("This Fedora layout is not supported for dual-boot preparation.")
                 self._footer.set_text("No storage changes were made. Review the preflight blockers above.")
             if not controller.terminal:
-                if controller.prepared:
+                if controller.operation_pending and not controller.prepared:
+                    self._render_recorded_progress()
+                elif controller.resume_pending:
+                    self._progress.set_fraction(0.0)
+                    self._progress.set_text("Last reported state: waiting after restart")
+                    self._activity.set_text("Last reported progress; this window is not monitoring the operation.")
+                elif controller.prepared:
                     self._progress.set_fraction(1.0)
-                    self._progress.set_text("Verified installer staged")
+                    self._progress.set_text("Download verified")
                 else:
                     self._progress.set_fraction(0.0)
-                    self._progress.set_text("Ready for review")
+                    self._progress.set_text("Ready to download")
 
         def _prepare_clicked(self, _button: Any) -> None:
             allocation = int(self._allocation_spin.get_value())
-            self._set_busy(True, "Rechecking the target before preparation…")
+            if allocation != _plan_allocation(controller.plan, controller.allocation_gib):
+                self._prepare_button.set_sensitive(False)
+                self._status.set_text("Review the updated allocation first.")
+                self._footer.set_text("Check again before downloading so the selected allocation is reviewed.")
+                return
+            self._set_busy(True, WAITING_FOR_REVIEW)
             self._progress.set_fraction(0.0)
-            self._progress.set_text("Preparing verified payload")
+            self._progress_determinate = False
+            self._progress.set_text(WAITING_FOR_REVIEW)
+            self._footer.set_text(WAITING_FOR_REVIEW)
 
             def worker() -> Any:
-                plan = controller.refresh(allocation)
+                operation_token = self._active_operation
                 if not controller.can_prepare():
                     raise BackendUnavailableError(
                         "Preparation is disabled until Fedora preflight passes and a preparation backend is available."
                     )
 
                 def progress(value: Any) -> None:
-                    GLib.idle_add(self._progress_update, value)
+                    if self._closed or operation_token is None:
+                        return
+                    GLib.idle_add(self._progress_update, value, operation_token)
 
-                result = controller.prepare(progress=progress)
-                return plan, result
+                result = controller.prepare(progress=progress, allocation_gib=allocation)
+                return controller.plan or {}, result
 
             self._submit(worker, self._apply_preparation)
 
-        def _progress_update(self, value: Any) -> bool:
+        def _progress_update(self, value: Any, token: int | None = None) -> bool:
+            if self._closed or not self._busy or (token is not None and token != self._active_operation):
+                return False
+            stage = ""
             if isinstance(value, Mapping):
-                done = value.get("bytes", value.get("completed"))
-                total = value.get("total")
-                try:
-                    if total and float(total) > 0:
-                        fraction = max(0.0, min(1.0, float(done or 0) / float(total)))
-                        self._progress.set_fraction(fraction)
-                        self._progress.set_text(f"Preparing verified payload ({int(fraction * 100)}%)")
-                        return False
-                except (TypeError, ValueError):
-                    pass
+                stage = _safe_text(value.get("stage")).lower()
+            if stage:
+                self._progress_stage = stage
+                self._progress_detail = ""
+                self._progress_last_bytes = None
+                self._progress_last_time = None
+                self._progress_determinate = False
+                stage_text = _progress_stage_text(stage)
+                self._status.set_text(stage_text)
+                self._footer.set_text("Working on the reviewed plan; Fedora is unchanged.")
+                self._progress.set_fraction(0.0)
+                self._progress.set_text(stage_text)
+
+            done = value.get("bytes", value.get("completed")) if isinstance(value, Mapping) else None
+            total = value.get("total") if isinstance(value, Mapping) else None
+            if type(done) is int and type(total) is int and total > 0 and 0 <= done <= total:
+                if done == total:
+                    self._progress_stage = "verifying"
+                    self._progress_determinate = False
+                    self._progress.set_fraction(0.0)
+                    self._progress.set_text("Download complete; verifying…")
+                    self._status.set_text(_progress_stage_text("verifying"))
+                    self._footer.set_text("Working on the reviewed plan; Fedora is unchanged.")
+                    self._progress_detail = ""
+                    self._update_activity()
+                    self._progress.pulse()
+                    return False
+                if done > 0:
+                    self._progress_stage = "downloading"
+                elif not self._progress_stage:
+                    self._progress_stage = "connecting"
+                if done == 0:
+                    self._progress_determinate = False
+                    self._progress.set_fraction(0.0)
+                    self._progress.set_text(_progress_stage_text(self._progress_stage))
+                    self._status.set_text(_progress_stage_text(self._progress_stage))
+                    self._footer.set_text("Working on the reviewed plan; Fedora is unchanged.")
+                    self._progress_detail = ""
+                    self._update_activity()
+                    self._progress.pulse()
+                    return False
+                stage_text = _progress_stage_text(self._progress_stage)
+                now = time.monotonic()
+                rate = None
+                if (
+                    self._progress_last_bytes is not None
+                    and self._progress_last_time is not None
+                    and now > self._progress_last_time
+                    and done > self._progress_last_bytes
+                ):
+                    rate = (done - self._progress_last_bytes) / (now - self._progress_last_time)
+                self._progress_last_bytes = done
+                self._progress_last_time = now
+                self._progress_determinate = True
+                fraction = done / total
+                self._progress.set_fraction(fraction)
+                self._progress.set_text(
+                    f"{stage_text} {int(fraction * 100)}% · "
+                    f"{_format_progress_bytes(done)}/{_format_progress_bytes(total)}"
+                )
+                self._status.set_text(stage_text)
+                self._footer.set_text("Working on the reviewed plan; Fedora is unchanged.")
+                self._progress_detail = (
+                    f"Speed: {_format_progress_bytes(rate)}/s" if rate and rate > 0 else ""
+                )
+                self._update_activity()
+                return False
+            if not stage and not self._progress_stage:
+                self._progress_stage = "checking_release"
+            self._progress_determinate = False
+            self._progress.set_fraction(0.0)
+            self._progress.set_text(_progress_stage_text(self._progress_stage))
+            self._update_activity()
             self._progress.pulse()
             return False
 
         def _apply_preparation(self, value: Any, error: Exception | None) -> bool:
             if error is not None:
-                self._set_busy(False, f"Preparation stopped safely: {error}")
+                self._progress_determinate = False
+                self._progress.set_fraction(0.0)
+                self._progress.set_text("Preparation failed")
+                self._set_busy(False, f"Preparation failed: {error}")
+                self._footer.set_text("Review the error above before trying again.")
                 self._restart_button.set_sensitive(False)
                 return False
             plan, result = value
             self._render_plan(plan)
             if controller.prepared:
                 self._progress.set_fraction(1.0)
-                self._progress.set_text("Verified installer staged")
+                self._progress.set_text("Download verified")
                 self._status.set_text("Download verified. Ready to install.")
             else:
                 state = result.get("state") if isinstance(result, Mapping) else "preparing"
                 self._status.set_text(
-                    f"Backend state: {_safe_text(state, 'preparing')}. Installation remains disabled until staging is ready."
+                    f"Preparation is not ready: {_safe_text(state, 'preparing')}. Installation remains disabled."
                 )
+                self._progress_determinate = False
+                self._progress.set_fraction(0.0)
+                self._progress.set_text("Preparation needs review")
             self._set_busy(False)
             return False
 
         def _install_clicked(self, _button: Any) -> None:
             self._set_busy(True, "Installing Zeus…")
+            self._footer.set_text("Working on the reviewed plan; Fedora is unchanged.")
+            self._progress_determinate = False
             self._progress.set_fraction(0.0)
             self._progress.set_text("Installing Zeus…")
 
@@ -1250,15 +1584,20 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
 
         def _apply_installation(self, value: Any, error: Exception | None) -> bool:
             if error is not None:
-                self._set_busy(False, f"Installation stopped safely: {error}")
+                self._progress_determinate = False
+                self._progress.set_fraction(0.0)
+                self._progress.set_text("Installation failed")
+                self._set_busy(False, f"Installation failed: {error}")
+                self._footer.set_text("Review the error above before trying again.")
                 self._restart_button.set_sensitive(False)
                 return False
             plan, result = value
             self._render_plan(plan)
             if controller.reboot_ready:
                 self._progress.set_fraction(1.0)
-                self._progress.set_text("Maintenance reboot ready")
+                self._progress.set_text("Ready to restart")
                 self._status.set_text("Restart Fedora to continue installing Zeus.")
+                self._footer.set_text("Restart Fedora to continue. Fedora remains the default boot choice.")
             else:
                 phase = "unknown"
                 if isinstance(result, Mapping):
@@ -1267,7 +1606,10 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
                     self._progress.set_fraction(1.0)
                     self._progress.set_text("Installation complete")
                     self._status.set_text("Installation complete. Restart to choose Fedora or Zeus.")
+                    self._footer.set_text("Fedora remains the default choice.")
                 else:
+                    self._progress_determinate = False
+                    self._progress.set_fraction(0.0)
                     self._progress.set_text("Installation state requires review")
                     self._status.set_text(
                         f"Executor state: {_safe_text(phase, 'unknown')}. Restart remains disabled until it reports reboot_required."
@@ -1276,17 +1618,30 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
             return False
 
         def _restart_clicked(self, _button: Any) -> None:
-            self._set_busy(True, "Requesting the explicit restart…")
+            self._set_busy(True, "Requesting restart…")
+            self._footer.set_text("Waiting for the restart request to finish safely.")
+            self._progress_determinate = False
+            self._progress.set_fraction(0.0)
+            self._progress.set_text("Requesting restart…")
             self._submit(controller.request_restart, self._apply_restart)
 
         def _apply_restart(self, _result: Any, error: Exception | None) -> bool:
             if error is not None:
+                self._progress_determinate = False
+                self._progress.set_fraction(0.0)
+                self._progress.set_text("Restart was not requested")
                 self._set_busy(False, f"Restart was not requested: {error}")
+                self._footer.set_text("Review the error above before trying again.")
             else:
+                self._progress_determinate = False
+                self._progress.set_fraction(0.0)
+                self._progress.set_text("Restart requested")
                 if controller.terminal:
                     self._set_busy(False, "Restart requested. Choose Fedora or Zeus; Fedora remains the default.")
+                    self._footer.set_text("Choose Fedora or Zeus after the restart.")
                 else:
                     self._set_busy(False, "Restart requested. Reopen Zeus Installer in Fedora to continue the recorded operation.")
+                    self._footer.set_text("Reopen Zeus Installer in Fedora to continue the recorded operation.")
             return False
 
         def _cancel_clicked(self, _button: Any) -> None:

@@ -13,8 +13,9 @@ startup choice. The supported route has passed disposable Fedora 43 VM testing;
 the Nimo laptop's hardware and physical installation remain untested. See the
 [qualification record](../docs/iterations/installer-20260910/README.md).
 
-On an installed system the GTK and CLI launchers ask the backend facade for
-their read-only preflight. That facade may authenticate through the fixed
+On an installed system the GTK launcher uses one privileged `review` request
+to read the existing operation and collect the Fedora layout only when idle.
+The CLI also exposes a standalone read-only preflight through the fixed
 `/usr/libexec/zeus-installer-helper preflight <allocation-gib>` action, so a
 normal Fedora desktop user can inspect the same root-owned inventory used for
 revalidation. The allocation is passed as a number; the launcher cannot
@@ -63,6 +64,13 @@ zeus-installer
 ```
 
 Choose the allocation, use **Download and prepare**, then start installation.
+If you change the allocation, choose **Check again** before downloading.
+The window shows checking, connecting, downloading and verification stages.
+Downloads show received/total bytes and percentage; other stages show activity
+and elapsed time. A completed download still needs verification before
+installation becomes available. Reopening an active operation displays its
+last reported status, rather than claiming to monitor it live.
+
 When asked, restart Fedora and reopen Zeus Installer to continue. After the
 second phase, restart again and choose **Zeus OS** from Fedora's startup menu.
 This personal preview provisions user **shane** with the requested password
@@ -109,10 +117,18 @@ conditions are true:
 2. It exposes a separately qualified `install(plan)` executor.
 3. It exposes `restart()`.
 
-The facade should also expose `preflight(allocation_gib)` for the GUI's
-read-only scan. This operation is allowed to authenticate because the fixed
+The facade exposes `review(allocation_gib)` for the GUI's combined status and
+read-only scan. Older facades can provide separate `status()` and
+`preflight(allocation_gib)` calls. Review is allowed to authenticate because the fixed
 helper only collects and validates an allocation; it never accepts an
 arbitrary command or filesystem path.
+
+Starting preparation uses the reviewed allocation and fingerprint without
+another desktop review. The root helper still recollects the current layout
+and checks that fingerprint, then revalidates inside the operation lock.
+Preparation callbacks carry either `{"stage": "checking_target"}` (or another
+fixed stage identifier) or `{"bytes": 123, "total": 456}`. These bounded advisory
+events do not alter the journal or authorize any operation.
 
 `status()` should report the root-owned journal phase and an explicit
 `current_boot_changed` boolean. Before reboot, `phase: "reboot_required"`
