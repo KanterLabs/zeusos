@@ -1,0 +1,43 @@
+{
+  "recorded_at_utc": "2026-09-10T20:08:17.826979+00:00",
+  "vmid": 118,
+  "vcpus": 4,
+  "ram_gib": 8,
+  "version": "0.1.0-preview.2",
+  "build_id": "git-ad091ecc2978",
+  "manifest_digest": "sha256:9b7ea1104c3398007600a502d4d73d6588b87735b85cad810a952aa73c7048e0",
+  "backup": {
+    "verified": true,
+    "method": "vzdump, zstd decompression and vma verify",
+    "restore_performed": false
+  },
+  "offline_stage": {
+    "network_disconnected": true,
+    "service_result": "success",
+    "exec_status": 0
+  },
+  "corrected_boot": {
+    "build_verified": true,
+    "updater_unprivileged_state": "up_to_date",
+    "old_image_retained": true,
+    "pending_marker_consumed": true
+  },
+  "preservation": {
+    "verified_files": 27,
+    "changed_files": [],
+    "table_unchanged": true,
+    "ok": true
+  },
+  "wifi": {
+    "intel_firmware_files": 342,
+    "kernel_driver": true,
+    "networkmanager_wifi_plugin": true,
+    "physical_radio_tested": false
+  },
+  "rollback": {
+    "old_build_booted": "git-f080c2d9bc53",
+    "native_updater_status_ok": true,
+    "zeus_document_preserved": true,
+    "offline_update_not_reapplied": true
+  }
+}

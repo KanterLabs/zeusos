@@ -33,7 +33,7 @@ _PINNED_UPDATE_MANIFEST_SHA256 = "b40ddd8b9fbdb8478440a7bedeb422dc909d65482c71c9
 _PINNED_SIGNERS_SHA256 = "5df19482073c9a1c2f1c77da2a3c50ae2d9b97c20a46d523a5ca6dc09a5a1b51"
 _PINNED_FEED_URL = (
     "https://raw.githubusercontent.com/KanterLabs/zeusos/"
-    "5f3daf375d5354a75f24a65d58bc424af5a2f899/updates/preview.json"
+    "3c9ad01c11739af250745be37e15b07e7dba85cd/updates/preview.json"
 )
 
 

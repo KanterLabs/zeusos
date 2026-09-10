@@ -9,7 +9,26 @@ Planning task: ZOS-78. This supersedes the replacement-only direction in ZOS-76.
 
 The no-USB dual-boot route has been demonstrated on disposable Fedora 43
 VMs matching the reported partition geometry. Both operating systems boot
-through Fedora's menu. The Nimo laptop itself has not been modified or tested.
+through Fedora's menu. The owner subsequently reported booting Zeus on the
+Nimo laptop; physical device qualification is still incomplete.
+
+### Updating an existing installation from Fedora
+
+The `zeus-installer update-existing` screen prepares a signed offline update
+on the journal-owned Zeus filesystem. It does not replay the initial installer,
+resize partitions, format filesystems, or replace the owner's home directory.
+The packaged signed manifest selects the tested OS payload, downloaded with
+Fedora's working network connection.
+
+Boot Zeus after preparation. A one-time system service verifies the archive
+again and stages it through `bootc switch --retain`, without a network request.
+The Updates app reports when another Zeus restart is needed. Consuming the
+activation marker after staging prevents an old rollback boot from reapplying
+the update. Normal Temp cleanup still applies to these reboots.
+
+The Intel firmware correction includes an image-build validation gate. VM
+software validation cannot establish physical AX101 connectivity or battery
+behavior; those remain hardware checks after installation.
 
 The owner launches a small graphical installer from Fedora, reviews the detected
 disk and space allocation, downloads a verified Zeus build, and starts the

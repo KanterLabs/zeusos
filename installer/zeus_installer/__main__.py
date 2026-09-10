@@ -71,6 +71,15 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="GIB",
         help=f"initial total Zeus allocation (default: {DEFAULT_ALLOCATION_GIB})",
     )
+
+    commands.add_parser(
+        "update-existing",
+        help="download an update for an existing Zeus installation",
+        description=(
+            "Open the standalone GTK4 screen that downloads an update in Fedora "
+            "for offline application by an existing Zeus installation."
+        ),
+    )
     return parser
 
 
@@ -197,6 +206,16 @@ def _run_gui(arguments: argparse.Namespace) -> int:
         return 1
 
 
+def _run_update_existing(_arguments: argparse.Namespace) -> int:
+    try:
+        from .repair_gui import launch_update_existing
+
+        return int(launch_update_existing())
+    except (InstallerError, RuntimeError) as error:
+        print(f"zeus-installer: {error}", file=sys.stderr)
+        return 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     arguments = parser.parse_args(list(argv) if argv is not None else None)
@@ -207,6 +226,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_preflight(arguments)
     if arguments.command in {"gui", "graphical"}:
         return _run_gui(arguments)
+    if arguments.command == "update-existing":
+        return _run_update_existing(arguments)
     parser.error(f"unsupported command: {arguments.command}")
     return 2  # pragma: no cover - argparse exits above
 

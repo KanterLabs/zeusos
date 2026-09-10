@@ -15,6 +15,7 @@ import importlib
 import inspect
 import math
 import os
+import subprocess
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -1326,6 +1327,9 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
             self._restart_button.connect("clicked", self._restart_clicked)
             self._restart_button.set_sensitive(False)
             action_buttons.append(self._restart_button)
+            self._update_existing_button = Gtk.Button(label="Update existing Zeus…")
+            self._update_existing_button.connect("clicked", self._update_existing_clicked)
+            action_buttons.append(self._update_existing_button)
             self._cancel_button = Gtk.Button(label="Cancel")
             self._cancel_button.connect("clicked", self._cancel_clicked)
             self._cancel_button.set_sensitive(False)
@@ -1348,6 +1352,10 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
             self._restart_button.set_sensitive(False)
             self._status.set_text("Allocation changed. Check again to review this plan.")
             self._footer.set_text("Check again before downloading so the selected allocation is reviewed.")
+
+        def _update_existing_clicked(self, _button: Any) -> None:
+            if not self._busy:
+                subprocess.Popen(["/usr/bin/zeus-installer", "update-existing"], close_fds=True)
 
         def _stop_activity_timer(self) -> None:
             if self._timer_id:
@@ -1422,6 +1430,7 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
                 "Continue installation" if controller.resume_pending else "Install into new space"
             )
             self._prepare_button.set_sensitive(not busy and controller.can_prepare())
+            self._update_existing_button.set_sensitive(not busy and controller.terminal)
             can_recover = not busy and controller.can_recover_prewrite()
             self._recover_button.set_visible(can_recover)
             self._recover_button.set_sensitive(can_recover)

@@ -830,3 +830,25 @@ or battery-hours from VM counters.
 - Product remains `0.1.0-preview.2`; no OS image or boot/battery metric changes.
   Reverified independent 14-file VM backup, RPM preservation and exact-commit
   CI results are recorded in the signed release receipt.
+
+### 2026-09-10 — Intel Wi-Fi image and offline recovery
+
+- Recorded at (UTC): `2026-09-10T20:09:35.540201+00:00`
+- Measurement date: `2026-09-10`; offline service completed at `19:55:48Z`,
+  corrected image and updater were observed after its `20:04:55Z` service run.
+- Version: `0.1.0-preview.2`; build: `git-ad091ecc2978`
+- Environment: populated dual-boot VM118, 4 vCPUs, 8 GiB RAM
+- Intel firmware files: **0 → 342**; driver, NetworkManager Wi-Fi plugin,
+  daemon and authentication backend validated in the running corrected image.
+- Offline stage: successful with virtual NIC disconnected; CPU time reported
+  by systemd: **53.096 s**, peak service memory: **4.6 GiB**. This is an
+  update operation, not a boot-speed or idle-memory benchmark.
+- Preservation: **27/27** tracked files unchanged; exact partition table
+  unchanged; verified vzdump backup available and no restore performed.
+- Corrected boot and retained old-image rollback both succeeded; ordinary
+  user could read native updater status, and the Zeus document was preserved.
+- Physical wireless connection, battery runtime and laptop boot speed: **not
+  measured** in this VM.
+
+Evidence: [recovery qualification](iterations/wifi-recovery-20260910/README.md)
+and [receipt](iterations/wifi-recovery-20260910/qualification.json).

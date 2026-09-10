@@ -117,9 +117,9 @@ _QUALIFICATION_RECEIPT = {
     "physical": False,
     "vmid": 118,
     "lifecycle_vmid": 117,
-    "evidence": "docs/iterations/installer-20260910/README.md",
-    "build_id": "git-f080c2d9bc53",
-    "manifest_digest": "sha256:8797860dc4c27c7e8e3f0034bfcf71f9876401df809509c6b49588752c9c1c18",
+    "evidence": "docs/iterations/wifi-recovery-20260910/README.md",
+    "build_id": "git-ad091ecc2978",
+    "manifest_digest": "sha256:9b7ea1104c3398007600a502d4d73d6588b87735b85cad810a952aa73c7048e0",
     "bootc_version": "1.16.10",
     "bootupd_version": "0.2.35",
 }
@@ -3269,6 +3269,7 @@ def helper_main(
             "install",
             "continue",
             "restart",
+            "update_existing",
         ),
     )
     parser.add_argument(
@@ -3298,6 +3299,18 @@ def helper_main(
     )
     args = parser.parse_args(argv)
     try:
+        if args.action == "update_existing":
+            if args.expected_fingerprint is not None or args.without_backup:
+                raise InstallError("invalid_action", "Existing-install updates do not accept installation options.")
+            from .repair import stage
+            def update_progress(value):
+                if args.progress_json:
+                    event = ({"event": "stage", "stage": value["stage"]} if "stage" in value
+                             else {"event": "progress", "progress": value})
+                    print(json.dumps(event), flush=True)
+            result = stage(update_progress)
+            print(json.dumps(result), flush=True)
+            return 0
         if args.expected_fingerprint is not None and args.action != "prepare":
             raise InstallError(
                 "invalid_action", "A target fingerprint is accepted only for prepare."

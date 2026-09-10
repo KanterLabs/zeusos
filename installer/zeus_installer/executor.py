@@ -78,7 +78,7 @@ TARGET_FSTAB = TARGET_ROOT / "etc/fstab"
 TARGET_VAR = TARGET_ROOT / "ostree/deploy/default/var"
 TARGET_SEED = TARGET_VAR / "lib/cloud/seed/nocloud-net"
 TARGET_EFI_CONFIG = TARGET_ROOT / "etc/zeus/efi-update.json"
-TARGET_IMAGE_REF = "/var/lib/zeus/updater/downloads/zeusos-0.1.0-preview.2-git-f080c2d9bc53.oci"
+TARGET_IMAGE_REF = "/var/lib/zeus/updater/downloads/zeusos-0.1.0-preview.2-git-ad091ecc2978.oci"
 TARGET_PAYLOAD = TARGET_VAR / TARGET_IMAGE_REF.removeprefix("/var/")
 EFI_WRAPPER_NAME = "efi_update.py"
 EFI_DROPIN_NAME = "systemd/system/bootloader-update.service.d/zeus-efi.conf"
@@ -90,8 +90,13 @@ FEDORA_GRUB_CONFIG = Path("/boot/grub2/grub.cfg")
 # proves that a new bootc/bootupd pair preserves the same scoped semantics.
 # Keep this allowlist in code so a fresh signed feed cannot silently widen the
 # qualified maintenance surface.
-QUALIFIED_BUILD_ID = "git-f080c2d9bc53"
-QUALIFIED_MANIFEST_DIGEST = "sha256:8797860dc4c27c7e8e3f0034bfcf71f9876401df809509c6b49588752c9c1c18"
+QUALIFIED_BUILD_ID = "git-ad091ecc2978"
+QUALIFIED_MANIFEST_DIGEST = "sha256:9b7ea1104c3398007600a502d4d73d6588b87735b85cad810a952aa73c7048e0"
+# Retain the original qualified payload for already journaled installations.
+QUALIFIED_ARTIFACTS = frozenset({
+    (QUALIFIED_BUILD_ID, QUALIFIED_MANIFEST_DIGEST),
+    ("git-f080c2d9bc53", "sha256:8797860dc4c27c7e8e3f0034bfcf71f9876401df809509c6b49588752c9c1c18"),
+})
 QUALIFIED_BOOTC_VERSION = "1.16.10"
 QUALIFIED_BOOTUPD_VERSION = "0.2.35"
 
@@ -1148,8 +1153,8 @@ class DualBootExecutor:
             receipt.get("bootupd", tools.get("bootupd_version", tools.get("bootupd"))),
         )
         return (
-            build == QUALIFIED_BUILD_ID
-            and digest == QUALIFIED_MANIFEST_DIGEST
+            isinstance(build, str) and isinstance(digest, str)
+            and (build, digest) in QUALIFIED_ARTIFACTS
             and bootc == QUALIFIED_BOOTC_VERSION
             and bootupd == QUALIFIED_BOOTUPD_VERSION
         )
@@ -1163,14 +1168,8 @@ class DualBootExecutor:
                 "executor_unavailable",
                 "The pinned VM qualification receipt is unavailable or unsupported.",
             )
-        nested = receipt.get("artifact") if isinstance(receipt, Mapping) else None
-        expected = nested if isinstance(nested, Mapping) else receipt
-        expected_build = expected.get("build_id", QUALIFIED_BUILD_ID)
-        expected_digest = expected.get(
-            "manifest_digest",
-            expected.get("image_manifest_digest", QUALIFIED_MANIFEST_DIGEST),
-        )
-        if artifact.get("build_id") != expected_build or artifact.get("manifest_digest") != expected_digest:
+        build, digest = artifact.get("build_id"), artifact.get("manifest_digest")
+        if not isinstance(build, str) or not isinstance(digest, str) or (build, digest) not in QUALIFIED_ARTIFACTS:
             raise ExecutorError(
                 "artifact_invalid",
                 "The staged image is outside the pinned VM qualification build.",
@@ -2966,6 +2965,16 @@ class DualBootExecutor:
             return
         self._mkdir_fixed(target.parent)
         try:
+            downloads_metadata = target.parent.lstat()
+            if downloads_metadata.st_uid != 0 or downloads_metadata.st_mode & 0o077:
+                raise OSError("updater downloads directory is not private")
+            # Only these shared status directories are public. The archive and
+            # downloads directory retain their private permissions.
+            for public_directory in (target.parent.parent.parent, target.parent.parent):
+                metadata = public_directory.lstat()
+                if metadata.st_uid != 0 or metadata.st_mode & 0o022:
+                    raise OSError("updater status directory is not protected")
+                public_directory.chmod(0o755)
             source_metadata = os.lstat(source)
             if (
                 stat.S_ISLNK(source_metadata.st_mode)

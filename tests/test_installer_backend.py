@@ -1066,7 +1066,7 @@ class ArtifactPinTests(unittest.TestCase):
             trusted.DEFAULT_FEED_URL,
             artifacts._PINNED_FEED_URL,
         )
-        self.assertIn("5f3daf375d5354a75f24a65d58bc424af5a2f899", trusted.DEFAULT_FEED_URL)
+        self.assertIn("3c9ad01c11739af250745be37e15b07e7dba85cd", trusted.DEFAULT_FEED_URL)
         self.assertEqual(
             seen_urls,
             [artifacts._PINNED_FEED_URL, artifacts._PINNED_FEED_URL + ".sig"],

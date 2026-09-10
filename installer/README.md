@@ -221,3 +221,22 @@ an SSH detached signature using the existing Zeus release key. Verify it with
 `security/allowed_signers` from an independently obtained checkout, signer
 `zeusos-preview` and namespace `zeusos-release`, then check the downloaded
 files against that manifest. This is separate from RPM's native GPG signing.
+
+## Update an existing Zeus installation from Fedora
+
+Run `zeus-installer update-existing`, or choose **Update existing Zeus…** after
+the main installer recognizes a completed installation. This path downloads a
+signed OS image using Fedora's connection and prepares an offline Zeus update.
+It reuses the recorded Zeus filesystem; it does not resize, format, or create
+partitions, and it preserves Fedora and Zeus personal files.
+
+After preparation, boot **Zeus OS** from the existing boot menu. Zeus verifies
+and stages the prepared image without needing Wi-Fi. Open **Updates** after
+login and restart Zeus once more when it reports ready. Fedora remains the
+default boot choice. The previous Zeus image is retained for rollback.
+Your normal Temp cleanup policy still applies to these reboots.
+
+The original completed installer journal must remain in Fedora. Changed disk
+or filesystem identities are rejected. An incomplete original installation must
+be completed before this update route can be used. This is an OS update, not a
+factory reset; it does not reset accounts, preferences, or personal files.

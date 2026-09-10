@@ -60,6 +60,11 @@ required_files=(
     installer/zeus_installer/executor.py
     installer/zeus_installer/preflight.py
     installer/zeus_installer/removal.py
+    installer/zeus_installer/repair.py
+    installer/zeus_installer/repair_gui.py
+    installer/zeus_installer/offline_apply.py
+    installer/zeus_installer/data/offline-preview.json
+    installer/zeus_installer/data/offline-preview.json.sig
     installer/zeus_installer/storage.py
     installer/zeus_installer/data/update-allowed-signers
     installer/zeus_installer/vendor/update_manifest.py
