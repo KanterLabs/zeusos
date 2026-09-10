@@ -582,17 +582,28 @@ class InstallerController:
             raise InstallerError(_safe_text(message, "The backend refused to restart."))
         return result
 
+    def supports_cancel(self) -> bool:
+        backend = self.backend_module if self.backend_module is not None else _load_backend_module()
+        return backend is not None and _backend_function(backend, ("cancel",)) is not None
+
     def cancel(self) -> Any:
         """Request cancellation only through an explicitly provided backend API."""
 
         backend = self.backend_module if self.backend_module is not None else _load_backend_module()
         function = _backend_function(backend, ("cancel",)) if backend is not None else None
         if function is None:
-            return {"ok": True, "state": "cancel_requested", "supported": False}
+            raise InstallerError("This step cannot be cancelled. Wait for it to finish.")
         try:
             result = function()
         except Exception as error:  # pragma: no cover - backend-specific failures
             raise InstallerError("The backend could not cancel before its next safe boundary.") from error
+        if (
+            not isinstance(result, Mapping)
+            or result.get("ok") is not True
+            or result.get("supported") is False
+            or result.get("state") not in {"cancel_requested", "cancelled"}
+        ):
+            raise InstallerError("Cancellation was not accepted. Wait for the current step to finish.")
         return result
 
 
@@ -880,6 +891,7 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
             self._cancel_button = Gtk.Button(label="Cancel")
             self._cancel_button.connect("clicked", self._cancel_clicked)
             self._cancel_button.set_sensitive(False)
+            self._cancel_button.set_visible(controller.supports_cancel())
             action_buttons.append(self._cancel_button)
             content.append(action_buttons)
 
@@ -924,7 +936,9 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
             self._restart_button.set_sensitive(
                 not busy and controller.can_restart()
             )
-            self._cancel_button.set_sensitive(busy and controller.preparation is not None)
+            self._cancel_button.set_sensitive(
+                busy and controller.preparation is not None and controller.supports_cancel()
+            )
             if status:
                 self._status.set_text(status)
 
@@ -1167,7 +1181,7 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
             except InstallerError as error:
                 self._status.set_text(str(error))
                 return
-            self._status.set_text("Cancellation requested at the backend's next safe boundary.")
+            self._status.set_text("Cancellation requested. Wait for the current step to stop safely.")
 
     class InstallerApplication(application_type):
         def __init__(self) -> None:

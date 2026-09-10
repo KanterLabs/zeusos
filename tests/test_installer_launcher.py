@@ -164,6 +164,27 @@ class LauncherCliTests(unittest.TestCase):
 
 
 class ControllerGateTests(unittest.TestCase):
+    def test_unavailable_cancellation_is_not_offered_or_reported_as_requested(self):
+        controller = gui.InstallerController(backend_module=types.SimpleNamespace())
+        self.assertFalse(controller.supports_cancel())
+        with self.assertRaisesRegex(InstallerError, "cannot be cancelled"):
+            controller.cancel()
+
+    def test_cancellation_requires_an_explicit_acceptance(self):
+        for response in (None, {}, {"ok": False}, {"ok": True, "state": "cancel_requested", "supported": False}):
+            controller = gui.InstallerController(
+                backend_module=types.SimpleNamespace(cancel=lambda: response)
+            )
+            with self.subTest(response=response), self.assertRaisesRegex(InstallerError, "not accepted"):
+                controller.cancel()
+        controller = gui.InstallerController(
+            backend_module=types.SimpleNamespace(
+                cancel=lambda: {"ok": True, "state": "cancel_requested"}
+            )
+        )
+        self.assertTrue(controller.supports_cancel())
+        self.assertEqual(controller.cancel()["state"], "cancel_requested")
+
     def _worker(self):
         return types.SimpleNamespace(
             collect=lambda: {"fixture": True},

@@ -142,6 +142,10 @@ when a download or install phase completes. `cancel()` is optional and, when
 provided, is called only through the backend's documented safe-boundary
 operation.
 
+The current backend does not offer cancellation during a running operation,
+so the launcher hides that control. Review before starting and wait for each
+step to finish; do not treat closing the window as confirmation that it stopped.
+
 ## Building a downloadable package
 
 Run the packaging script from the repository root:

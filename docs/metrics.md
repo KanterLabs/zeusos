@@ -721,3 +721,15 @@ or battery-hours from VM counters.
   packaging tests passed again after including the license in the source tar.
 - Evidence: [dated installer record](iterations/installer-20260910/README.md).
   The idle VM116 builder was gracefully stopped after its probes finished.
+
+### 2026-09-10 14:38 UTC — installer final UI correction
+
+- The launcher now hides cancellation when its backend does not support it.
+  Unsupported or rejected cancellation cannot be reported as accepted.
+- All 123 installer tests pass, including two cancellation acceptance tests.
+  The earlier CI-only FIFO fixture directory assumption was also corrected;
+  both homelab runner jobs passed afterward.
+- The RPM installs through Fedora DNF and passes `rpm -V`; its fixed helper
+  reads the completed journal and verifies the installed GPT before restart.
+  Distribution uses detached SSH-signed checksums and an independent public
+  download check. This does not add native RPM OpenPGP signing.
