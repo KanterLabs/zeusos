@@ -163,6 +163,154 @@ class BackendTests(TempRootMixin, unittest.TestCase):
             boot_id=lambda: "boot-a",
         )
 
+    @staticmethod
+    def _recovery_plan_and_inventory() -> tuple[dict[str, object], dict[str, object]]:
+        table: dict[str, object] = {
+            "label": "gpt",
+            "id": "table-a",
+            "device": "/dev/nvme0n1",
+            "sectorsize": 512,
+            "partitions": [
+                {"node": "/dev/nvme0n1p1", "start": 2048, "size": 2048},
+                {"node": "/dev/nvme0n1p2", "start": 4096, "size": 4096},
+                {"node": "/dev/nvme0n1p3", "start": 8192, "size": 1048576},
+            ],
+        }
+        candidate = plan()
+        candidate["target"] = {
+            "fingerprint": "target-a",
+            "partition_table": copy.deepcopy(table),
+        }
+        inventory: dict[str, object] = {
+            "fingerprint": "target-a",
+            "partition_table": copy.deepcopy(table),
+        }
+        return candidate, inventory
+
+    def _failed_prewrite_service(self) -> installer_backend.InstallerBackend:
+        candidate, inventory = self._recovery_plan_and_inventory()
+        service = self._backend(inventory=inventory)
+        service.prepare(candidate)
+        record = service.journal.load()
+        assert record is not None
+        record = service.journal.transition(record, installer_backend.PHASE_INSTALLING)
+        service.journal.transition(
+            record,
+            installer_backend.PHASE_ERROR,
+            error="backup_receipt_missing",
+            message="A verified backup receipt is required before shrinking; no receipt was found.",
+        )
+        return service
+
+    def test_recover_prewrite_reuses_archive_and_preserves_legacy_history(self) -> None:
+        service = self._failed_prewrite_service()
+        before = service.journal.load()
+        assert before is not None
+        before_history = copy.deepcopy(before["history"])
+        before_artifact = copy.deepcopy(before["artifact"])
+        before_release = copy.deepcopy(before["release"])
+        artifact = before_artifact
+        assert isinstance(artifact, dict)
+        artifact_path = Path(str(artifact["path"]))
+
+        status = service.status()
+        self.assertFalse(status["ok"])
+        self.assertTrue(status["can_recover_prewrite"])
+        recovered = service.recover_prewrite()
+
+        self.assertTrue(recovered["ok"])
+        self.assertEqual(recovered["state"], installer_backend.PHASE_PREPARED)
+        self.assertFalse(recovered["can_recover_prewrite"])
+        self.assertEqual(recovered["artifact"], before_artifact)
+        self.assertEqual(recovered["release"], before_release)
+        self.assertEqual(artifact_path.read_bytes(), b"archive")
+        after = service.journal.load()
+        assert after is not None
+        self.assertEqual(after["history"][:-1], before_history)
+        self.assertEqual(after["history"][-1]["phase"], installer_backend.PHASE_PREPARED)
+        self.assertEqual(after["artifact"], before_artifact)
+        self.assertEqual(after["release"], before_release)
+        self.assertIsNone(after["error"])
+        self.assertEqual(after["progress"], {"bytes": len(b"archive"), "total": len(b"archive")})
+        self.assertIsNone(service._current_record)
+
+    def test_recover_prewrite_rejects_executor_markers_even_when_malformed(self) -> None:
+        service = self._failed_prewrite_service()
+        record = service.journal.load()
+        assert record is not None
+        history = copy.deepcopy(record["history"])
+        record["executor_state"] = None
+        service.journal.write(record)
+        status = service.status()
+        self.assertFalse(status["can_recover_prewrite"])
+        with self.assertRaises(installer_backend.InstallError) as context:
+            service.recover_prewrite()
+        self.assertEqual(context.exception.code, "recovery_not_allowed")
+        unchanged = service.journal.load()
+        assert unchanged is not None
+        self.assertEqual(unchanged["phase"], installer_backend.PHASE_ERROR)
+        self.assertEqual(unchanged["history"], history)
+
+    def test_recover_prewrite_rejects_changed_target_and_tampered_archive(self) -> None:
+        candidate, inventory = self._recovery_plan_and_inventory()
+        service = self._backend(inventory=inventory)
+        service.prepare(candidate)
+        record = service.journal.load()
+        assert record is not None
+        record = service.journal.transition(record, installer_backend.PHASE_INSTALLING)
+        service.journal.transition(record, installer_backend.PHASE_ERROR, error="file_missing")
+        history = copy.deepcopy(service.journal.load()["history"])
+        artifact = service.journal.load()["artifact"]
+        assert isinstance(artifact, dict)
+        artifact_path = Path(str(artifact["path"]))
+
+        inventory["fingerprint"] = "target-b"
+        with self.assertRaises(installer_backend.InstallError) as context:
+            service.recover_prewrite()
+        self.assertEqual(context.exception.code, "target_mismatch")
+        self.assertEqual(service.journal.load()["history"], history)
+
+        inventory["fingerprint"] = "target-a"
+        artifact_path.write_bytes(b"tampered")
+        with self.assertRaises(installer_backend.InstallError) as context:
+            service.recover_prewrite()
+        self.assertEqual(context.exception.code, "artifact_tampered")
+        self.assertEqual(service.journal.load()["phase"], installer_backend.PHASE_ERROR)
+        self.assertEqual(service.journal.load()["history"], history)
+
+    def test_backend_install_forwards_only_explicit_without_backup_choice(self) -> None:
+        calls: list[dict[str, object]] = []
+
+        class Executor:
+            qualified = True
+
+            def execute(self, **kwargs: object) -> dict[str, object]:
+                calls.append(kwargs)
+                return {"phase": installer_backend.PHASE_INSTALLED}
+
+        service = self._backend(executor=Executor())
+        service.prepare(plan())
+        result = service.install(plan(), without_backup=True)
+        self.assertEqual(result["state"], installer_backend.PHASE_INSTALLED)
+        self.assertIs(calls[0]["without_backup"], True)
+
+    def test_module_facade_restricts_without_backup_to_install_actions(self) -> None:
+        payload = json.dumps({"ok": True, "state": "installed", "phase": "installed"})
+        result = type("Result", (), {"returncode": 0, "stdout": payload})()
+        with mock.patch.object(installer_backend.subprocess, "run", return_value=result) as run:
+            installer_backend.install(plan(), without_backup=True)
+        argv = run.call_args.args[0]
+        self.assertEqual(argv[-1], "--without-backup")
+
+        with mock.patch.object(installer_backend.subprocess, "run", return_value=result) as run:
+            installer_backend.install(plan(), without_backup=False)
+        self.assertNotIn("--without-backup", run.call_args.args[0])
+
+        for action in ("status", "prepare", "retry_prepare", "recover_prewrite", "restart"):
+            with self.subTest(action=action), self.assertRaises(installer_backend.InstallError) as context:
+                installer_backend._invoke_helper(action, without_backup=True)
+            self.assertEqual(context.exception.code, "invalid_action")
+
     def test_prepare_stages_verified_release_and_reports_progress(self) -> None:
         updates: list[dict[str, object]] = []
         service = self._backend()

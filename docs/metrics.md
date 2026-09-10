@@ -778,3 +778,21 @@ or battery-hours from VM counters.
   comparisons accompany the package upgrade in the signed release receipt.
   Existing journal format and retained rollback build remain unchanged.
 - Evidence: [preparation feedback record](iterations/installer-20260910/preparation-ux.md).
+
+### 2026-09-10 17:00 UTC — Installer owner choice and recovery
+
+- Product remains `0.1.0-preview.2`. Explicit no-backup selection is persisted
+  truthfully across the Fedora reboot; no verified receipt is fabricated.
+- Parent validation: 169 installer tests passed in 12.719 seconds, including
+  recovery refusal, artifact tampering, helper forwarding, and continuation.
+- Native GTK success and failure journeys passed with a responsive main loop.
+  Failed stages show no stale download percentage; recovery does not install
+  automatically. These journeys use a synthetic backend.
+- Isolated replay of the reported journal reverified the real signed 2 GB
+  archive and reused it. Changed disk metadata and executor markers refused
+  recovery without rewriting the journal. Disk inventory is injected.
+- The populated Fedora test VM has a reverified independent 14-file backup;
+  package upgrade preservation, exact-commit CI and installed-RPM replay are
+  recorded in the signed release receipt. No physical laptop installation or
+  new boot-time/battery measurement is claimed.
+- Evidence: [owner choice and recovery](iterations/installer-20260910/owner-choice-recovery.md).

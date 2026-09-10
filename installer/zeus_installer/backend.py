@@ -75,6 +75,7 @@ _HELPER_TIMEOUTS = {
     "status": 30.0,
     "prepare": 1800.0,
     "retry_prepare": 1800.0,
+    "recover_prewrite": 3600.0,
     "install": 3600.0,
     "continue": 3600.0,
     "restart": 30.0,
@@ -198,8 +199,14 @@ class MaintenanceExecutor(Protocol):
         artifact: Mapping[str, Any],
         runner: "CommandRunner",
         journal: "Journal",
+        without_backup: bool = False,
     ) -> Mapping[str, Any]:
-        """Perform the qualified maintenance operation and return its phase."""
+        """Perform the qualified maintenance operation and return its phase.
+
+        ``without_backup`` is an explicit owner choice.  It is optional in the
+        protocol so older fixture executors can continue to receive the
+        original call shape when the choice is false.
+        """
 
     def verify_resume(
         self,
@@ -763,7 +770,12 @@ class Journal:
         if message is not None:
             updated["message"] = str(message)[:2048]
         updated["error"] = str(error)[:256] if error is not None else None
-        if progress is not None:
+        # Byte counters describe an active download only.  Keeping stale
+        # counters on an error snapshot makes the UI look as if work is still
+        # progressing and can mislead recovery decisions.
+        if phase == PHASE_ERROR:
+            updated["progress"] = None
+        elif progress is not None:
             updated["progress"] = copy.deepcopy(dict(progress))
         if artifact is not None:
             updated["artifact"] = copy.deepcopy(dict(artifact))
@@ -1086,6 +1098,109 @@ class InstallerBackend:
                     return value
         return None
 
+    @classmethod
+    def _can_recover_prewrite(cls, record: Mapping[str, Any] | None) -> bool:
+        """Check only immutable journal facts for pre-write recovery.
+
+        This predicate deliberately does not inspect the target or artifact;
+        those checks belong to :meth:`recover_prewrite` while the root lock is
+        held.  Keeping the status decision pure prevents a status read from
+        becoming an implicit retry or from collecting a replacement plan.
+        """
+
+        if not isinstance(record, Mapping) or record.get("phase") != PHASE_ERROR:
+            return False
+        error_code = record.get("error")
+        if not isinstance(error_code, str) or error_code not in {
+            "file_missing",
+            "backup_unverified",
+            "backup_receipt_missing",
+        }:
+            return False
+
+        # Any executor marker, including a malformed value, means the old
+        # attempt crossed or may have crossed the storage boundary. Presence
+        # of these keys is therefore enough to make recovery ineligible.
+        for key in ("executor_state", "dualboot_state", "executor_result"):
+            if key in record:
+                return False
+
+        # Command and storage records are evidence that the executor reached
+        # its privileged path. The legacy missing-receipt failure had no such
+        # record; reject any marker or malformed entry conservatively.
+        for key in (
+            "commands",
+            "storage_result",
+            "storage",
+            "allocated_table",
+            "filesystem_uuids",
+            "new_guids",
+            "reboot_required",
+        ):
+            if key not in record:
+                continue
+            value = record.get(key)
+            if key == "commands" and value == []:
+                continue
+            return False
+
+        history = record.get("history")
+        if not isinstance(history, list) or not history:
+            return False
+        allowed_history = {
+            PHASE_PREPARING,
+            PHASE_DOWNLOADING,
+            PHASE_VERIFYING,
+            PHASE_PREPARED,
+            PHASE_INSTALLING,
+            PHASE_ERROR,
+        }
+        phases: list[str] = []
+        for entry in history:
+            entry_phase = entry.get("phase") if isinstance(entry, Mapping) else None
+            if not isinstance(entry_phase, str) or entry_phase not in allowed_history:
+                return False
+            phases.append(entry_phase)
+        # The final attempt must be exactly prepared -> installing -> error,
+        # with one installing entry and no prior error/risky boundary. The
+        # history may begin in the middle of a capped download log.
+        if len(phases) < 3 or phases[-3:] != [PHASE_PREPARED, PHASE_INSTALLING, PHASE_ERROR]:
+            return False
+        if phases.count(PHASE_INSTALLING) != 1 or phases.count(PHASE_ERROR) != 1:
+            return False
+
+        try:
+            candidate = record.get("plan")
+            if not isinstance(candidate, Mapping):
+                return False
+            validated = validate_plan(candidate)
+            if not validated["supported"] or validated["blockers"]:
+                return False
+            recorded = record.get("fingerprint")
+            if not isinstance(recorded, str) or not hmac.compare_digest(
+                _fingerprint_text(recorded), validated["fingerprint"]
+            ):
+                return False
+            if cls._plan_partition_table(validated) is None:
+                return False
+        except (InstallError, TypeError, ValueError, KeyError):
+            return False
+
+        release = record.get("release")
+        artifact = record.get("artifact")
+        if not isinstance(release, Mapping) or not isinstance(artifact, Mapping):
+            return False
+        try:
+            validated_release = artifacts.validate_release(release)
+            archive = validated_release["archive"]
+            path = artifact.get("path")
+            if not isinstance(path, str) or not path or not isinstance(archive, Mapping):
+                return False
+            _safe_artifact_name(archive["name"])
+        except (artifacts.ArtifactError, InstallError, KeyError, TypeError, ValueError):
+            return False
+        return True
+
     def _refuse_interrupted(self, record: Mapping[str, Any] | None) -> None:
         if record is None:
             return
@@ -1402,7 +1517,27 @@ class InstallerBackend:
             "message": record.get("message", ""),
             "operation_id": record.get("operation_id"),
             "updated_at": record.get("updated_at"),
+            "can_recover_prewrite": self._can_recover_prewrite(record),
         }
+        # Surface an explicit owner-declined backup choice without exposing a
+        # synthetic receipt. The executor state is root-owned and may be
+        # malformed in a hand-edited journal, so only copy the exact bounded
+        # schema recognized by the status contract.
+        executor_state = self._executor_state(record)
+        backup_decision = executor_state.get("backup_decision") if isinstance(executor_state, Mapping) else None
+        if isinstance(backup_decision, Mapping):
+            try:
+                detached_decision = _json_clone(
+                    dict(backup_decision),
+                    limit=4 * 1024,
+                    code="invalid_state",
+                    message="The persisted backup decision is invalid.",
+                )
+            except InstallError:
+                detached_decision = None
+            if isinstance(detached_decision, Mapping):
+                result["backup_decision"] = detached_decision
+                result["without_backup"] = detached_decision.get("without_backup") is True
         # The root journal is authoritative after the reboot boundary.  Keep
         # the reviewed plan in status so the launcher can display the original
         # target and allocation without collecting a new (potentially smaller)
@@ -1527,6 +1662,7 @@ class InstallerBackend:
                     "progress": None,
                     "error": None,
                     "message": "No Zeus installation has been prepared.",
+                    "can_recover_prewrite": False,
                 }
             validated = validate_plan(plan)
             return {
@@ -1541,6 +1677,7 @@ class InstallerBackend:
                 "progress": None,
                 "error": None,
                 "message": "No Zeus installation has been prepared.",
+                "can_recover_prewrite": False,
             }
         validated = self._record_plan(record) if plan is None else validate_plan(plan)
         if not self._same_fingerprint(record, validated):
@@ -1552,6 +1689,7 @@ class InstallerBackend:
                 "fingerprint": record.get("fingerprint"),
                 "error": "target_mismatch",
                 "message": "The installer journal belongs to a different target.",
+                "can_recover_prewrite": False,
             }
         phase = record.get("phase")
         if phase in IN_PROGRESS_PHASES and not self.journal.is_locked():
@@ -1811,6 +1949,122 @@ class InstallerBackend:
         assert validated is not None
         return self.prepare(validated, progress=progress)
 
+    @staticmethod
+    def _plan_partition_table(plan: Mapping[str, Any]) -> Mapping[str, Any] | None:
+        """Find the original GPT table retained in a validated plan."""
+
+        candidates: list[Mapping[str, Any]] = [plan]
+        for key in ("target", "inventory", "proposed_target_layout"):
+            value = plan.get(key)
+            if isinstance(value, Mapping):
+                candidates.append(value)
+        for candidate in candidates:
+            table = InstallerBackend._inventory_partition_table(candidate)
+            if table is not None:
+                return table
+        return None
+
+    def _validate_recovery_target(
+        self,
+        plan: Mapping[str, Any],
+        inventory: Mapping[str, Any],
+    ) -> None:
+        """Revalidate the exact original target before restoring readiness."""
+
+        validate_target(plan, inventory)
+        expected = self._plan_partition_table(plan)
+        if expected is None:
+            raise InstallError(
+                "target_unverified",
+                "The original GPT table is unavailable for recovery validation.",
+            )
+        observed = self._inventory_partition_table(inventory)
+        if observed is None:
+            raise InstallError(
+                "target_unverified",
+                "The current GPT table is unavailable for recovery validation.",
+            )
+        if dict(observed) != dict(expected):
+            raise InstallError(
+                "target_mismatch",
+                "The original GPT table changed after the failed installation attempt.",
+            )
+
+    def recover_prewrite(
+        self,
+        plan: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Restore a legacy missing-backup journal to the prepared boundary.
+
+        This action is intentionally narrower than :meth:`retry_prepare`.
+        It accepts only a final ``installing`` -> ``error`` journal whose
+        error is a legacy missing or unverified backup and whose record shows
+        no executor or storage evidence. It revalidates the original target
+        and staged artifact under the root lock, then writes only the journal
+        phase transition; it never invokes the executor or removes files.
+        """
+
+        self._require_privilege()
+        requested: dict[str, Any] | None = None
+        if plan is not None:
+            requested = validate_plan(plan)
+        with self._operation(wait=True):
+            record = self.journal.load()
+            if not self._can_recover_prewrite(record):
+                raise InstallError(
+                    "recovery_not_allowed",
+                    "This installer failure is not eligible for safe pre-write recovery.",
+                )
+            assert record is not None
+            original_plan = self._record_plan(record)
+            if requested is not None:
+                self._check_record_binding(record, requested)
+            inventory = self._provider_inventory()
+            self._validate_recovery_target(original_plan, inventory)
+
+            release = record.get("release")
+            artifact = record.get("artifact")
+            if not isinstance(release, Mapping) or not isinstance(artifact, Mapping):
+                raise InstallError(
+                    "invalid_state", "The prepared installer state is incomplete."
+                )
+            try:
+                validated_release = artifacts.validate_release(release)
+                archive = validated_release["archive"]
+                expected = self.journal.artifacts_path / _safe_artifact_name(archive["name"])
+                path_value = artifact.get("path")
+                if not isinstance(path_value, str) or Path(path_value) != expected:
+                    raise InstallError(
+                        "artifact_tampered",
+                        "The prepared archive path is not owned by the installer.",
+                    )
+                verified = self._verify_path(expected, validated_release)
+                if verified.get("sha256") != archive.get("sha256"):
+                    raise InstallError(
+                        "artifact_tampered",
+                        "The prepared archive no longer matches its signed identity.",
+                    )
+            except artifacts.ArtifactError as error:
+                raise InstallError(
+                    "artifact_tampered",
+                    "The prepared archive no longer matches its signed identity.",
+                ) from error
+
+            recovered = self.journal.transition(
+                record,
+                PHASE_PREPARED,
+                message=(
+                    "The verified Zeus build is ready to install. Verify a Fedora backup "
+                    "or explicitly choose to install without one."
+                ),
+                error=None,
+                progress={
+                    "bytes": validated_release["archive"]["size"],
+                    "total": validated_release["archive"]["size"],
+                },
+            )
+            return self._prepared_result(recovered)
+
     def _qualified_executor(self) -> Any:
         executor = self.maintenance_executor
         if executor is None or getattr(executor, "qualified", False) is not True:
@@ -1845,7 +2099,13 @@ class InstallerBackend:
             if isinstance(nested_plan, Mapping):
                 owners.append(nested_plan)
         for owner in owners:
-            for key in ("partition_table", "partitiontable", "sfdisk", "table"):
+            for key in (
+                "partition_table",
+                "partitiontable",
+                "sfdisk",
+                "sfdisk_table",
+                "table",
+            ):
                 candidate = owner.get(key)
                 if not isinstance(candidate, Mapping):
                     continue
@@ -1969,7 +2229,12 @@ class InstallerBackend:
                 "The changed target layout did not match the recorded reboot boundary.",
             )
 
-    def install(self, plan: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    def install(
+        self,
+        plan: Mapping[str, Any] | None = None,
+        *,
+        without_backup: bool = False,
+    ) -> dict[str, Any]:
         """Run a qualified maintenance executor, or fail closed.
 
         Omitting ``plan`` continues the exact plan persisted by ``prepare``.
@@ -1978,6 +2243,10 @@ class InstallerBackend:
         """
 
         self._require_privilege()
+        if type(without_backup) is not bool:
+            raise InstallError(
+                "invalid_action", "The backup choice must be an explicit boolean."
+            )
         validated: dict[str, Any] | None = None
         if plan is not None:
             validated = validate_plan(plan)
@@ -2033,12 +2302,17 @@ class InstallerBackend:
                     artifact=verified,
                 )
                 self._current_record = record
-                result = method(
-                    plan=validated,
-                    artifact=verified,
-                    runner=self.command_runner,
-                    journal=self.journal,
-                )
+                executor_kwargs: dict[str, Any] = {
+                    "plan": validated,
+                    "artifact": verified,
+                    "runner": self.command_runner,
+                    "journal": self.journal,
+                }
+                # Keep the legacy false call shape for fixture and extension
+                # executors that predate the owner backup-choice flag.
+                if without_backup:
+                    executor_kwargs["without_backup"] = True
+                result = method(**executor_kwargs)
                 if not isinstance(result, Mapping):
                     raise InstallError("executor_invalid", "The maintenance executor returned no safe phase.")
                 phase = result.get("phase", result.get("state"))
@@ -2071,10 +2345,15 @@ class InstallerBackend:
                     # not overwrite an ambiguous storage record with a stale
                     # in-memory snapshot.
                     record = self._reload_record()
+                    error_message = (
+                        str(error)[:2048]
+                        if code in {"backup_receipt_missing", "backup_unverified", "file_missing"}
+                        else "The maintenance operation did not complete safely."
+                    )
                     record = self.journal.transition(
                         record,
                         PHASE_ERROR,
-                        message="The maintenance operation did not complete safely.",
+                        message=error_message,
                         error=code,
                     )
                     self._current_record = record
@@ -2555,12 +2834,19 @@ def _invoke_helper(
     *,
     allocation_gib: int | None = None,
     expected_fingerprint: str | None = None,
+    without_backup: bool = False,
     progress: Callable[[Mapping[str, Any]], Any] | None = None,
 ) -> dict[str, Any]:
     """Invoke the fixed root helper with no caller-selected path or command."""
 
     if action not in _HELPER_TIMEOUTS:
         raise InstallError("invalid_action", "The installer action is not supported.")
+    if type(without_backup) is not bool:
+        raise InstallError("invalid_action", "The backup choice must be an explicit boolean.")
+    if without_backup and action not in {"install", "continue"}:
+        raise InstallError(
+            "invalid_action", "The without-backup choice is accepted only for installation."
+        )
     if progress is not None:
         if action not in {"prepare", "retry_prepare"}:
             raise InstallError(
@@ -2581,6 +2867,8 @@ def _invoke_helper(
         argv.extend(("--allocation-gib", str(allocation_gib)))
     if expected_fingerprint is not None:
         argv.extend(("--expected-fingerprint", expected_fingerprint))
+    if without_backup:
+        argv.append("--without-backup")
     if progress is not None:
         # This is the sole opt-in transport switch.  The root helper accepts
         # it only for prepare/retry_prepare, and never accepts a stream/path
@@ -2697,7 +2985,17 @@ def retry_prepare(
     return _invoke_helper("retry_prepare", progress=progress)
 
 
-def install(plan: Mapping[str, Any] | None = None) -> dict[str, Any]:
+def recover_prewrite() -> dict[str, Any]:
+    """Recover an eligible legacy missing-backup operation through pkexec."""
+
+    return _invoke_helper("recover_prewrite")
+
+
+def install(
+    plan: Mapping[str, Any] | None = None,
+    *,
+    without_backup: bool = False,
+) -> dict[str, Any]:
     """Continue the qualified executor through the fixed root helper.
 
     The current package has no qualified physical executor, so this function
@@ -2706,6 +3004,8 @@ def install(plan: Mapping[str, Any] | None = None) -> dict[str, Any]:
     desktop-supplied plan file.
     """
 
+    if type(without_backup) is not bool:
+        raise InstallError("invalid_action", "The backup choice must be an explicit boolean.")
     if QUALIFIED is not True:
         raise InstallError(
             "executor_unavailable",
@@ -2717,7 +3017,7 @@ def install(plan: Mapping[str, Any] | None = None) -> dict[str, Any]:
             raise InstallError(
                 "unsupported_plan", "The preflight plan contains blockers and cannot be installed."
             )
-    return _invoke_helper("install")
+    return _invoke_helper("install", without_backup=without_backup)
 
 
 def restart() -> dict[str, Any]:
@@ -2926,7 +3226,17 @@ def helper_main(
     parser = argparse.ArgumentParser(description="Journaled Zeus dual-boot installer helper")
     parser.add_argument(
         "action",
-        choices=("preflight", "review", "status", "prepare", "retry_prepare", "install", "continue", "restart"),
+        choices=(
+            "preflight",
+            "review",
+            "status",
+            "prepare",
+            "retry_prepare",
+            "recover_prewrite",
+            "install",
+            "continue",
+            "restart",
+        ),
     )
     parser.add_argument(
         "--allocation-gib",
@@ -2948,11 +3258,20 @@ def helper_main(
         action="store_true",
         help="stream bounded JSON stage and byte-progress events (prepare/retry_prepare only)",
     )
+    parser.add_argument(
+        "--without-backup",
+        action="store_true",
+        help="record the owner's explicit choice to continue without a verified backup (install/continue only)",
+    )
     args = parser.parse_args(argv)
     try:
         if args.expected_fingerprint is not None and args.action != "prepare":
             raise InstallError(
                 "invalid_action", "A target fingerprint is accepted only for prepare."
+            )
+        if args.without_backup and args.action not in {"install", "continue"}:
+            raise InstallError(
+                "invalid_action", "The without-backup choice is accepted only for installation."
             )
         if args.progress_json and args.action not in {"prepare", "retry_prepare"}:
             raise InstallError(
@@ -3121,10 +3440,18 @@ def helper_main(
                     result = service.retry_prepare()
                 else:
                     result = service.retry_prepare(progress=progress_callback)
+            elif args.action == "recover_prewrite":
+                result = service.recover_prewrite()
             elif args.action == "restart":
                 result = service.restart()
             else:
-                result = service.install()
+                # Preserve the old no-keyword call for default installs and
+                # fixtures while forwarding only an explicit owner opt-out.
+                result = (
+                    service.install(without_backup=True)
+                    if args.without_backup
+                    else service.install()
+                )
         print(json.dumps(result, ensure_ascii=False, sort_keys=True), flush=True)
         return 0 if result.get("ok") else 1
     except InstallError as error:
@@ -3207,6 +3534,7 @@ __all__ = [
     "preflight",
     "prepare",
     "qualification",
+    "recover_prewrite",
     "review",
     "restart",
     "retry_prepare",

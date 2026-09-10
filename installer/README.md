@@ -33,20 +33,25 @@ Fedora's ext4 `/boot` may use either the generic Linux data or Linux extended
 boot (XBOOTLDR) GPT type. The original type, names, attributes and identifiers
 are retained; accepting XBOOTLDR does not change the supported partition order.
 
-The disk-writing path requires a verified pre-change backup under this
-session's data-preservation policy. The root executor reads the protected
-`/etc/zeus-dualboot-backup.json` receipt; staging and reviewing the layout do not
-require it. A missing receipt stops installation before resizing. The current
-package does not create or verify laptop backups for the owner. Do not create
-a receipt claiming verification until an independent backup has actually been
-checked. This administrative requirement is separate from VM qualification.
+Before installation, the owner can choose **Install without a backup**. This
+is an explicit product choice recorded in the root-owned operation journal;
+it does not create a backup receipt or claim that a backup was verified.
+Leaving the choice off retains the verified-backup route, which reads the
+protected `/etc/zeus-dualboot-backup.json` receipt. The package does not create
+or verify laptop backups for the owner.
 
-The receipt is a root-owned regular file with mode `0600`, containing
-`verified`, `backup_target`, and the reviewed plan `fingerprint`; verification
-evidence should also record the backup digest, size, time, and exact GPT table
-fingerprint. The disposable VM qualification receipts under
-`docs/iterations/installer-20260910/` document actual checked test backups;
-they cannot be reused as laptop receipts.
+A real receipt is a root-owned regular file with mode `0600`, containing
+`verified`, `backup_target`, and the reviewed plan `fingerprint`. The
+qualification receipts document actual checked test backups and cannot be
+reused as laptop receipts. Agent-run VM trials retain independent pre-change
+backups separately from the product's owner-choice workflow.
+
+If an older installer stopped at the missing-receipt check before any executor
+write, **Review and retry** rechecks the original disk and signed download,
+then restores preparation readiness. It preserves the journal and existing
+archive. Recovery refuses operations with executor state, disk changes,
+corrupt artifacts, or other ambiguous installation history. It never starts
+installation automatically.
 
 The installer downloads the signed build qualified with its pinned toolchain.
 That metadata URL is fixed to a Git commit, so a later preview-feed change
@@ -154,6 +159,14 @@ the launcher offers an explicit **Restart to choose an OS** action. Fedora
 remains the default boot choice, and the launcher never restarts automatically.
 The launcher never accepts a URL, archive path, shell command, or credential
 from the desktop user. The GTK process does not invoke `pkexec` directly.
+
+`install(plan, without_backup=True)` forwards only the explicit owner choice
+through the fixed `--without-backup` helper flag. The flag is accepted only
+for installation and continuation. The journal records `verified: false`
+with the original target fingerprint, and keeps that decision across reboot.
+The GUI uses `recover_prewrite()` only when status reports
+`can_recover_prewrite: true`; the root action performs the actual disk and
+archive checks under its operation lock.
 
 `restart()` is an explicit owner action after the executor reaches
 `reboot_required` or completes installation. It is never called automatically

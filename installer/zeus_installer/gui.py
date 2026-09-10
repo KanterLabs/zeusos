@@ -216,6 +216,22 @@ def _invoke_prepare(function: Callable[..., Any], plan: Mapping[str, Any], progr
     return function(plan)
 
 
+def _invoke_recover(function: Callable[..., Any], progress: Callable[[Any], None] | None) -> Any:
+    """Call a recovery facade with progress only when it supports it."""
+
+    try:
+        signature = inspect.signature(function)
+        parameters = signature.parameters
+    except (TypeError, ValueError):  # pragma: no cover - extension backend
+        parameters = {}
+    accepts_progress = "progress" in parameters or any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
+    )
+    if accepts_progress:
+        return function(progress=progress)
+    return function()
+
+
 def _invoke_preflight(function: Callable[..., Any], allocation_gib: int) -> Any:
     """Call the fixed-helper facade with a numeric allocation only.
 
@@ -393,15 +409,42 @@ def _status_resume_invalid(result: Mapping[str, Any]) -> bool:
 def _status_error_message(status: Mapping[str, Any]) -> str:
     """Turn durable backend error codes into owner-facing next steps."""
 
-    error = _safe_text(status.get("error")).lower()
+    error_code = _safe_text(status.get("error") or status.get("code"))
+    error = error_code.lower()
     messages = {
-        "backup_receipt_missing": "A verified backup receipt is missing. Create and verify the backup before continuing.",
-        "backup_unverified": "The backup receipt is missing or invalid. Verify the backup before continuing.",
-        "backup_target_mismatch": "The verified backup belongs to another target disk or layout. Review the backup before continuing.",
+        "backup_missing": (
+            "No verified Fedora backup is available. Create and verify a backup, "
+            "or explicitly choose Install without a backup to continue."
+        ),
+        "backup_receipt_missing": (
+            "A verified backup receipt is missing. Create and verify a backup, "
+            "or explicitly choose Install without a backup to continue."
+        ),
+        "backup_unverified": (
+            "The backup receipt is missing or invalid. Verify a backup, or explicitly "
+            "choose Install without a backup to continue."
+        ),
+        "backup_target_mismatch": (
+            "The verified backup belongs to another target disk or layout. Review the "
+            "backup, or explicitly choose Install without a backup to continue."
+        ),
+        "file_missing": "A required installer file was missing before installation could start.",
     }
-    if error in messages:
-        return messages[error]
-    return _safe_text(status.get("message") or status.get("error"))
+    if error == "file_missing" and status.get("can_recover_prewrite") is True:
+        messages[error] = (
+            "A required installer file was missing before installation could start. "
+            "The pre-write check stopped before disk changes. Select Review and retry."
+        )
+    saved_message = _safe_text(status.get("message"))
+    message = messages.get(error) or saved_message
+    if not message:
+        message = error_code
+    if (saved_message and saved_message != "The maintenance operation did not complete safely."
+            and saved_message.lower() not in message.lower()):
+        message = f"{message} ({saved_message})"
+    if error_code and message and error_code.lower() not in message.lower():
+        return f"{error_code}: {message}"
+    return message
 
 
 def _status_display_plan(status: Mapping[str, Any], allocation_gib: int, phase: str) -> dict[str, Any]:
@@ -581,6 +624,21 @@ class InstallerController:
             and _backend_function(backend, ("prepare", "download_and_prepare")) is not None
         )
 
+    def can_recover_prewrite(self) -> bool:
+        """Expose only the backend's explicit pre-write recovery decision."""
+
+        backend = self.backend_module if self.backend_module is not None else _load_backend_module()
+        return (
+            isinstance(self.resume_status, Mapping)
+            and self.resume_status.get("can_recover_prewrite") is True
+            and _backend_function(backend, ("recover_prewrite",)) is not None
+            and not self.resume_pending
+            and not self.resume_blocked
+            and not self.terminal
+            and not self.prepared
+            and self.installation is None
+        )
+
     def can_install(self) -> bool:
         return (
             not self.terminal
@@ -633,7 +691,53 @@ class InstallerController:
         self.operation_blocked = not self.prepared
         return result
 
-    def install(self) -> Any:
+    def recover_prewrite(self, progress: Callable[[Any], None] | None = None) -> Any:
+        """Recover a backend-eligible preparation failure without recollecting a plan."""
+
+        if not self.can_recover_prewrite():
+            raise BackendUnavailableError(
+                "Recovery is available only for a backend-approved pre-write preparation failure."
+            )
+        backend = self.backend_module if self.backend_module is not None else _load_backend_module()
+        if backend is None:
+            raise BackendUnavailableError("The installation backend is unavailable.")
+        function = _backend_function(backend, ("recover_prewrite",))
+        if function is None:
+            raise BackendUnavailableError("The recovery backend does not expose recover_prewrite().")
+        try:
+            result = _invoke_recover(function, progress)
+        except BackendUnavailableError:
+            raise
+        except Exception as error:  # pragma: no cover - backend-specific failures
+            raise InstallerError(_prepare_error_message(error)) from error
+        if not _result_ok(result):
+            if isinstance(result, Mapping):
+                self._consume_status(result)
+                message = _status_error_message(result)
+            else:
+                message = "The backend refused to recover this preparation."
+            raise InstallerError(_safe_text(message, "The backend refused to recover this preparation."))
+        if not isinstance(result, Mapping):
+            raise InstallerError("The recovery backend returned an invalid preparation result.")
+
+        result_plan = result.get("plan")
+        if isinstance(result_plan, Mapping):
+            self.plan = _normalise_plan(result_plan, self.allocation_gib)
+        elif self.plan is None:
+            raise InstallerError("The recovery backend returned no installation plan.")
+        self.preparation = result
+        self.installation = None
+        self.resume_status = dict(result)
+        self.resume_pending = False
+        self.resume_blocked = False
+        self.terminal = False
+        self.prepared = _result_ready(result)
+        self.operation_pending = True
+        self.operation_blocked = not self.prepared
+        self.last_error = None
+        return result
+
+    def install(self, *, without_backup: bool = False) -> Any:
         """Run the separately qualified executor after verified staging."""
 
         if not self.can_install():
@@ -650,7 +754,16 @@ class InstallerController:
             # A rebooted operation must continue the root-owned journal plan.
             # Do not forward the newly collected display plan, whose target
             # fingerprint may legitimately differ after the shrink boundary.
-            result = function() if self.resume_pending else function(self.plan or {})
+            if without_backup:
+                result = (
+                    function(without_backup=True)
+                    if self.resume_pending
+                    else function(self.plan or {}, without_backup=True)
+                )
+            else:
+                # Keep the default call shape compatible with older backends
+                # and fixtures whose install method accepts only a plan.
+                result = function() if self.resume_pending else function(self.plan or {})
         except BackendUnavailableError:
             raise
         except Exception as error:  # pragma: no cover - backend-specific failures
@@ -1106,6 +1219,19 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
             allocation_row.append(label("Includes Zeus root, home, /boot and its boot data.", wrap=True))
             content.append(allocation_row)
 
+            backup_row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            self._without_backup_check = Gtk.CheckButton(label="Install without a backup")
+            self._without_backup_check.set_active(False)
+            backup_row.append(self._without_backup_check)
+            backup_row.append(
+                label(
+                    "By default, installation requires a verified Fedora backup. "
+                    "Select this only if you accept continuing without that safety copy.",
+                    css="caption",
+                )
+            )
+            content.append(backup_row)
+
             self._disk = label("Disk details will appear after read-only preflight.")
             self._disk.add_css_class("card")
             content.append(self._disk)
@@ -1135,6 +1261,11 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
             self._prepare_button.connect("clicked", self._prepare_clicked)
             self._prepare_button.set_sensitive(False)
             buttons.append(self._prepare_button)
+            self._recover_button = Gtk.Button(label="Review and retry")
+            self._recover_button.connect("clicked", self._recover_clicked)
+            self._recover_button.set_sensitive(False)
+            self._recover_button.set_visible(False)
+            buttons.append(self._recover_button)
             self._install_button = Gtk.Button(label="Install into new space")
             self._install_button.connect("clicked", self._install_clicked)
             self._install_button.set_sensitive(False)
@@ -1227,6 +1358,9 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
                 and not controller.prepared
                 and not controller.terminal
             )
+            self._without_backup_check.set_sensitive(
+                not busy and not controller.resume_pending and not controller.terminal
+            )
             if controller.terminal:
                 self._restart_button.set_label("Restart to choose an OS")
             else:
@@ -1239,6 +1373,9 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
                 "Continue installation" if controller.resume_pending else "Install into new space"
             )
             self._prepare_button.set_sensitive(not busy and controller.can_prepare())
+            can_recover = not busy and controller.can_recover_prewrite()
+            self._recover_button.set_visible(can_recover)
+            self._recover_button.set_sensitive(can_recover)
             self._install_button.set_sensitive(not busy and controller.can_install())
             self._restart_button.set_sensitive(
                 not busy and controller.can_restart()
@@ -1321,7 +1458,17 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
             progress = status.get("progress")
             done = progress.get("bytes") if isinstance(progress, Mapping) else None
             total = progress.get("total") if isinstance(progress, Mapping) else None
-            if type(done) is int and type(total) is int and total > 0 and 0 <= done <= total:
+            # A terminal or interrupted journal may retain the last download
+            # counters.  Those counters are historical data, not current
+            # progress; only an explicitly downloading snapshot may render a
+            # byte percentage.
+            if (
+                phase == "downloading"
+                and type(done) is int
+                and type(total) is int
+                and total > 0
+                and 0 <= done <= total
+            ):
                 fraction = done / total
                 label = {
                     "downloading": "Downloading Zeus…",
@@ -1386,7 +1533,15 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
                 )
                 if controller.last_error:
                     self._status.set_text(controller.last_error)
-                self._footer.set_text("The existing journal operation must reach a safe boundary before another action.")
+                if controller.can_recover_prewrite():
+                    self._footer.set_text(
+                        "Review and retry rechecks the disk and existing download; "
+                        "installation starts only when you choose it."
+                    )
+                else:
+                    self._footer.set_text(
+                        "The existing journal operation must reach a safe boundary before another action."
+                    )
             elif controller.prepared:
                 self._status.set_text("Download verified. Ready to install.")
                 if qualification.get("qualified") is True:
@@ -1457,6 +1612,30 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
                 return controller.plan or {}, result
 
             self._submit(worker, self._apply_preparation)
+
+        def _recover_clicked(self, _button: Any) -> None:
+            self._set_busy(True, WAITING_FOR_REVIEW)
+            self._progress.set_fraction(0.0)
+            self._progress_determinate = False
+            self._progress.set_text(WAITING_FOR_REVIEW)
+            self._footer.set_text(WAITING_FOR_REVIEW)
+
+            def worker() -> Any:
+                operation_token = self._active_operation
+                if not controller.can_recover_prewrite():
+                    raise BackendUnavailableError(
+                        "Recovery is available only for a backend-approved pre-write preparation failure."
+                    )
+
+                def progress(value: Any) -> None:
+                    if self._closed or operation_token is None:
+                        return
+                    GLib.idle_add(self._progress_update, value, operation_token)
+
+                result = controller.recover_prewrite(progress=progress)
+                return controller.plan or {}, result
+
+            self._submit(worker, self._apply_recovery)
 
         def _progress_update(self, value: Any, token: int | None = None) -> bool:
             if self._closed or not self._busy or (token is not None and token != self._active_operation):
@@ -1565,7 +1744,35 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
             self._set_busy(False)
             return False
 
+        def _apply_recovery(self, value: Any, error: Exception | None) -> bool:
+            if error is not None:
+                self._progress_determinate = False
+                self._progress.set_fraction(0.0)
+                self._progress.set_text("Recovery failed")
+                if controller.plan is not None:
+                    self._render_plan(controller.plan)
+                self._set_busy(False, f"Recovery failed: {error}")
+                self._footer.set_text("Review the error above before trying again.")
+                return False
+            plan, result = value
+            self._render_plan(plan)
+            if controller.prepared:
+                self._progress.set_fraction(1.0)
+                self._progress.set_text("Download verified")
+                self._status.set_text("Download verified. Ready to install.")
+            else:
+                state = result.get("state") if isinstance(result, Mapping) else "preparing"
+                self._status.set_text(
+                    f"Recovery is not ready: {_safe_text(state, 'preparing')}. Installation remains disabled."
+                )
+                self._progress_determinate = False
+                self._progress.set_fraction(0.0)
+                self._progress.set_text("Recovery needs review")
+            self._set_busy(False)
+            return False
+
         def _install_clicked(self, _button: Any) -> None:
+            without_backup = self._without_backup_check.get_active() is True
             self._set_busy(True, "Installing Zeus…")
             self._footer.set_text("Working on the reviewed plan; Fedora is unchanged.")
             self._progress_determinate = False
@@ -1577,7 +1784,7 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
                     raise BackendUnavailableError(
                         "Installation is disabled until a qualified executor is available and a verified payload is staged."
                     )
-                result = controller.install()
+                result = controller.install(without_backup=without_backup)
                 return controller.plan or {}, result
 
             self._submit(worker, self._apply_installation)

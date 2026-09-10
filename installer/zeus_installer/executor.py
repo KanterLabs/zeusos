@@ -214,6 +214,7 @@ class DualBootExecutor:
         artifact: Mapping[str, Any],
         runner: Any,
         journal: Any,
+        without_backup: bool = False,
     ) -> Mapping[str, Any]:
         """Execute one safe boundary of the installation.
 
@@ -221,6 +222,11 @@ class DualBootExecutor:
         The durable executor result from the previous call determines whether
         this is the pre-reboot phase or the post-reboot phase.
         """
+
+        if type(without_backup) is not bool:
+            raise ExecutorError(
+                "invalid_action", "The backup choice must be an explicit boolean."
+            )
 
         if self.qualified is not True:
             raise ExecutorError(
@@ -238,11 +244,32 @@ class DualBootExecutor:
 
         state_record = self._load_record(journal)
         saved = self._saved_state(state_record)
+        effective_without_backup = bool(without_backup)
         if saved is not None:
+            persisted_choice = self._saved_backup_choice(saved, plan)
+            if persisted_choice is not None:
+                if persisted_choice is False and without_backup:
+                    raise ExecutorError(
+                        "backup_choice_mismatch",
+                        "The recorded installation already selected a verified backup.",
+                    )
+                # A reopened GUI may clear its checkbox after the Fedora
+                # reboot.  The root-owned stage-one decision remains
+                # authoritative for stage two and must not be replaced by a
+                # fresh default.
+                effective_without_backup = persisted_choice
             self._reject_ambiguous(saved)
             stage = saved.get("stage")
             if stage == 1 and saved.get("phase") == "reboot_required":
-                return self._stage2(plan, artifact, runner, journal, state_record, saved)
+                return self._stage2(
+                    plan,
+                    artifact,
+                    runner,
+                    journal,
+                    state_record,
+                    saved,
+                    without_backup=effective_without_backup,
+                )
             if stage == 2 and saved.get("phase") == "installed":
                 return copy.deepcopy(saved.get("result") or self._installed_result(saved))
             if stage == 2:
@@ -268,7 +295,14 @@ class DualBootExecutor:
             if stage not in (None, 1, 2):
                 raise ExecutorError("invalid_state", "The dual-boot journal state is unsupported.")
 
-        return self._stage1(plan, artifact, runner, journal, state_record)
+        return self._stage1(
+            plan,
+            artifact,
+            runner,
+            journal,
+            state_record,
+            without_backup=effective_without_backup,
+        )
 
     @staticmethod
     def _validate_execution_plan(plan: Mapping[str, Any]) -> None:
@@ -332,6 +366,62 @@ class DualBootExecutor:
     # ------------------------------------------------------------------
     # Stage 1: mounted Fedora shrink and end-only GPT change
     # ------------------------------------------------------------------
+
+    @classmethod
+    def _saved_backup_choice(
+        cls,
+        state: Mapping[str, Any],
+        plan: Mapping[str, Any],
+    ) -> bool | None:
+        """Read and authenticate a persisted owner backup decision.
+
+        A stage-one state is written before the first mutating command. Once
+        that state exists it is authoritative across the reboot, including
+        when the reopened GUI's checkbox has returned to its default. Older
+        states carry only a public verified receipt and therefore resolve to
+        the normal backup path.
+        """
+
+        if not isinstance(state, Mapping):
+            return None
+        expected_fp = cls._fingerprint(plan.get("fingerprint"))
+        choices: list[bool] = []
+        if "backup_decision" in state:
+            candidate = state.get("backup_decision")
+            if not isinstance(candidate, Mapping):
+                raise ExecutorError("invalid_state", "The persisted backup decision is invalid.")
+            # This is the sole schema written for an owner-declined choice.
+            # Requiring all three fields prevents a hand-edited or truncated
+            # state from turning a continuation into an unverified write.
+            if (
+                type(candidate.get("without_backup")) is not bool
+                or candidate.get("without_backup") is not True
+                or type(candidate.get("verified")) is not bool
+                or candidate.get("verified") is not False
+                or set(candidate) != {"without_backup", "verified", "fingerprint"}
+            ):
+                raise ExecutorError("invalid_state", "The persisted backup decision is invalid.")
+            recorded = cls._fingerprint(candidate.get("fingerprint"))
+            if recorded is None or expected_fp is None or recorded != expected_fp:
+                raise ExecutorError(
+                    "target_mismatch",
+                    "The persisted backup decision belongs to another target.",
+                )
+            choices.append(True)
+
+        # Older stage-one state has a public receipt under ``backup`` and no
+        # decision marker. Keep that verified path for fixture compatibility.
+        legacy_receipt = state.get("backup")
+        if legacy_receipt not in (None, {}, []):
+            if not isinstance(legacy_receipt, Mapping) or legacy_receipt.get("verified") is not True:
+                raise ExecutorError("invalid_state", "The persisted backup decision is invalid.")
+            choices.append(False)
+
+        if not choices:
+            return None
+        if any(choice != choices[0] for choice in choices[1:]):
+            raise ExecutorError("invalid_state", "The persisted backup decision is conflicting.")
+        return choices[0]
 
     @staticmethod
     def _valid_qualification_receipt(receipt: Mapping[str, Any] | None) -> bool:
@@ -588,8 +678,14 @@ class DualBootExecutor:
         runner: Any,
         journal: Any,
         record: Mapping[str, Any] | None,
+        *,
+        without_backup: bool = False,
     ) -> Mapping[str, Any]:
         del artifact  # Artifact verification is owned by InstallerBackend.
+        if type(without_backup) is not bool:
+            raise ExecutorError(
+                "invalid_action", "The backup choice must be an explicit boolean."
+            )
         # The backend's target fingerprint intentionally omits volatile AC,
         # RAM, and staging values.  Refresh those values immediately before
         # the first shrink and require the current plan to remain supported.
@@ -597,8 +693,16 @@ class DualBootExecutor:
         original, proposal = self._plan_storage(plan, runner)
         disk = self._disk(proposal.get("disk"))
 
-        receipt = self._read_backup_receipt()
-        self._verify_receipt(receipt, plan, proposal)
+        if without_backup:
+            # This is an owner-declined safety copy, not a synthetic receipt.
+            # Keep the decision bound to the exact journal plan so a later
+            # continuation cannot silently apply it to another target.
+            receipt = None
+            backup_record = self._owner_declined_backup(plan)
+        else:
+            receipt = self._read_backup_receipt()
+            self._verify_receipt(receipt, plan, proposal)
+            backup_record = self._public_receipt(receipt)
 
         # Capture the exact table from the privileged read-only command.  If
         # preflight supplied one, equality is required; otherwise this exact
@@ -661,8 +765,11 @@ class DualBootExecutor:
             "actual_filesystem_bytes_before": actual_before,
             "minimum_filesystem_bytes": minimum,
             "filesystem_limit_bytes": limit_bytes,
-            "backup": self._public_receipt(receipt),
         }
+        if without_backup:
+            state["backup_decision"] = copy.deepcopy(backup_record)
+        else:
+            state["backup"] = copy.deepcopy(backup_record)
         self._persist_state(journal, state)
 
         return self._stage1_write_boundary(
@@ -764,8 +871,53 @@ class DualBootExecutor:
         journal: Any,
         record: Mapping[str, Any] | None,
         saved: Mapping[str, Any],
+        *,
+        without_backup: bool = False,
     ) -> Mapping[str, Any]:
         del record
+        # The stage-one decision was authenticated before any storage write;
+        # validate it again at continuation so a malformed journal cannot
+        # turn stage two into an unbound operation.  ``without_backup`` is
+        # otherwise intentionally unused here because no receipt is read in
+        # stage two.
+        persisted_choice = self._saved_backup_choice(saved, plan)
+        if persisted_choice is None:
+            # Legacy stage-one journals predate the explicit choice and carry
+            # no backup record in some fixtures. They already crossed the
+            # verified receipt check, so preserve their continuation path.
+            return self._stage2_after_choice(
+                plan,
+                artifact,
+                runner,
+                journal,
+                saved,
+                without_backup=without_backup,
+            )
+        if persisted_choice is False and without_backup:
+            raise ExecutorError(
+                "backup_choice_mismatch",
+                "The recorded installation already selected a verified backup.",
+            )
+        return self._stage2_after_choice(
+            plan,
+            artifact,
+            runner,
+            journal,
+            saved,
+            without_backup=persisted_choice,
+        )
+
+    def _stage2_after_choice(
+        self,
+        plan: Mapping[str, Any],
+        artifact: Mapping[str, Any],
+        runner: Any,
+        journal: Any,
+        saved: Mapping[str, Any],
+        *,
+        without_backup: bool = False,
+    ) -> Mapping[str, Any]:
+        del without_backup
         # A reboot can leave the machine on battery or with less staging/RAM
         # than preflight observed.  Refresh the volatile write preconditions
         # before taking the second mutation boundary as well.  The exact
@@ -1156,8 +1308,37 @@ class DualBootExecutor:
             if path and path != proposal.get("disk"):
                 raise ExecutorError("target_mismatch", "The target disk changed after preflight.")
 
+    def _owner_declined_backup(self, plan: Mapping[str, Any]) -> dict[str, Any]:
+        """Return the truthful journal record for an owner-declined backup."""
+
+        fingerprint = self._fingerprint(plan.get("fingerprint"))
+        if fingerprint is None:
+            raise ExecutorError(
+                "invalid_plan", "The installer plan has no valid target fingerprint."
+            )
+        return {
+            "without_backup": True,
+            "verified": False,
+            "fingerprint": fingerprint,
+        }
+
     def _read_backup_receipt(self) -> dict[str, Any]:
-        value = self._read_json(self.backup_receipt_path, code="backup_unverified", limit=128 * 1024)
+        try:
+            value = self._read_json(
+                self.backup_receipt_path,
+                code="backup_unverified",
+                limit=128 * 1024,
+            )
+        except ExecutorError as error:
+            if error.code == "file_missing":
+                # Keep the legacy machine-readable code only in journals
+                # created by older helpers. New failures identify the missing
+                # backup receipt directly for the owner and GUI.
+                raise ExecutorError(
+                    "backup_receipt_missing",
+                    "A verified backup receipt is required before shrinking; no receipt was found.",
+                ) from error
+            raise
         if not isinstance(value, Mapping):
             raise ExecutorError("backup_unverified", "A verified backup receipt is required.")
         return dict(value)

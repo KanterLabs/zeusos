@@ -21,6 +21,45 @@ def reviewed_plan(fingerprint='target-a'):
 
 
 class DesktopHelperRoundTripTests(unittest.TestCase):
+    def test_recovery_and_explicit_owner_choice_cross_fixed_helper_boundary(self):
+        calls = []
+        choices = []
+        original = reviewed_plan()
+        failed = {'ok': False, 'phase': 'error', 'error': 'file_missing',
+                  'can_recover_prewrite': True, 'plan': original}
+        ready = {'ok': True, 'phase': 'prepared', 'state': 'prepared',
+                 'prepared': True, 'plan': original}
+
+        def install(*, without_backup=False):
+            choices.append(without_backup)
+            return {'ok': True, 'phase': 'reboot_required'}
+
+        service = types.SimpleNamespace(status=lambda: failed,
+                                        recover_prewrite=lambda: ready,
+                                        install=install)
+
+        def invoke(argv, **kwargs):
+            self.assertEqual(argv[:2], [backend.PKEXEC_COMMAND, backend.HELPER_COMMAND])
+            self.assertFalse(kwargs['shell'])
+            calls.append(argv[2:])
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                code = backend.helper_main(argv[2:], backend=service)
+            return subprocess.CompletedProcess(argv, code, stdout=output.getvalue(), stderr='')
+
+        with mock.patch.object(backend.os, 'geteuid', return_value=0), \
+                mock.patch.object(backend.subprocess, 'run', side_effect=invoke):
+            controller = gui.InstallerController(backend_module=backend)
+            controller.refresh()
+            self.assertFalse(controller.can_install())
+            controller.recover_prewrite()
+            self.assertTrue(controller.can_install())
+            self.assertEqual(choices, [])
+            controller.install(without_backup=True)
+        self.assertEqual([argv[0] for argv in calls], ['review', 'recover_prewrite', 'install'])
+        self.assertEqual(calls[-1], ['install', '--without-backup'])
+        self.assertEqual(choices, [True])
+
     def exercise(self, *, changed_target=False, existing=None):
         calls = []
         downloaded = []

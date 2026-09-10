@@ -313,6 +313,223 @@ class ExecutorFixtureTests(unittest.TestCase):
         self.assertEqual(result["phase"], "reboot_required")
         return result
 
+    def _set_fresh_resources(self, *, ac_online: bool) -> None:
+        inventory = copy.deepcopy(self.plan["inventory"])
+        inventory.update(
+            {
+                "memory": {"available_bytes": 4 * 1024**3},
+                "power": {"ac_online": ac_online},
+                "staging": {"free_bytes": 16 * 1024**3},
+            }
+        )
+        self.executor.inventory_provider = lambda: {
+            "supported": True,
+            "blockers": [],
+            "fingerprint": self.plan["fingerprint"],
+            "inventory": inventory,
+        }
+
+    def _replace_executor_state(self, state: dict[str, object]) -> None:
+        record = self.journal.load()
+        self.assertIsInstance(record, dict)
+        record["executor_state"] = copy.deepcopy(state)
+        self.journal.write(record)
+
+    @staticmethod
+    def _is_mutating_command(argv: list[str]) -> bool:
+        return argv[0] in {
+            installer_executor.BTRFS,
+            installer_executor.MKFS_FAT,
+            installer_executor.MKFS_EXT4,
+            installer_executor.MOUNT,
+            installer_executor.PARTX,
+            installer_executor.PODMAN,
+            installer_executor.GRUB2_MKCONFIG,
+        } or "-N" in argv or "--append" in argv
+
+    def test_missing_backup_receipt_default_fails_before_mutating_command(self) -> None:
+        self.executor.backup_receipt_path = Path(self.temp.name) / "missing-backup.json"
+        self.executor.reader = None
+        with self.assertRaises(installer_executor.ExecutorError) as context:
+            self.executor.execute(
+                plan=self.plan,
+                artifact=self.artifact,
+                runner=self.runner,
+                journal=self.journal,
+            )
+        self.assertEqual(context.exception.code, "backup_receipt_missing")
+        self.assertFalse(any(self._is_mutating_command(argv) for argv, _kwargs in self.runner.calls))
+        self.assertEqual(self.events, [])
+        self.assertNotIn("executor_state", self.journal.load())
+
+    def test_without_backup_stage1_keeps_geometry_guards_and_truthful_decision(self) -> None:
+        self._set_fresh_resources(ac_online=True)
+        receipt_reader = mock.Mock(side_effect=AssertionError("without-backup stage1 read a receipt"))
+        self.executor.reader = receipt_reader
+        result = self.executor.execute(
+            plan=self.plan,
+            artifact=self.artifact,
+            runner=self.runner,
+            journal=self.journal,
+            without_backup=True,
+        )
+        self.assertEqual(result["phase"], "reboot_required")
+        commands = [argv for argv, _kwargs in self.runner.calls]
+        resize = commands.index(
+            [
+                installer_executor.BTRFS,
+                "filesystem",
+                "resize",
+                str(self.proposal["fedora_filesystem_limit_bytes"]),
+                "/",
+            ]
+        )
+        sync = commands.index([installer_executor.BTRFS, "filesystem", "sync", "/"])
+        end_change = next(index for index, argv in enumerate(commands) if "-N" in argv)
+        self.assertLess(resize, sync)
+        self.assertLess(sync, end_change)
+        state = self.journal.load()["executor_state"]
+        self.assertEqual(
+            state["backup_decision"],
+            {
+                "without_backup": True,
+                "verified": False,
+                "fingerprint": self.plan["fingerprint"],
+            },
+        )
+        self.assertNotIn("backup", state)
+        self.assertEqual(receipt_reader.call_count, 0)
+        self.assertNotIn(self.executor.backup_receipt_path, self.files)
+
+    def test_without_backup_still_requires_ac_before_storage_mutation(self) -> None:
+        self._set_fresh_resources(ac_online=False)
+        with self.assertRaises(installer_executor.ExecutorError) as context:
+            self.executor.execute(
+                plan=self.plan,
+                artifact=self.artifact,
+                runner=self.runner,
+                journal=self.journal,
+                without_backup=True,
+            )
+        self.assertEqual(context.exception.code, "ac_required")
+        self.assertFalse(any(self._is_mutating_command(argv) for argv, _kwargs in self.runner.calls))
+        self.assertEqual(self.events, [])
+        self.assertNotIn("executor_state", self.journal.load())
+
+    def test_stage2_false_continuation_preserves_persisted_without_backup_choice(self) -> None:
+        self._set_fresh_resources(ac_online=True)
+        receipt_path = self.executor.backup_receipt_path
+
+        def reader(path: Path) -> str | None:
+            if path == receipt_path:
+                raise AssertionError("stage2 continuation read a backup receipt")
+            return None
+
+        self.executor.reader = reader
+        self.executor.execute(
+            plan=self.plan,
+            artifact=self.artifact,
+            runner=self.runner,
+            journal=self.journal,
+            without_backup=True,
+        )
+        self.boot["id"] = "feedface"
+        result = self.executor.execute(
+            plan=self.plan,
+            artifact=self.artifact,
+            runner=self.runner,
+            journal=self.journal,
+            without_backup=False,
+        )
+        self.assertEqual(result["phase"], "installed")
+        state = self.journal.load()["executor_state"]
+        self.assertEqual(
+            state["backup_decision"],
+            {
+                "without_backup": True,
+                "verified": False,
+                "fingerprint": self.plan["fingerprint"],
+            },
+        )
+        self.assertNotIn("backup", state)
+        self.assertNotIn(receipt_path, self.files)
+
+    def test_mismatched_persisted_backup_decision_is_refused(self) -> None:
+        self.executor.execute(
+            plan=self.plan,
+            artifact=self.artifact,
+            runner=self.runner,
+            journal=self.journal,
+            without_backup=True,
+        )
+        state = copy.deepcopy(self.journal.load()["executor_state"])
+        state["backup_decision"]["fingerprint"] = "sha256:" + "b" * 64
+        self._replace_executor_state(state)
+        calls_before = len(self.runner.calls)
+        with self.assertRaises(installer_executor.ExecutorError) as context:
+            self.executor.execute(
+                plan=self.plan,
+                artifact=self.artifact,
+                runner=self.runner,
+                journal=self.journal,
+            )
+        self.assertEqual(context.exception.code, "target_mismatch")
+        self.assertEqual(len(self.runner.calls), calls_before)
+
+    def test_malformed_persisted_backup_decision_is_refused(self) -> None:
+        self.executor.execute(
+            plan=self.plan,
+            artifact=self.artifact,
+            runner=self.runner,
+            journal=self.journal,
+            without_backup=True,
+        )
+        state = copy.deepcopy(self.journal.load()["executor_state"])
+        state["backup_decision"] = {"without_backup": True, "verified": False}
+        self._replace_executor_state(state)
+        calls_before = len(self.runner.calls)
+        with self.assertRaises(installer_executor.ExecutorError) as context:
+            self.executor.execute(
+                plan=self.plan,
+                artifact=self.artifact,
+                runner=self.runner,
+                journal=self.journal,
+            )
+        self.assertEqual(context.exception.code, "invalid_state")
+        self.assertEqual(len(self.runner.calls), calls_before)
+
+    def test_null_persisted_backup_decision_is_refused(self) -> None:
+        self.executor.execute(
+            plan=self.plan,
+            artifact=self.artifact,
+            runner=self.runner,
+            journal=self.journal,
+            without_backup=True,
+        )
+        state = copy.deepcopy(self.journal.load()["executor_state"])
+        state["backup_decision"] = None
+        self._replace_executor_state(state)
+        calls_before = len(self.runner.calls)
+        with self.assertRaises(installer_executor.ExecutorError) as context:
+            self.executor.execute(
+                plan=self.plan,
+                artifact=self.artifact,
+                runner=self.runner,
+                journal=self.journal,
+            )
+        self.assertEqual(context.exception.code, "invalid_state")
+        self.assertEqual(len(self.runner.calls), calls_before)
+
+    def test_verified_receipt_route_remains_the_default_stage1_path(self) -> None:
+        result = self.execute_stage1()
+        self.assertEqual(result["phase"], "reboot_required")
+        state = self.journal.load()["executor_state"]
+        self.assertEqual(
+            state["backup"],
+            {"verified": True, "backup_target": "/var/backups/zeus-test"},
+        )
+        self.assertNotIn("backup_decision", state)
+
     def test_disabled_by_default_and_pinned_qualification_is_explicit(self) -> None:
         self.assertFalse(installer_executor.DualBootExecutor().qualified)
         self.assertTrue(self.executor.qualified)

@@ -463,6 +463,149 @@ class ControllerGateTests(unittest.TestCase):
         self.assertEqual(controller.resume_status["progress"], {"bytes": 4, "total": 8})
         self.assertEqual(plan["fingerprint"], "sha256:" + "8" * 64)
 
+    def test_recovery_is_gated_only_by_backend_eligibility(self):
+        calls: list[str] = []
+        plan = {
+            "supported": True,
+            "blockers": [],
+            "target": {"allocation_gib": 128},
+            "fingerprint": "sha256:" + "a" * 64,
+        }
+        backend = types.SimpleNamespace(
+            status=lambda: {
+                "ok": False,
+                "phase": "error",
+                "error": "file_missing",
+                "message": "The prepared release file is missing.",
+                "can_recover_prewrite": False,
+                "plan": plan,
+            },
+            recover_prewrite=lambda: calls.append("recover"),
+        )
+        controller = gui.InstallerController(backend_module=backend)
+        controller.refresh()
+        self.assertFalse(controller.can_recover_prewrite())
+        with self.assertRaisesRegex(InstallerError, "backend-approved"):
+            controller.recover_prewrite()
+        self.assertEqual(calls, [])
+
+    def test_recovery_uses_saved_plan_without_redundant_refresh_and_preserves_allocation(self):
+        calls: list[str] = []
+        plan = {
+            "schema_version": 1,
+            "supported": True,
+            "blockers": [],
+            "inventory": {"fixture": "saved"},
+            "target": {"allocation_gib": 160, "disk": "/dev/vda"},
+            "fingerprint": "sha256:" + "b" * 64,
+            "allocation_gib": 160,
+        }
+
+        def status():
+            calls.append("status")
+            return {
+                "ok": False,
+                "phase": "error",
+                "error": "file_missing",
+                "message": "The prepared release file is missing.",
+                "can_recover_prewrite": True,
+                "progress": {"bytes": 8, "total": 8},
+                "plan": plan,
+            }
+
+        def recover_prewrite():
+            calls.append("recover")
+            return {
+                "ok": True,
+                "state": "prepared",
+                "phase": "prepared",
+                "prepared": True,
+                "plan": plan,
+                "allocation_gib": 160,
+            }
+
+        backend = types.SimpleNamespace(status=status, recover_prewrite=recover_prewrite)
+        controller = gui.InstallerController(allocation_gib=160, backend_module=backend)
+        controller.refresh()
+        self.assertTrue(controller.can_recover_prewrite())
+        result = controller.recover_prewrite()
+        self.assertEqual(calls, ["status", "recover"])
+        self.assertIs(result["plan"], plan)
+        self.assertTrue(controller.prepared)
+        self.assertFalse(controller.can_recover_prewrite())
+        self.assertEqual(controller.allocation_gib, 160)
+        self.assertEqual(controller.plan["target"]["allocation_gib"], 160)
+
+    def test_recovery_error_preserves_backend_eligibility_and_error_code(self):
+        plan = {
+            "supported": True,
+            "blockers": [],
+            "target": {"allocation_gib": 128},
+            "fingerprint": "sha256:" + "c" * 64,
+        }
+        backend = types.SimpleNamespace(
+            status=lambda: {
+                "ok": False,
+                "phase": "error",
+                "error": "file_missing",
+                "message": "The prepared release file is missing.",
+                "can_recover_prewrite": True,
+                "plan": plan,
+            },
+            recover_prewrite=lambda: {
+                "ok": False,
+                "phase": "error",
+                "error": "file_missing",
+                "message": "The prepared release file is still missing.",
+                "can_recover_prewrite": True,
+                "plan": plan,
+            },
+        )
+        controller = gui.InstallerController(backend_module=backend)
+        controller.refresh()
+        with self.assertRaisesRegex(InstallerError, "file_missing"):
+            controller.recover_prewrite()
+        self.assertTrue(controller.can_recover_prewrite())
+        self.assertIn("file_missing", controller.last_error or "")
+
+    def test_install_forwards_without_backup_only_when_selected(self):
+        plan = {
+            "supported": True,
+            "blockers": [],
+            "target": {"allocation_gib": 128},
+            "fingerprint": "sha256:" + "d" * 64,
+        }
+
+        for without_backup in (False, True):
+            with self.subTest(without_backup=without_backup):
+                calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+                def install(*args, **kwargs):
+                    calls.append((args, kwargs))
+                    return {"ok": True, "phase": "reboot_required"}
+
+                backend = types.SimpleNamespace(
+                    qualification=lambda: {"qualified": True, "status": "qualified"},
+                    preflight=lambda **_kwargs: plan,
+                    prepare=lambda *_args, **_kwargs: {
+                        "ok": True,
+                        "state": "ready",
+                        "prepared": True,
+                    },
+                    install=install,
+                    restart=lambda: {"ok": True},
+                )
+                controller = gui.InstallerController(backend_module=backend)
+                controller.refresh()
+                controller.prepare()
+                controller.install(without_backup=without_backup)
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(calls[0][0], (controller.plan,))
+                self.assertEqual(
+                    calls[0][1],
+                    {"without_backup": True} if without_backup else {},
+                )
+
     def test_prepare_uses_exact_reviewed_plan_without_refreshing(self):
         calls: list[str] = []
         reviewed_fingerprint = "sha256:" + "9" * 64
@@ -749,6 +892,24 @@ class ControllerGateTests(unittest.TestCase):
         self.assertIn("missing", gui._status_error_message({"error": "backup_receipt_missing"}).lower())
         self.assertIn("invalid", gui._status_error_message({"error": "backup_unverified"}).lower())
         self.assertIn("another target", gui._status_error_message({"error": "backup_target_mismatch"}).lower())
+
+    def test_backup_missing_error_explains_explicit_choice(self):
+        message = gui._status_error_message({"error": "backup_missing"})
+        self.assertIn("backup", message.lower())
+        self.assertIn("Install without a backup", message)
+
+    def test_file_missing_error_is_conservative_and_preserves_saved_message(self):
+        message = gui._status_error_message(
+            {
+                "error": "file_missing",
+                "message": "The required installer file is unavailable.",
+                "can_recover_prewrite": True,
+            }
+        )
+        self.assertIn("file_missing", message)
+        self.assertIn("required installer file", message)
+        self.assertIn("Review and retry", message)
+        self.assertIn("The required installer file is unavailable", message)
 
 
 class PackagingContractTests(unittest.TestCase):
