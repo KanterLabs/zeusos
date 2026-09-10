@@ -1565,12 +1565,7 @@ def _make_application(controller: InstallerController, gtk_parts: tuple[Any, Any
                     )
             elif controller.resume_pending:
                 status = controller.resume_status or {}
-                error_code = (
-                    _safe_text(status.get("error") or status.get("code")).lower()
-                    if isinstance(status, Mapping)
-                    else ""
-                )
-                if error_code in {"grub_invalid", "grub_conflict"}:
+                if status.get("can_resume_finalization") is True:
                     detail = controller.last_error or _status_error_message(status)
                     self._status.set_text(
                         f"{detail} Continue installation to retry the recorded finalization."

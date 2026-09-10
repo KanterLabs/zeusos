@@ -2380,7 +2380,7 @@ class InstallerBackend:
                     record = self._reload_record()
                     error_message = (
                         str(error)[:2048]
-                        if code in {"backup_receipt_missing", "backup_unverified", "file_missing", "grub_invalid", "grub_conflict"}
+                        if code in {"backup_receipt_missing", "backup_unverified", "file_missing", "grub_invalid", "grub_conflict", "ac_required", "resource_unverified", "insufficient_ram", "insufficient_staging_space"}
                         else "The maintenance operation did not complete safely."
                     )
                     record = self.journal.transition(

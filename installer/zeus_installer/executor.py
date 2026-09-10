@@ -114,7 +114,12 @@ _MAX_OUTPUT = 8 * 1024 * 1024
 # boundary.  Keep this allowlist explicit: every earlier stage can have
 # modified a disk, filesystem, mount, deployment, or EFI tree and therefore
 # remains permanently ambiguous after an interruption.
-_FINALIZATION_ERRORS = frozenset({"grub_invalid", "grub_conflict"})
+# These errors can occur during read-only finalization preconditions. The
+# full saved boundary and fresh target proof are still mandatory on retry.
+_FINALIZATION_ERRORS = frozenset({
+    "grub_invalid", "grub_conflict", "target_mismatch", "ac_required",
+    "resource_unverified", "insufficient_ram", "insufficient_staging_space",
+})
 _FINALIZATION_ACTIONS = frozenset({"write_grub_entry", "grub_regenerate"})
 _FINALIZATION_COMPLETED_PREFIX = (
     "btrfs_resize",
@@ -754,7 +759,9 @@ def verify_finalization_resume(
         observed_boot = _finalization_inventory_boot_id(inventory)
         if observed_boot is not None and observed_boot != state.get("current_boot_id"):
             return False
-        checker._check_dynamic_resources(inventory)
+        # Power/RAM/staging are volatile write preconditions, not target
+        # identity. The executor checks them immediately before finalization
+        # and returns their specific errors instead of a false disk mismatch.
         return True
     except (AttributeError, ExecutorError, OSError, TypeError, ValueError, KeyError, RuntimeError):
         return False

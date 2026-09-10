@@ -814,3 +814,19 @@ or battery-hours from VM counters.
   results are recorded in the signed release receipt.
 - No new OS image, boot-time measurement, or battery measurement. Evidence:
   [GRUB finalization record](iterations/installer-20260910/grub-finalization.md).
+
+### 2026-09-10 19:01 UTC — Accurate finalization power errors
+
+- Replayed the owner diagnostic: current GPT, target mounts and boot session
+  matched the journal. The old target verifier returned false solely because
+  AC was offline; changing only AC to online made it pass.
+- Target identity proof now excludes volatile resource checks. The executor
+  still checks AC/RAM/staging before writes and reports their specific errors.
+  The exact saved finalization boundary can be retried after correcting them,
+  including the old incorrectly persisted `target_mismatch`.
+- Parent installer suite: 182 tests passed in 14.299 seconds. Coupled tests
+  confirm battery refusal without writes, successful charger retry with only
+  GRUB regeneration, and continued refusal of a changed GPT.
+- Product remains `0.1.0-preview.2`; no OS image or boot/battery metric changes.
+  Reverified independent 14-file VM backup, RPM preservation and exact-commit
+  CI results are recorded in the signed release receipt.

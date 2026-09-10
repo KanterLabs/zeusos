@@ -28,3 +28,15 @@ runner records no repeated partition, format, mount, image or EFI install
 commands on retry. Fresh disk, mount, boot and saved identity mismatches are
 refused. Installed-RPM fixture verification is recorded separately in the
 release receipt; it is not a physical laptop boot test.
+
+## Power-check correction
+
+A subsequent owner diagnostic proved that the live disk table, target mounts
+and boot session matched the finalization record, but AC was offline. The
+boolean target verifier incorrectly swallowed the resource error and the
+backend persisted it as `target_mismatch`. Target proof now covers identity
+only; runtime resource checks retain their typed errors before any writes.
+The same tightly validated finalization boundary remains retryable after
+restoring AC, including an old falsely recorded target mismatch. A real
+changed target still fails fresh verification. Parent suite: 182 tests passed
+in 14.299 seconds; installed-package results are in the release receipt.
