@@ -798,7 +798,7 @@ class ArtifactPinTests(unittest.TestCase):
         self.assertEqual(manifest["sequence"], 1788996337)
 
     def test_archive_fifo_is_rejected_without_blocking(self) -> None:
-        with tempfile.TemporaryDirectory(dir=ROOT / "out" / "installer" / "tmp") as directory:
+        with tempfile.TemporaryDirectory() as directory:
             fifo = Path(directory) / "archive"
             os.mkfifo(fifo, 0o600)
             with self.assertRaises(artifacts.ArtifactError) as context:
