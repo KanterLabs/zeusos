@@ -28,6 +28,8 @@ jobs:
         run: |
           python3 -m unittest discover -s tests -p 'test_codex*.py' -v
           python3 -m py_compile scripts/install-codex.py scripts/validate-codex.py
+      - name: Verify offline Wi-Fi image prerequisites
+        run: python3 -m unittest discover -s tests -p 'test_wifi.py' -v
       - name: Verify Fedora installer preflight and preservation boundaries
         run: |
           python3 -m unittest discover -s tests -p 'test_installer*.py' -v

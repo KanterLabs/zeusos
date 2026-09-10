@@ -18,6 +18,7 @@ wireplumber
 bluez
 NetworkManager-wifi
 NetworkManager-bluetooth
+iwlwifi-mvm-firmware
 adwaita-icon-theme
 google-noto-sans-fonts
 google-noto-sans-mono-fonts
