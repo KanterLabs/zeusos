@@ -29,6 +29,15 @@ or its signature. Keep the initial release notes as historical evidence and add
 a latest-build reference and dated iteration notes. A Git commit/build is not a
 new product release or version bump.
 
+The planned [Developer Mode](features/developer-mode.md) adds two pre-release
+iteration lanes. Approved desktop-only files may be delivered as a read-only
+system extension tied to the exact immutable base build; other changes still
+produce a complete developer bootc image. Both lanes require a clean commit
+that has been pushed to the canonical repository and record its full revision.
+Neither lane may advance the public preview feed or product version. A promoted
+release continues to use the complete qualification and exact-digest
+publication process below.
+
 ## Record measurements
 
 After qualifying each deployed iteration, append a dated entry to the

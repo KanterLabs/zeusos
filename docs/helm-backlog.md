@@ -77,3 +77,17 @@ Sources: [implementation plan](implementation-plan.md), [testing plan](testing-p
 - ZOS-59: Implement scoped Temp cleanup and schedules.
 - ZOS-60: Expose Temp settings and Keep action.
 - ZOS-61: Qualify Temp deletion and populated upgrades.
+
+## Repository-backed Developer Mode — September 11, 2026
+
+[Architecture, implementation and testing plan](features/developer-mode.md).
+These are unclaimed Backlog cards; ZOS-92 tracks planning only.
+
+- [ZOS-93 — Qualify system extensions for Zeus Developer Mode](https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-93)
+- [ZOS-94 — Define Developer Mode components and provenance](https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-94)
+- [ZOS-95 — Build deterministic repo-backed developer artifacts](https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-95)
+- [ZOS-96 — Implement transactional Developer Mode apply and undo](https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-96)
+- [ZOS-97 — Add Developer Mode CLI and Settings controls](https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-97)
+- [ZOS-98 — Coordinate Developer Mode with Zeus Updates](https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-98)
+- [ZOS-99 — Add the full Developer Mode image lane](https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-99)
+- [ZOS-100 — Split fast checks from the Zeus release gate](https://tc.shanekanterman.dev/p/zeusos/tasks/ZOS-100)

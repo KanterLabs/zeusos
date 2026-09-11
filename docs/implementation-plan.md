@@ -6,6 +6,11 @@ Helm tracking: [implementation card index](helm-backlog.md#implementation).
 
 Implement the product work here alongside the harnesses and acceptance runs in [the testing checklist](testing-plan.md). `I` identifies implementation work, `Q` identifies testing work, and `R`/`T` retain the design's requirement and acceptance IDs. Each item has a deliverable, dependencies, file/module ownership, and measurable acceptance criteria suitable for a future Backlog card.
 
+The active [repository-backed Developer Mode plan](features/developer-mode.md)
+defines the newer DM00–DM07 implementation sequence for fast laptop iteration.
+It preserves this checklist's immutable-image, update, rollback and release
+boundaries rather than repurposing the existing `zeus dev` remote-SSH command.
+
 M0 proves the architecture while M1 produces the first usable preview: a very lightweight, fast, aesthetically pleasing macOS-like GNOME baseline. Remote work and replacement recovery arrive as later M1/M2 increments and must not delay that baseline. M3 extends the baseline with optional advanced polish and hardware/power qualification; M4 supplies maintained release operations. A functional preview is not a daily-use stable release. Signing and client trust enforcement begin in M1; M4 automates them.
 
 ## M0 — Prove the architecture

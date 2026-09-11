@@ -26,7 +26,7 @@ Deployment and measured results are recorded in the [preview VM runbook](docs/pr
 The [timestamped metrics history](docs/metrics.md) keeps measurements, testing
 conditions and regressions together across builds.
 
-We keep this version fixed while iterating. Each update has its own Git build ID; see the [iteration build policy](docs/iteration-builds.md).
+We keep this version fixed while iterating. Each update has its own Git build ID; see the [iteration build policy](docs/iteration-builds.md). The planned [repository-backed Developer Mode](docs/features/developer-mode.md) adds a fast, reversible desktop-extension lane while keeping every applied change tied to a pushed Git commit and the next immutable image.
 
 ## Install alongside Fedora
 
@@ -106,6 +106,7 @@ The review VM now has a qualified signed preview updater for owner-triggered Upd
 - [Preview strategy](docs/preview-strategy.md)
 - [Implementation checklist](docs/implementation-plan.md)
 - [Testing checklist](docs/testing-plan.md)
+- [Developer Mode plan](docs/features/developer-mode.md)
 - [Helm backlog](docs/helm-backlog.md)
 - [Original design](docs/design-v0.1.md)
 - [Planning overview](docs/backlog-overview.md)
