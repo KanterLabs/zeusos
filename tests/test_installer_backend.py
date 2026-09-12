@@ -1034,8 +1034,8 @@ class ArtifactPinTests(unittest.TestCase):
             signature,
             ROOT / "installer" / "zeus_installer" / "data" / "update-allowed-signers",
         )
-        self.assertEqual(manifest["build_id"], "git-ad091ecc2978")
-        self.assertEqual(artifacts.validate_release(manifest)["sequence"], 1789068697)
+        self.assertEqual(manifest["build_id"], "git-be53ae3e736f")
+        self.assertEqual(artifacts.validate_release(manifest)["sequence"], 1789222841)
 
     def test_installer_fetch_uses_immutable_feed_and_bounded_metadata(self) -> None:
         trusted = artifacts._trusted()
@@ -1073,12 +1073,12 @@ class ArtifactPinTests(unittest.TestCase):
         )
         self.assertLessEqual(len(raw), trusted.MAX_MANIFEST_BYTES)
         self.assertLessEqual(len(signature), trusted.MAX_SIGNATURE_BYTES)
-        self.assertEqual(manifest["build_id"], "git-ad091ecc2978")
+        self.assertEqual(manifest["build_id"], "git-be53ae3e736f")
         self.assertEqual(
             manifest["archive"]["manifest_digest"],
-            "sha256:9b7ea1104c3398007600a502d4d73d6588b87735b85cad810a952aa73c7048e0",
+            "sha256:9255261fbfb77e002fe72bf42f4bd3268f02b7357a23aa9483c712694636c481",
         )
-        self.assertEqual(manifest["sequence"], 1789068697)
+        self.assertEqual(manifest["sequence"], 1789222841)
 
     def test_archive_fifo_is_rejected_without_blocking(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
