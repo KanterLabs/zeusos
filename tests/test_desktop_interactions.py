@@ -12,6 +12,15 @@ EXTENSION = ROOT / (
 )
 DCONF = ROOT / "desktop/rootfs/etc/dconf/db/local.d/00-zeus"
 WELCOME = ROOT / "zeus/assets/welcome.py"
+GNOME_SETTINGS_ICON = ROOT / (
+    "desktop/rootfs/usr/share/icons/Zeus/scalable/apps/"
+    "org.gnome.Settings.svg"
+)
+ZEUS_SETTINGS_ICON = ROOT / (
+    "desktop/rootfs/usr/share/icons/hicolor/scalable/apps/"
+    "org.zeus.Settings.svg"
+)
+GTK4_THEME = ROOT / "desktop/rootfs/usr/share/themes/Zeus/gtk-4.0/gtk.css"
 
 
 class DesktopInteractions(unittest.TestCase):
@@ -83,6 +92,27 @@ class DesktopInteractions(unittest.TestCase):
         self.assertEqual(dock["autohide"], "false")
         self.assertEqual(dock["intellihide"], "false")
         self.assertEqual(dock["show-favorites"], "true")
+
+    def test_settings_destinations_have_distinct_identity(self):
+        self.assertIn(
+            "_addLauncher('Zeus Settings', 'org.zeus.Settings.desktop')",
+            self.extension,
+        )
+        self.assertIn(
+            "_addLauncher('GNOME Settings', 'org.gnome.Settings.desktop')",
+            self.extension,
+        )
+        self.assertTrue(ZEUS_SETTINGS_ICON.is_file())
+        self.assertFalse(
+            GNOME_SETTINGS_ICON.exists(),
+            "The Zeus icon theme must not replace the native GNOME Settings icon",
+        )
+
+    def test_sidebar_header_reserves_room_for_its_title(self):
+        css = GTK4_THEME.read_text(encoding="utf-8")
+        self.assertIn(".sidebar-pane windowcontrols button.minimize", css)
+        self.assertIn(".sidebar-pane windowcontrols button.maximize", css)
+        self.assertIn(".sidebar-pane windowcontrols button.restore", css)
 
 
 if __name__ == "__main__":

@@ -36,8 +36,9 @@
   font-family: "Adwaita Sans";
 }
 
-window,
-.background {
+window.zeus-window,
+window.zeus-window.background,
+window.zeus-window .background {
   background-color: var(--zeus-window-bg);
   color: var(--zeus-window-fg);
 }
@@ -48,9 +49,8 @@ decoration,
   box-shadow: 0 16px 42px 0 rgba(5, 10, 28, 0.26);
 }
 
-headerbar,
-headerbar.titlebar,
-.titlebar {
+window.zeus-window headerbar,
+window.zeus-window headerbar.titlebar {
   background-color: var(--zeus-header-bg);
   background-image: none;
   color: var(--zeus-header-fg);
@@ -60,8 +60,8 @@ headerbar.titlebar,
   padding: 0 8px;
 }
 
-headerbar:backdrop,
-.titlebar:backdrop {
+window.zeus-window headerbar:backdrop,
+window.zeus-window headerbar.titlebar:backdrop {
   background-color: color-mix(in srgb, var(--zeus-header-bg) 88%, transparent);
   color: color-mix(in srgb, var(--zeus-header-fg) 72%, transparent);
 }
@@ -72,7 +72,7 @@ headerbar:backdrop,
  * lights remain discoverable without replacing the titlebar buttons.
  */
 
-button {
+window.zeus-window button {
   color: var(--zeus-window-fg);
   background-color: var(--zeus-control-bg);
   background-image: none;
@@ -82,37 +82,37 @@ button {
   padding: 7px 12px;
 }
 
-button:hover {
+window.zeus-window button:hover {
   background-color: var(--zeus-control-hover);
   border-color: color-mix(in srgb, var(--zeus-accent) 36%, transparent);
 }
 
-button:active,
-button:checked {
+window.zeus-window button:active,
+window.zeus-window button:checked {
   background-color: color-mix(in srgb, var(--zeus-accent) 18%, transparent);
   border-color: color-mix(in srgb, var(--zeus-accent) 48%, transparent);
 }
 
-button.suggested-action,
-button.suggested-action:hover,
-button.suggested-action:active {
+window.zeus-window button.suggested-action,
+window.zeus-window button.suggested-action:hover,
+window.zeus-window button.suggested-action:active {
   color: var(--zeus-accent-fg);
   background-color: var(--zeus-accent);
   border-color: var(--zeus-accent);
 }
 
-button.destructive-action,
-button.destructive-action:hover {
+window.zeus-window button.destructive-action,
+window.zeus-window button.destructive-action:hover {
   color: #FFFFFF;
   background-color: #D54C5A;
   border-color: #C6404E;
 }
 
-entry,
-spinbutton,
-dropdown,
-searchentry,
-.searchentry {
+window.zeus-window entry,
+window.zeus-window spinbutton,
+window.zeus-window dropdown,
+window.zeus-window searchentry,
+window.zeus-window .searchentry {
   color: var(--zeus-view-fg);
   background-color: var(--zeus-view-bg);
   border: 1px solid var(--zeus-border);
@@ -122,67 +122,49 @@ searchentry,
   box-shadow: inset 0 1px 2px 0 rgba(8, 19, 47, 0.05);
 }
 
-entry:focus,
-spinbutton:focus,
-dropdown:focus,
-searchentry:focus,
-.searchentry:focus {
+window.zeus-window entry:focus,
+window.zeus-window spinbutton:focus,
+window.zeus-window dropdown:focus,
+window.zeus-window searchentry:focus,
+window.zeus-window .searchentry:focus {
   border-color: color-mix(in srgb, var(--zeus-accent) 68%, transparent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--zeus-accent) 16%, transparent);
 }
 
-viewport,
-scrolledwindow,
-textview,
-textview.view {
+window.zeus-window viewport,
+window.zeus-window scrolledwindow,
+window.zeus-window textview,
+window.zeus-window textview.view {
   background-color: var(--zeus-view-bg);
   color: var(--zeus-view-fg);
 }
 
-frame,
-list,
-row,
-.card,
-.boxed-list {
+window.zeus-window frame,
+window.zeus-window list,
+window.zeus-window row,
+window.zeus-window .card,
+window.zeus-window .boxed-list {
   border-color: var(--zeus-border);
 }
 
-.card,
-.boxed-list {
+window.zeus-window .card,
+window.zeus-window .boxed-list {
   background-color: var(--zeus-card-bg);
   border-radius: 14px;
 }
 
-popover,
-popover.background,
-menu {
-  background-color: var(--zeus-popover-bg);
-  color: var(--zeus-view-fg);
-  border: 1px solid var(--zeus-border);
-  border-radius: 14px;
-  box-shadow: 0 12px 32px 0 rgba(5, 10, 28, 0.22);
-  padding: 5px;
-}
+/* Popovers and menus intentionally retain their application/native toolkit
+ * styling. Applying padding and backgrounds to both the outer popover and its
+ * inner background node creates nested frames in GTK 4 applications. */
 
-popover modelbutton,
-menuitem {
-  border-radius: 9px;
-  padding: 7px 10px;
-}
-
-popover modelbutton:hover,
-menuitem:hover {
-  background-color: var(--zeus-control-hover);
-}
-
-scale trough,
-progressbar trough {
+window.zeus-window scale trough,
+window.zeus-window progressbar trough {
   background-color: color-mix(in srgb, var(--zeus-window-fg) 12%, transparent);
   border-radius: 999px;
 }
 
-scale highlight,
-progressbar progress {
+window.zeus-window scale highlight,
+window.zeus-window progressbar progress {
   background-color: var(--zeus-accent);
   border-radius: 999px;
 }
@@ -228,3 +210,12 @@ windowcontrols button.close:focus-visible,
 windowcontrols button.minimize:focus-visible,
 windowcontrols button.maximize:focus-visible,
 windowcontrols button.restore:focus-visible { outline: 2px solid #5475c8; outline-offset: -1px; }
+
+/* A split-view sidebar has only enough header width for one window action.
+ * Keep Close visible and return the minimize/maximize space to its title. */
+.sidebar-pane windowcontrols button.minimize,
+.sidebar-pane windowcontrols button.maximize,
+.sidebar-pane windowcontrols button.restore {
+  min-width: 0;
+  background-image: none;
+}
