@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Root-side append-only receiver. Archive bytes arrive on standard input.
+set -euo pipefail
+
+[[ ${EUID:-$(id -u)} -eq 0 && $# -eq 4 ]] || {
+  echo 'Usage: zeus-publish-artifact VERSION NAME SIZE SHA256' >&2
+  exit 2
+}
+
+version=$1
+name=$2
+expected_size=$3
+expected_digest=$4
+[[ "$version" =~ ^[0-9A-Za-z][0-9A-Za-z.-]*$ ]] || exit 2
+[[ "$name" =~ ^zeusos-${version}-git-[0-9a-f]{12}\.oci$ ]] || exit 2
+[[ "$expected_size" =~ ^[1-9][0-9]*$ && "$expected_size" -le 8589934592 ]] || exit 2
+[[ "$expected_digest" =~ ^[0-9a-f]{64}$ ]] || exit 2
+
+root=/srv/zeusos
+directory="$root/zeusos/preview/v$version"
+final="$directory/$name"
+partial="$directory/.$name.$expected_digest.part"
+
+mountpoint -q "$root" || {
+  echo 'Artifact filesystem is not mounted.' >&2
+  exit 1
+}
+exec 9>/run/lock/zeus-publish-artifact.lock
+flock 9
+install -d -o root -g root -m 0755 "$directory"
+test ! -e "$final"
+test ! -e "$partial"
+
+cleanup() {
+  status=$?
+  if [[ $status -ne 0 ]]; then
+    rm -f -- "$partial"
+  fi
+  exit "$status"
+}
+trap cleanup EXIT
+umask 022
+set -o noclobber
+cat > "$partial"
+set +o noclobber
+
+[[ $(stat -c %s -- "$partial") == "$expected_size" ]]
+[[ $(sha256sum -- "$partial" | awk '{print $1}') == "$expected_digest" ]]
+chmod 0644 "$partial"
+sync -f "$partial"
+mv --no-clobber -- "$partial" "$final"
+test ! -e "$partial"
+[[ $(stat -c %s -- "$final") == "$expected_size" ]]
+[[ $(sha256sum -- "$final" | awk '{print $1}') == "$expected_digest" ]]
+sync -f "$directory"
+trap - EXIT

@@ -27,6 +27,9 @@ VERSION = "0.1.0-preview.2"
 BUILD_ID = "git-0123456789ab"
 ARCHIVE_NAME = f"zeusos-{VERSION}-{BUILD_ID}.oci"
 ARCHIVE_URL = f"https://github.com/KanterLabs/zeusos/releases/download/v{VERSION}/{ARCHIVE_NAME}"
+HOMELAB_ARCHIVE_URL = (
+    f"https://updates.shanekanterman.dev/zeusos/preview/v{VERSION}/{ARCHIVE_NAME}"
+)
 
 
 def make_manifest(**changes):
@@ -258,6 +261,22 @@ class ValidationTests(unittest.TestCase):
                 with self.assertRaises(updater.UpdateError):
                     updater.validate_manifest({**make_manifest(), field: value})
 
+    def test_only_exact_github_and_homelab_archive_urls_are_accepted(self):
+        self.assertEqual(
+            updater.validate_manifest(make_manifest(archive_url=HOMELAB_ARCHIVE_URL))["archive"]["url"],
+            HOMELAB_ARCHIVE_URL,
+        )
+        for url in (
+            HOMELAB_ARCHIVE_URL + "?token=secret",
+            HOMELAB_ARCHIVE_URL.replace("https://", "http://"),
+            HOMELAB_ARCHIVE_URL.replace("/zeusos/preview/", "/other/"),
+            HOMELAB_ARCHIVE_URL.replace("updates.", "other-host."),
+            HOMELAB_ARCHIVE_URL.replace(".dev/", ".dev:9448/"),
+        ):
+            with self.subTest(url=url):
+                with self.assertRaises(updater.UpdateError):
+                    updater.validate_manifest(make_manifest(archive_url=url))
+
     def test_bounds_are_rejected(self):
         with self.assertRaises(updater.UpdateError):
             updater.validate_manifest(make_manifest(notes="x" * (updater.MAX_NOTES_BYTES + 1)))
@@ -304,6 +323,32 @@ class NetworkPolicyTests(unittest.TestCase):
             )
         with self.assertRaises(updater._UnsafeRedirect):
             handler.redirect_request(request, None, 302, "Found", {}, target)
+
+    def test_homelab_downloads_cannot_redirect_off_the_fixed_public_host(self):
+        hosts = updater._archive_download_hosts(HOMELAB_ARCHIVE_URL)
+        self.assertEqual(hosts, frozenset({"updates.shanekanterman.dev"}))
+        request = urlrequest.Request(HOMELAB_ARCHIVE_URL)
+        handler = updater._SafeRedirectHandler(hosts)
+        self.assertIsInstance(
+            handler.redirect_request(
+                request,
+                None,
+                302,
+                "Found",
+                {},
+                HOMELAB_ARCHIVE_URL,
+            ),
+            urlrequest.Request,
+        )
+        with self.assertRaises(updater._UnsafeRedirect):
+            handler.redirect_request(
+                request,
+                None,
+                302,
+                "Found",
+                {},
+                ARCHIVE_URL,
+            )
 
     def test_bounded_metadata_rejects_oversize_and_truncated_content(self):
         oversized = _Response(b"x" * 8, content_length=True)
@@ -444,9 +489,8 @@ class PublisherTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def command(self, output, sequence=42):
-        return subprocess.run(
-            [
+    def command(self, output, sequence=42, artifact_origin=None):
+        command = [
                 sys.executable,
                 str(ROOT / "scripts" / "make-update-manifest.py"),
                 "--archive",
@@ -461,7 +505,11 @@ class PublisherTests(unittest.TestCase):
                 str(output),
                 "--signing-key",
                 str(self.signing_key),
-            ],
+            ]
+        if artifact_origin is not None:
+            command.extend(["--artifact-origin", artifact_origin])
+        return subprocess.run(
+            command,
             cwd=ROOT,
             capture_output=True,
             text=True,
@@ -484,6 +532,18 @@ class PublisherTests(unittest.TestCase):
         result = self.command(output)
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(output.read_bytes(), original)
+
+    def test_publisher_can_select_only_the_fixed_homelab_origin(self):
+        output = self.directory / "preview.json"
+        result = self.command(output, artifact_origin="homelab")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(output.read_text())["archive"]["url"], HOMELAB_ARCHIVE_URL)
+
+        rejected = self.command(
+            self.directory / "rejected.json",
+            artifact_origin="https://evil.example",
+        )
+        self.assertNotEqual(rejected.returncode, 0)
 
     def test_publisher_requires_sequence_label_and_build_info_match(self):
         self.build_info.write_text(

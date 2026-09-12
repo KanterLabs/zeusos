@@ -1,0 +1,13 @@
+[Unit]
+Description=Zeus OS immutable update artifact storage
+Documentation=https://github.com/KanterLabs/zeusos
+Before=zeusos-update-origin.service
+
+[Mount]
+What=/dev/disk/by-label/zeus-updates
+Where=/srv/zeusos
+Type=ext4
+Options=rw,nosuid,nodev,noexec,noatime
+
+[Install]
+WantedBy=multi-user.target

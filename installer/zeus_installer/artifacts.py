@@ -29,7 +29,7 @@ MAX_ARCHIVE_SIZE = 8 * 1024**3
 # Keep the installer verifier and public signer pinned to the exact copies
 # shipped by the desktop updater.  The hashes are public integrity metadata;
 # no private signing material is included here.
-_PINNED_UPDATE_MANIFEST_SHA256 = "b40ddd8b9fbdb8478440a7bedeb422dc909d65482c71c99140aae3a26aa89a8d"
+_PINNED_UPDATE_MANIFEST_SHA256 = "b602decdb0cb41919ec92a4b011c78a73076e50b7e733300f7b3a3e19488778c"
 _PINNED_SIGNERS_SHA256 = "5df19482073c9a1c2f1c77da2a3c50ae2d9b97c20a46d523a5ca6dc09a5a1b51"
 _PINNED_FEED_URL = (
     "https://raw.githubusercontent.com/KanterLabs/zeusos/"

@@ -30,6 +30,11 @@ DEFAULT_FEED_URL = (
     "https://raw.githubusercontent.com/KanterLabs/zeusos/main/updates/preview.json"
 )
 DEFAULT_SIGNERS = "/usr/share/zeus/update-allowed-signers"
+GITHUB_ARCHIVE_ORIGIN = "github"
+HOMELAB_ARCHIVE_ORIGIN = "homelab"
+HOMELAB_ARCHIVE_BASE_URL = (
+    "https://updates.shanekanterman.dev/zeusos/preview"
+)
 
 SSH_KEYGEN = "/usr/bin/ssh-keygen"
 
@@ -88,6 +93,7 @@ _RELEASE_HOSTS = frozenset(
         "github-releases.githubusercontent.com",
     }
 )
+_HOMELAB_ARCHIVE_HOSTS = frozenset({"updates.shanekanterman.dev"})
 _FEED_HOSTS = frozenset({"raw.githubusercontent.com"})
 
 _OCI_INDEX_MEDIA_TYPE = "application/vnd.oci.image.index.v1+json"
@@ -187,15 +193,29 @@ def _validate_published_at(value: Any) -> str:
     return value
 
 
+def archive_url(version: str, name: str, origin: str = GITHUB_ARCHIVE_ORIGIN) -> str:
+    """Return one of the two fixed archive publication URLs.
+
+    The publisher selects a symbolic origin instead of accepting a caller
+    supplied URL.  That keeps the signed URL useful as a network-policy
+    boundary while permitting a public tunnel backed by the homelab store.
+    """
+
+    if origin == GITHUB_ARCHIVE_ORIGIN:
+        return f"https://github.com/KanterLabs/zeusos/releases/download/v{version}/{name}"
+    if origin == HOMELAB_ARCHIVE_ORIGIN:
+        return f"{HOMELAB_ARCHIVE_BASE_URL}/v{version}/{name}"
+    _error("manifest_invalid", "archive origin is not supported")
+
+
 def _validate_https_url(url: Any, *, version: str, name: str) -> str:
     url = _bounded_text(url, field="archive.url", limit=512)
-    expected = (
-        f"https://github.com/KanterLabs/zeusos/releases/download/v{version}/{name}"
-    )
-    # The signed URL is intentionally canonical.  This also rejects encoded
-    # separators, query strings, fragments, alternate ports, and userinfo.
-    if url != expected:
-        _error("manifest_invalid", "archive URL is not the canonical GitHub release URL")
+    github_url = archive_url(version, name, GITHUB_ARCHIVE_ORIGIN)
+    homelab_url = archive_url(version, name, HOMELAB_ARCHIVE_ORIGIN)
+    # Both signed URLs are exact.  This rejects encoded separators, query
+    # strings, fragments, alternate ports, userinfo, and arbitrary mirrors.
+    if url not in {github_url, homelab_url}:
+        _error("manifest_invalid", "archive URL is not a canonical Zeus OS artifact URL")
     try:
         parsed = _urlparse.urlsplit(url)
         port = parsed.port
@@ -203,16 +223,37 @@ def _validate_https_url(url: Any, *, version: str, name: str) -> str:
         _error("manifest_invalid", "archive URL is invalid")
     if (
         parsed.scheme != "https"
-        or parsed.hostname != "github.com"
+        or parsed.hostname not in {"github.com", "updates.shanekanterman.dev"}
         or port not in (None, 443)
         or parsed.username is not None
         or parsed.password is not None
         or parsed.query
         or parsed.fragment
-        or parsed.path != f"/KanterLabs/zeusos/releases/download/v{version}/{name}"
+        or (
+            url == github_url
+            and parsed.path != f"/KanterLabs/zeusos/releases/download/v{version}/{name}"
+        )
+        or (
+            url == homelab_url
+            and parsed.path != f"/zeusos/preview/v{version}/{name}"
+        )
     ):
         _error("manifest_invalid", "archive URL is not safe")
     return url
+
+
+def _archive_download_hosts(url: str) -> frozenset[str]:
+    """Select a redirect allowlist from the already validated archive URL."""
+
+    try:
+        hostname = _urlparse.urlsplit(url).hostname
+    except (TypeError, ValueError):
+        _error("network_url_rejected", "update URL is not allowed")
+    if hostname == "github.com":
+        return _RELEASE_HOSTS
+    if hostname == "updates.shanekanterman.dev":
+        return _HOMELAB_ARCHIVE_HOSTS
+    _error("network_url_rejected", "update URL is not allowed")
 
 
 def _validate_manifest_shape(data: Mapping[str, Any]) -> dict[str, Any]:
@@ -921,7 +962,7 @@ def download_archive(
         with closing(
             _open_network(
                 archive["url"],
-                hosts=_RELEASE_HOSTS,
+                hosts=_archive_download_hosts(archive["url"]),
                 accept="application/octet-stream",
             )
         ) as response:
@@ -982,8 +1023,12 @@ def download_archive(
 __all__ = [
     "DEFAULT_FEED_URL",
     "DEFAULT_SIGNERS",
+    "GITHUB_ARCHIVE_ORIGIN",
+    "HOMELAB_ARCHIVE_BASE_URL",
+    "HOMELAB_ARCHIVE_ORIGIN",
     "MAX_ARCHIVE_SIZE",
     "UpdateError",
+    "archive_url",
     "download_archive",
     "fetch_manifest",
     "inspect_archive",

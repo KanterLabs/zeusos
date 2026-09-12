@@ -1,0 +1,36 @@
+[Unit]
+Description=Loopback-only Zeus OS update artifact origin
+Documentation=https://github.com/KanterLabs/zeusos
+Requires=srv-zeusos.mount
+After=network.target srv-zeusos.mount
+ConditionPathIsMountPoint=/srv/zeusos
+
+[Service]
+Type=notify
+User=caddy
+Group=caddy
+ExecStartPre=/usr/bin/caddy validate --config /etc/zeusos-updates/Caddyfile --adapter caddyfile
+ExecStart=/usr/bin/caddy run --environ --config /etc/zeusos-updates/Caddyfile --adapter caddyfile
+ExecReload=/usr/bin/caddy reload --config /etc/zeusos-updates/Caddyfile --adapter caddyfile --force
+TimeoutStopSec=5s
+LimitNOFILE=1048576
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectHome=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+ReadOnlyPaths=/etc/caddy/tls /etc/zeusos-updates /srv/zeusos
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,20 @@
+tunnel: b0ba744b-0ca9-4098-8172-136f72f76799
+credentials-file: /etc/homelab-edge/credentials/cloudflared.json
+no-autoupdate: true
+protocol: quic
+metrics: 127.0.0.1:20000
+ingress:
+  - hostname: canary-homelab.shanekanterman.dev
+    service: https://127.0.0.1:19100
+    originRequest:
+      originServerName: canary-homelab.shanekanterman.dev
+      httpHostHeader: canary-homelab.shanekanterman.dev
+      caPool: /etc/caddy/tls/canary-ca.pem
+  - hostname: updates.shanekanterman.dev
+    path: ^/zeusos/preview/v[0-9A-Za-z][0-9A-Za-z.-]*/zeusos-[0-9A-Za-z][0-9A-Za-z.-]*-git-[0-9a-f]{12}\.oci$
+    service: https://127.0.0.1:19101
+    originRequest:
+      originServerName: canary-homelab.shanekanterman.dev
+      httpHostHeader: updates.shanekanterman.dev
+      caPool: /etc/caddy/tls/canary-ca.pem
+  - service: http_status:404

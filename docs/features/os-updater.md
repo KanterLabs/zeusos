@@ -64,6 +64,15 @@ before invoking `bootc switch --transport oci-archive --retain` without `--apply
 It preserves a different existing staged deployment and keeps owner files and
 preferences out of updater storage. Root job locking serializes install requests.
 
+Archive URLs are a signed and compiled-in network boundary, not a general mirror
+setting. A manifest may name either the exact KanterLabs GitHub release path or
+`https://updates.shanekanterman.dev/zeusos/preview/vVERSION/ARCHIVE`. The public
+homelab endpoint is delivered by an outbound-only Cloudflare Tunnel, rejects
+unrelated paths, disables Cloudflare caching, and serves immutable files. The
+client rejects alternate hosts, ports, schemes, paths, query strings, fragments,
+userinfo, and cross-host redirects. It permits archives up to 8 GiB and always
+enforces the signed content length and SHA-256 while streaming.
+
 Sequence is the payload Git commit timestamp, recorded in the image as
 `/usr/share/zeus/update-sequence`. Build identity disambiguates the same sequence;
 a different build with an equal/older sequence is not a forward update. Trusted

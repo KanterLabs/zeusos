@@ -27,10 +27,13 @@ if str(_MODULE_DIR) not in sys.path:
     sys.path.insert(0, str(_MODULE_DIR))
 
 from update_manifest import (  # noqa: E402
+    GITHUB_ARCHIVE_ORIGIN,
+    HOMELAB_ARCHIVE_ORIGIN,
     MAX_ARCHIVE_SIZE,
     MAX_NOTES_BYTES,
     SSH_KEYGEN,
     UpdateError,
+    archive_url,
     inspect_archive,
     validate_manifest,
 )
@@ -44,6 +47,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--notes-file", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--signing-key", required=True, type=Path)
+    parser.add_argument(
+        "--artifact-origin",
+        choices=(GITHUB_ARCHIVE_ORIGIN, HOMELAB_ARCHIVE_ORIGIN),
+        default=GITHUB_ARCHIVE_ORIGIN,
+        help="fixed archive host to encode in the signed manifest",
+    )
     return parser
 
 
@@ -263,6 +272,7 @@ def create_manifest(
     build_info: Path,
     sequence: int,
     notes_file: Path,
+    artifact_origin: str = GITHUB_ARCHIVE_ORIGIN,
 ) -> dict[str, Any]:
     """Inspect inputs and construct a validated schema-1 manifest."""
 
@@ -302,7 +312,7 @@ def create_manifest(
         "notes": _read_notes(notes_file),
         "archive": {
             "name": name,
-            "url": f"https://github.com/KanterLabs/zeusos/releases/download/v{version}/{name}",
+            "url": archive_url(version, name, artifact_origin),
             "size": size,
             "sha256": archive_sha256,
             "manifest_digest": image["manifest_digest"],
@@ -318,6 +328,7 @@ def run(args: argparse.Namespace) -> int:
         build_info=args.build_info,
         sequence=args.sequence,
         notes_file=args.notes_file,
+        artifact_origin=args.artifact_origin,
     )
     data = _json_bytes(manifest)
     with tempfile.TemporaryDirectory(prefix="zeus-update-publish-", dir=output.parent) as directory:

@@ -1,0 +1,30 @@
+{
+	admin off
+	auto_https off
+}
+
+# Cloudflared is the only network peer: this origin never binds a LAN or WAN
+# address. The certificate authenticates this loopback TLS hop to cloudflared.
+https://:19101 {
+	bind 127.0.0.1
+	tls /etc/caddy/tls/canary.crt /etc/caddy/tls/canary.key
+
+	@artifact {
+		host updates.shanekanterman.dev
+		method GET HEAD
+		path_regexp archive ^/zeusos/preview/v[0-9A-Za-z][0-9A-Za-z.-]*/zeusos-[0-9A-Za-z][0-9A-Za-z.-]*-git-[0-9a-f]{12}\.oci$
+	}
+	handle @artifact {
+		root * /srv/zeusos
+		header {
+			Cache-Control "no-store, no-transform"
+			Content-Type application/octet-stream
+			Strict-Transport-Security "max-age=31536000; includeSubDomains"
+			X-Content-Type-Options nosniff
+			Referrer-Policy no-referrer
+			-Server
+		}
+		file_server
+	}
+	respond 404
+}

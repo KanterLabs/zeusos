@@ -23,10 +23,12 @@ it before deployment. Store each archive in its own root-owned update directory
 on the guest; bootc continues to identify the exact image by digest even when
 several builds share the same version.
 
-Publish new archives as uniquely named assets of the existing
-`v0.1.0-preview.2` prerelease. Do not overwrite a historical archive, its checksum,
-or its signature. Keep the initial release notes as historical evidence and add
-a latest-build reference and dated iteration notes. A Git commit/build is not a
+Publish new archives once under their unique build identity. The normal origin
+is the public Cloudflare Tunnel endpoint backed by the homelab's dedicated,
+append-only artifact disk; GitHub release assets remain the bootstrap and
+rollback origin. Do not overwrite a historical archive, its checksum, or its
+signature. Keep the initial release notes as historical evidence and add a
+latest-build reference and dated iteration notes. A Git commit/build is not a
 new product release or version bump.
 
 The planned [Developer Mode](features/developer-mode.md) adds two pre-release
@@ -61,11 +63,14 @@ Installed clients read the canonical metadata URL
 `https://raw.githubusercontent.com/KanterLabs/zeusos/main/updates/preview.json`
 and its `.sig` companion; this is public publication access, not access to the
 private review environment.
-The feed points to an immutable, uniquely named OCI release asset such as
+The feed points to an immutable, uniquely named OCI archive such as
 `zeusos-0.1.0-preview.2-git-<12-character-commit>.oci`; publish each asset once
 and never replace an existing archive, manifest, or signature. The public feed
-and release assets carry only signed build metadata and image bytes. They do not
-make the Proxmox host, review VM, SSH service, or guest publicly reachable.
+and archive carry only signed build metadata and image bytes. The homelab origin
+is exposed only through an outbound Cloudflare Tunnel and a loopback Caddy
+listener; it does not make the Proxmox host, review VM, SSH service, or guest
+publicly reachable. Cloudflare caching is explicitly disabled because standard
+plans cannot cache an archive this large; the response streams from the origin.
 
 Build and export the immutable candidate on the dedicated builder first. Create
 a per-build manifest from a separate publication/signing environment with the
@@ -81,12 +86,15 @@ python3 scripts/make-update-manifest.py \
   --sequence "$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["update_sequence"])' "$candidate_dir/build-info.json")" \
   --notes-file "$candidate_dir/update-notes.md" \
   --output "$candidate_dir/update-git-<12-character-commit>.json" \
+  --artifact-origin homelab \
   --signing-key /secure/release/zeusos-preview
 ```
 
 The generator's required flags are `--archive`, `--build-info`, `--sequence`,
-`--notes-file`, `--output`, and `--signing-key`. `--sequence` is the payload
-Git commit timestamp in seconds; it is embedded in the image as
+`--notes-file`, `--output`, and `--signing-key`. `--artifact-origin` selects one
+of the two compiled-in origins: `homelab` for normal public delivery or `github`
+for bootstrap/rollback. It never accepts an arbitrary URL. `--sequence` is the
+payload Git commit timestamp in seconds; it is embedded in the image as
 `/usr/share/zeus/update-sequence` and lets the client order builds that retain
 the product version. The generator refuses to overwrite an existing output and
 writes `update-git-<12-character-commit>.json.sig` beside the per-build
@@ -94,12 +102,21 @@ manifest. Keep the private signing key outside the builder and outside the
 image; the installed public verification material is rooted at
 `/usr/share/zeus/update-allowed-signers`.
 
-Verify the source commit, image identity, per-build signature, archive checksum,
-and release-asset upload before publishing the latest pointer. After those
+Publish the archive with `scripts/publish-homelab-artifact.sh`; it validates the
+name, size, SHA-256, append-only destination, public content length, and cache
+bypass. Verify the source commit, image identity, per-build signature, archive
+checksum, and full public download before publishing the latest pointer. After those
 gates pass, copy the exact signed pair from the per-build directory to
 `updates/preview.json` and `updates/preview.json.sig` in one repository commit.
 Replacing that latest pointer across iterations is deliberate; the immutable
-per-build manifest and release asset remain retained under their build ID.
+per-build manifest and archive remain retained under their build ID. See the
+[homelab origin runbook](../deploy/homelab-updates/README.md) for deployment,
+validation, and rollback.
+
+Clients built before the fixed homelab hostname policy accept only GitHub release
+assets. Publish one final compatible GitHub bootstrap build before switching the
+signed feed to `--artifact-origin homelab`; retain that bootstrap asset so an old
+installation can always cross the compatibility boundary.
 
 For example, verify the exported archive and the per-build feed pair before the
 copy:

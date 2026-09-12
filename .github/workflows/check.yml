@@ -42,9 +42,13 @@ jobs:
       - name: Check build script syntax
         run: bash -n scripts/build.sh scripts/build-disk.sh scripts/export-iteration.sh
       - name: Verify signed updater trust and transactions
-        run: python3 -m unittest discover -s tests -p 'test_updat*.py' -v
+        run: |
+          python3 -m unittest discover -s tests -p 'test_updat*.py' -v
+          python3 -m unittest discover -s tests -p test_homelab_artifacts.py -v
       - name: Check updater syntax
-        run: python3 -m py_compile desktop/rootfs/usr/lib/zeus/update_manifest.py desktop/rootfs/usr/lib/zeus/zeus_update.py desktop/rootfs/usr/libexec/zeus-update-window scripts/make-update-manifest.py
+        run: |
+          python3 -m py_compile desktop/rootfs/usr/lib/zeus/update_manifest.py desktop/rootfs/usr/lib/zeus/zeus_update.py desktop/rootfs/usr/libexec/zeus-update-window scripts/make-update-manifest.py deploy/homelab-updates/configure-cloudflare-dns.py
+          bash -n scripts/publish-homelab-artifact.sh deploy/homelab-updates/zeus-publish-artifact
       - name: Check welcome application syntax
         run: python3 -m py_compile zeus/assets/welcome.py scripts/build-greeter-theme.py scripts/measure-*.py scripts/validate-*.py
       - name: Verify native laptop Settings
