@@ -57,10 +57,11 @@ class ImageContract(unittest.TestCase):
             for label in re.findall(r'runs-on:\s*(\S+)', path.read_text()):
                 self.assertIn(label, ('homelab', 'homelab-heavy'))
 
-    def test_iteration_export_recompresses_oci_with_publication_margin(self):
+    def test_iteration_export_uses_released_updater_compatible_compression(self):
         script = (ROOT / 'scripts/export-iteration.sh').read_text()
-        self.assertIn('podman push --format oci --compression-format zstd', script)
-        self.assertIn('--compression-level 19', script)
+        self.assertIn('podman push --format oci --compression-format gzip', script)
+        self.assertIn('--compression-level 9', script)
+        self.assertIn('every released Zeus updater', script)
         self.assertIn('--force-compression', script)
         self.assertIn('.${archive}.part', script)
         self.assertIn('mv -- "$partial" "$artifact_dir/$archive"', script)

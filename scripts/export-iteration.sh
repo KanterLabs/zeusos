@@ -14,11 +14,12 @@ partial="$artifact_dir/.${archive}.part"
 [[ ! -e "$partial" ]] || { echo 'A partial build archive already exists; inspect or remove it before retrying.' >&2; exit 1; }
 cleanup_partial() { rm -f -- "$partial"; }
 trap cleanup_partial EXIT
-# Recompress every layer as standard OCI zstd.  The Wi-Fi-capable image is
-# close to GitHub's per-asset limit when its inherited gzip layers are saved
-# verbatim; zstd preserves the exact filesystem and image labels while leaving
-# enough publication margin for future fixes.
-podman push --format oci --compression-format zstd --compression-level 19 \
+# Recompress every layer as standard OCI gzip.  The public homelab origin is
+# not constrained by GitHub's old 2 GiB asset ceiling, and gzip remains
+# consumable by every released Zeus updater, including the Cloudflare bridge.
+# Newer clients also accept zstd, but a promoted image must stay readable by
+# the oldest supported forward-update verifier.
+podman push --format oci --compression-format gzip --compression-level 9 \
   --force-compression "localhost/zeusos:$version-$build_id" \
   "oci-archive:$(pwd)/$partial"
 mv -- "$partial" "$artifact_dir/$archive"
