@@ -27,6 +27,52 @@ from zeus_installer import (  # noqa: E402
 )
 from zeus_installer import __main__ as cli  # noqa: E402
 from zeus_installer import gui  # noqa: E402
+from zeus_installer import launcher, removal  # noqa: E402
+
+
+class RemovalLauncherTests(unittest.TestCase):
+    def _fixture(self):
+        from tests.test_installer_removal import fixture
+
+        return fixture()
+
+    def test_safe_review_exposes_data_choice_fedora_retention_and_no_reclaim(self):
+        record, inventory = self._fixture()
+        controller = launcher.RemovalController()
+        plan = controller.review(record, inventory, require_root=False)
+        summary = controller.summary()
+        self.assertEqual(summary["mode"], removal.MENU_ONLY)
+        self.assertEqual(summary["data_policy"], removal.DATA_RETAIN)
+        self.assertEqual(summary["data_action"], "preserve")
+        self.assertEqual(summary["fedora_preserved"]["default_boot"], "fedora")
+        self.assertTrue(summary["fedora_preserved"]["esp"])
+        self.assertFalse(summary["automatic_space_reclaim"])
+        self.assertFalse(summary["confirmation_required"])
+        self.assertEqual(plan["data"]["owner"], "journal")
+
+    def test_destructive_review_requires_exact_confirmation_phrase(self):
+        record, inventory = self._fixture()
+        record["executor_state"]["vm_tested"] = True
+        record["executor_state"]["backup"] = {
+            "verified": True,
+            "root_trusted": True,
+            "backup_target": "/var/lib/zeus/recovery",
+        }
+        controller = launcher.RemovalController(executor=types.SimpleNamespace(qualified=True))
+        controller.review(
+            record,
+            inventory,
+            mode=removal.DESTRUCTIVE,
+            data_policy=removal.DATA_DELETE,
+            confirm_plan_id=record["operation_id"],
+            require_root=False,
+        )
+        summary = controller.summary()
+        self.assertTrue(summary["confirmation_required"])
+        self.assertEqual(summary["confirmation_phrase"], record["operation_id"])
+        with self.assertRaises(removal.RemovalError) as context:
+            controller.apply(record, inventory, confirm_plan_id="wrong", require_root=False)
+        self.assertEqual(context.exception.code, "confirmation_required")
 
 
 class LauncherPlanTests(unittest.TestCase):

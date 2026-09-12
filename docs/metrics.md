@@ -852,3 +852,31 @@ or battery-hours from VM counters.
 
 Evidence: [recovery qualification](iterations/wifi-recovery-20260910/README.md)
 and [receipt](iterations/wifi-recovery-20260910/qualification.json).
+
+### 2026-09-11 — Developer Mode system-extension mechanism
+
+- Recorded at (UTC): `2026-09-11T02:10:20Z`
+- Measurement date: `2026-09-11`
+- Version: `0.1.0-preview.2`; base build: `git-f080c2d9bc53`
+- Environment: disposable VM119, 4 vCPUs, 8 GiB RAM, Fedora 44,
+  systemd 259.8, SELinux enforcing
+- Compatible directory-extension apply: **11.833 ms**; unmerge: **7.584 ms**.
+  The base file's exact SHA-256 was restored.
+- Compatible SquashFS-extension apply: **102.740 ms**. A deliberately corrupt
+  image failed with exit code 1 and left the exact base file active.
+- Boot activation service cost: **45 ms**, **21.744 ms CPU**, no resident
+  process and no reported `MemoryCurrent` after the oneshot exited.
+- One disabled total OS-startup observation was **7.122 s** and one active
+  observation was **7.598 s**. These unmatched single samples do not establish
+  a boot-time regression or improvement.
+- Incompatible `VERSION_ID` was rejected in the current-base exercise; exact
+  `SYSEXT_LEVEL` rejection remains part of the reusable new-image fixture.
+- Relevant SELinux AVC records: **0** in runtime, boot, and SquashFS exercises.
+  `zeus-desktop-safe --dry-run` remained accessible and reported credentials
+  and personal data untouched.
+- Physical battery use and laptop boot speed were **not measured** in this VM.
+
+Evidence: [qualification record](features/developer-mode-qualification.md),
+[runtime JSON](iterations/developer-mode-20260911/sysext-runtime.json),
+[post-reboot JSON](iterations/developer-mode-20260911/sysext-post-reboot.json),
+and [SquashFS JSON](iterations/developer-mode-20260911/sysext-squashfs.json).

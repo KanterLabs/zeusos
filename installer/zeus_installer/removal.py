@@ -8,10 +8,13 @@ script.  A fresh Fedora inventory is then required before a plan is returned.
 
 The default operation only removes the installer-owned GRUB script and asks
 Fedora to regenerate its menu.  It does not touch Zeus files, filesystems, or
-partitions.  Partition deletion is an explicitly confirmed operation and is
-kept behind a VM-qualification marker.  This module emits fixed operation
-descriptors and offers narrow executor hooks for a later qualified backend;
-it never accepts a client-supplied privileged command.
+partitions; its data disposition is explicitly ``retain``.  Partition/data
+deletion is an explicitly confirmed operation and is kept behind a VM-
+qualification marker.  Every plan records the Fedora ESP, /boot, and root
+identities that must remain in place, and never requests space reallocation.
+This module emits fixed operation descriptors and offers narrow executor hooks
+for a later qualified backend; it never accepts a client-supplied privileged
+command.
 """
 from __future__ import annotations
 
@@ -35,6 +38,16 @@ REMOVAL_SCHEMA_VERSION = 1
 MENU_ONLY = "menu_only"
 DESTRUCTIVE = "destructive"
 SAFE = MENU_ONLY  # Friendly alias used by launcher integrations.
+
+# Data disposition is deliberately coupled to the removal mode.  A menu-only
+# removal leaves the Zeus filesystems available for a later reinstall or
+# manual recovery; a destructive removal deletes the journal-owned partitions
+# (and therefore all data stored on them) only after the same explicit plan-ID
+# confirmation and qualification gates as the partition operation.
+DATA_RETAIN = "retain"
+DATA_DELETE = "delete"
+DATA_KEEP = DATA_RETAIN  # Friendly alias for UI callers.
+DATA_POLICIES = frozenset({DATA_RETAIN, DATA_DELETE})
 
 FEDORA_GRUB_SCRIPT = Path(bootmenu.SCRIPT_PATH)
 FEDORA_GRUB_DEFAULTS = Path("/etc/default/grub")
@@ -317,7 +330,11 @@ def _partition_number(partition: Mapping[str, Any]) -> int | None:
         return value
     node = _first(partition, ("node", "path", "device"))
     if isinstance(node, str):
-        match = re.search(r"(?:p|)([4-6])\Z", node)
+        # ``p`` is present for nvme/mmc device names and absent for the
+        # traditional ``/dev/sda1`` form.  Keep all positive numbers here so
+        # the same identity parser can prove Fedora partitions are preserved;
+        # callers that select Zeus still explicitly restrict to 4--6.
+        match = re.search(r"(?:p|)([1-9][0-9]*)\Z", node)
         if match:
             return int(match.group(1))
     return None
@@ -794,6 +811,110 @@ def _requested_mode(mode: Any, destructive: bool) -> str:
     return selected
 
 
+def _requested_data_policy(
+    value: Any,
+    selected_mode: str,
+    *,
+    delete_data: bool | None = None,
+    preserve_data: bool | None = None,
+) -> str:
+    """Resolve the owner-visible Zeus-data choice for a removal plan.
+
+    The legacy API inferred deletion from ``mode=destructive``.  Keep that
+    call shape valid, but make the resulting disposition explicit in every
+    plan.  New UI callers can provide ``data_policy`` (or one of the boolean
+    compatibility aliases) and receive a stable conflict error instead of a
+    surprising implicit action.
+    """
+
+    aliases = [item for item in (delete_data, preserve_data) if item is not None]
+    if any(type(item) is not bool for item in aliases):
+        raise _error("invalid_data_policy", "The Zeus-data choice must be an explicit boolean.")
+    if delete_data is not None and preserve_data is not None and delete_data == preserve_data:
+        raise _error("invalid_data_policy", "The Zeus-data choices conflict.")
+
+    selected: Any = value
+    if selected is None:
+        if delete_data is True or preserve_data is False:
+            selected = DATA_DELETE
+        elif preserve_data is True or delete_data is False:
+            selected = DATA_RETAIN
+        else:
+            # Preserve the historical mode defaults while making them visible
+            # to the owner in the returned plan and confirmation copy.
+            selected = DATA_DELETE if selected_mode == DESTRUCTIVE else DATA_RETAIN
+    if isinstance(selected, str):
+        selected = {
+            "keep": DATA_RETAIN,
+            "preserve": DATA_RETAIN,
+            "retain": DATA_RETAIN,
+            "delete": DATA_DELETE,
+            "remove": DATA_DELETE,
+            "erase": DATA_DELETE,
+        }.get(selected.strip().lower(), selected.strip().lower())
+    if selected not in DATA_POLICIES:
+        raise _error("invalid_data_policy", "The Zeus-data choice is invalid.")
+    if selected_mode == MENU_ONLY and selected != DATA_RETAIN:
+        raise _error(
+            "data_policy_conflict",
+            "Menu-only removal cannot delete Zeus data; choose full removal to delete its partitions.",
+        )
+    if selected_mode == DESTRUCTIVE and selected != DATA_DELETE:
+        raise _error(
+            "data_policy_conflict",
+            "Full removal deletes the journal-owned Zeus partitions; choose data deletion explicitly.",
+        )
+    return selected
+
+
+def _table_partitions_by_number(table: Mapping[str, Any]) -> dict[int, Mapping[str, Any]]:
+    parts = table.get("partitions")
+    if not isinstance(parts, list):
+        return {}
+    result: dict[int, Mapping[str, Any]] = {}
+    for index, item in enumerate(parts, start=1):
+        if not isinstance(item, Mapping):
+            continue
+        number = _partition_number(item) or index
+        if number > 0:
+            result[number] = item
+    return result
+
+
+def _record_fedora_partitions(
+    record: Mapping[str, Any], table: Mapping[str, Any]
+) -> list[dict[str, Any]]:
+    """Return the exact Fedora ESP, /boot, and root identities to preserve."""
+
+    numbered = _table_partitions_by_number(table)
+    result: list[dict[str, Any]] = []
+    for number, role in ((1, "esp"), (2, "boot"), (3, "root")):
+        item = numbered.get(number)
+        if not isinstance(item, Mapping):
+            raise _error(
+                "fedora_boot_identity_missing",
+                "The journal has no exact Fedora ESP, /boot, and root identities.",
+            )
+        path_value = _first(item, ("node", "path", "device"))
+        guid_value = _first(item, ("uuid", "partuuid", "partition_uuid", "partition_guid"))
+        if path_value is None or guid_value is None:
+            raise _error(
+                "fedora_boot_identity_missing",
+                "The journal has no exact Fedora ESP, /boot, and root identities.",
+            )
+        result.append(
+            {
+                "number": number,
+                "role": role,
+                "path": _path(path_value, message="The recorded Fedora partition path is invalid."),
+                "guid": _uuid(guid_value, message="The recorded Fedora partition identity is invalid."),
+            }
+        )
+    if len({item["guid"] for item in result}) != 3:
+        raise _error("journal_invalid", "The recorded Fedora partition identities must be distinct.")
+    return result
+
+
 def build_plan(
     journal: Any,
     inventory: Mapping[str, Any],
@@ -805,6 +926,9 @@ def build_plan(
     plan_id: str | None = None,
     current_bootmenu_hash: str | bytes | None = None,
     bootmenu_present: bool | None = None,
+    data_policy: str | None = None,
+    delete_data: bool | None = None,
+    preserve_data: bool | None = None,
     cancelled: bool = False,
     require_root: bool = True,
 ) -> dict[str, Any]:
@@ -833,6 +957,12 @@ def build_plan(
     record = _load_journal(journal, require_root=require_root)
     state = _installed_state(record)
     selected_mode = _requested_mode(mode, destructive)
+    selected_data_policy = _requested_data_policy(
+        data_policy,
+        selected_mode,
+        delete_data=delete_data,
+        preserve_data=preserve_data,
+    )
     recorded_plan_id = _find_record_plan_id(record)
     if plan_id is not None and _plan_id(plan_id) != recorded_plan_id:
         raise _error("plan_id_mismatch", "The requested plan ID does not match the installation journal.")
@@ -852,6 +982,7 @@ def build_plan(
         raise _error("fedora_root_mismatch", "The running Fedora root is not the recorded Fedora root.")
 
     expected_table = _record_table(record)
+    fedora_partitions = _record_fedora_partitions(record, expected_table)
     expected_parts = _inventory_partitions(inventory, current_table)
     if current_table is None and not all(number in expected_parts for number in (4, 5, 6)):
         raise _error("partition_identity_unknown", "The current GPT partition identities could not be established.")
@@ -859,6 +990,17 @@ def build_plan(
         current = expected_parts.get(number)
         if current is None or _partition_uuid(current) != guid:
             raise _error("partition_identity_changed", f"The current Zeus partition {number} is not journal-owned.")
+    for item in fedora_partitions:
+        current = expected_parts.get(item["number"])
+        if (
+            current is None
+            or _partition_uuid(current) != item["guid"]
+            or _first(current, ("node", "path", "device")) != item["path"]
+        ):
+            raise _error(
+                "fedora_boot_changed",
+                "The recorded Fedora ESP, /boot, or root identity changed; removal stopped.",
+            )
 
     recorded_hash = _record_menu_hash(record)
     if current_bootmenu_hash is not None:
@@ -923,8 +1065,35 @@ def build_plan(
                 ],
                 "disk_guid": disk_guid,
                 "partition_guids": list(partition_guids),
+                "owner": "journal",
+                "data_policy": selected_data_policy,
             }
         )
+
+    zeus_resources = [
+        {
+            "kind": "partition",
+            "number": number,
+            "path": f"{disk}{'p' if disk[-1].isdigit() else ''}{number}",
+            "guid": guid,
+            "owner": "journal",
+            "contains_data": True,
+        }
+        for number, guid in zip((4, 5, 6), partition_guids)
+    ]
+    data = {
+        "policy": selected_data_policy,
+        "owner": "journal",
+        "resources": copy.deepcopy(zeus_resources),
+        "action": "preserve" if selected_data_policy == DATA_RETAIN else "delete_with_partitions",
+        "explicit_confirmation": selected_mode == MENU_ONLY or confirm_plan_id is not None,
+        "confirmation": "exact_plan_id" if selected_mode == DESTRUCTIVE else "not_required",
+        "warning": (
+            "Zeus root, boot, and ESP data remain on the journal-owned partitions."
+            if selected_data_policy == DATA_RETAIN
+            else "All data on the three journal-owned Zeus partitions is deleted with those partitions."
+        ),
+    }
 
     result: dict[str, Any] = {
         "schema_version": REMOVAL_SCHEMA_VERSION,
@@ -936,6 +1105,14 @@ def build_plan(
         "destructive": selected_mode == DESTRUCTIVE,
         "disk": {"path": disk, "guid": disk_guid},
         "fedora_root": {"path": expected_root_path, "partition_guid": expected_root_guid, "os": "fedora"},
+        "fedora_preservation": {
+            "partitions": copy.deepcopy(fedora_partitions),
+            "default_boot": "fedora",
+            "retain_esp": True,
+            "retain_boot": True,
+            "retain_root": True,
+            "other_entries": True,
+        },
         "zeus_partitions": [
             {"number": number, "path": f"{disk}{'p' if disk[-1].isdigit() else ''}{number}", "guid": guid, "mounted": mounted[str(number)]}
             for number, guid in zip((4, 5, 6), partition_guids)
@@ -952,7 +1129,11 @@ def build_plan(
         "backup": backup,
         "vm_qualified": _vm_tested(record),
         "operations": operations,
+        "zeus_resources": zeus_resources,
+        "data": data,
+        "data_policy": selected_data_policy,
         "reallocate_fedora": False,
+        "space": {"automatic_reclaim": False, "reallocate_fedora": False},
         "retains_zeus_files": selected_mode == MENU_ONLY,
         "retains_zeus_partitions": selected_mode == MENU_ONLY,
         "journal_schema_version": SCHEMA_VERSION,
@@ -982,6 +1163,15 @@ def validate_plan(value: Mapping[str, Any]) -> dict[str, Any]:
     _uuid(root.get("partition_guid"), message="The removal plan Fedora root identity is invalid.")
     if plan.get("mode") not in (MENU_ONLY, DESTRUCTIVE) or plan.get("destructive") is not (plan.get("mode") == DESTRUCTIVE):
         raise _error("invalid_plan", "The removal plan mode is invalid.")
+    if plan.get("reallocate_fedora") is not False:
+        raise _error("invalid_plan", "Removal never reallocates Fedora space.")
+    space = plan.get("space")
+    if (
+        not isinstance(space, Mapping)
+        or space.get("automatic_reclaim") is not False
+        or space.get("reallocate_fedora") is not False
+    ):
+        raise _error("invalid_plan", "The removal plan must disable automatic space reclamation.")
     if plan.get("mode") == DESTRUCTIVE:
         if plan.get("vm_qualified") is not True:
             raise _error("removal_not_qualified", "Destructive removal remains gated until the VM test is recorded.")
@@ -1000,6 +1190,61 @@ def validate_plan(value: Mapping[str, Any]) -> dict[str, Any]:
         guids.append(_uuid(item.get("guid"), message="The removal plan partition identity is invalid."))
     if len(set(guids)) != 3:
         raise _error("invalid_plan", "The removal plan partition identities must be distinct.")
+    resources = plan.get("zeus_resources")
+    if not isinstance(resources, list) or len(resources) != 3:
+        raise _error("invalid_plan", "The removal plan must list exactly three journal-owned Zeus resources.")
+    for expected_number, resource, partition_guid in zip((4, 5, 6), resources, guids):
+        if (
+            not isinstance(resource, Mapping)
+            or resource.get("kind") != "partition"
+            or resource.get("number") != expected_number
+            or resource.get("path") != f"{disk_path}{'p' if disk_path[-1].isdigit() else ''}{expected_number}"
+            or resource.get("guid") != partition_guid
+            or resource.get("owner") != "journal"
+            or resource.get("contains_data") is not True
+        ):
+            raise _error("invalid_plan", "The removal plan contains a non-journal-owned Zeus resource.")
+    data = plan.get("data")
+    if not isinstance(data, Mapping) or data.get("owner") != "journal":
+        raise _error("invalid_plan", "The removal plan has no explicit journal-owned Zeus-data decision.")
+    expected_policy = DATA_RETAIN if plan.get("mode") == MENU_ONLY else DATA_DELETE
+    if data.get("policy") != expected_policy or plan.get("data_policy") != expected_policy:
+        raise _error("invalid_plan", "The Zeus-data decision does not match the removal mode.")
+    if data.get("resources") != resources:
+        raise _error("invalid_plan", "The Zeus-data resources are not journal-bound.")
+    expected_action = "preserve" if expected_policy == DATA_RETAIN else "delete_with_partitions"
+    if data.get("action") != expected_action:
+        raise _error("invalid_plan", "The Zeus-data action is invalid.")
+    if plan.get("mode") == DESTRUCTIVE and data.get("confirmation") != "exact_plan_id":
+        raise _error("invalid_plan", "Destructive Zeus-data deletion requires exact plan confirmation.")
+    if plan.get("mode") == MENU_ONLY and data.get("confirmation") != "not_required":
+        raise _error("invalid_plan", "Menu-only Zeus-data retention must not request deletion confirmation.")
+    fedora_preservation = plan.get("fedora_preservation")
+    if not isinstance(fedora_preservation, Mapping):
+        raise _error("invalid_plan", "The removal plan has no Fedora boot-preservation contract.")
+    if (
+        fedora_preservation.get("default_boot") != "fedora"
+        or fedora_preservation.get("retain_esp") is not True
+        or fedora_preservation.get("retain_boot") is not True
+        or fedora_preservation.get("retain_root") is not True
+        or fedora_preservation.get("other_entries") is not True
+    ):
+        raise _error("invalid_plan", "The removal plan does not retain Fedora boot resources.")
+    fedora_parts = fedora_preservation.get("partitions")
+    if not isinstance(fedora_parts, list) or len(fedora_parts) != 3:
+        raise _error("invalid_plan", "The removal plan must retain Fedora ESP, /boot, and root identities.")
+    for expected_number, expected_role, item in zip((1, 2, 3), ("esp", "boot", "root"), fedora_parts):
+        if not isinstance(item, Mapping) or item.get("number") != expected_number or item.get("role") != expected_role:
+            raise _error("invalid_plan", "The Fedora preservation partition sequence is invalid.")
+        expected_path = f"{disk_path}{'p' if disk_path[-1].isdigit() else ''}{expected_number}"
+        if item.get("path") != expected_path:
+            raise _error("invalid_plan", "The Fedora preservation partition path is not disk-bound.")
+        _uuid(item.get("guid"), message="The Fedora preservation partition identity is invalid.")
+    if (
+        fedora_parts[2].get("path") != root.get("path")
+        or fedora_parts[2].get("guid") != root.get("partition_guid")
+    ):
+        raise _error("invalid_plan", "The Fedora root preservation identity is inconsistent.")
     menu = plan.get("menu")
     if not isinstance(menu, Mapping) or menu.get("script_path") != str(FEDORA_GRUB_SCRIPT):
         raise _error("invalid_plan", "The removal plan managed file is invalid.")
@@ -1009,6 +1254,11 @@ def validate_plan(value: Mapping[str, Any]) -> dict[str, Any]:
     operations = plan.get("operations")
     if not isinstance(operations, list) or len(operations) > 3:
         raise _error("invalid_plan", "The removal plan operations are invalid.")
+    expected_kinds = ["remove_file", "regenerate_grub"] if menu.get("action") == "remove_managed_script" else []
+    if plan.get("mode") == DESTRUCTIVE:
+        expected_kinds.append("delete_partitions")
+    if [operation.get("kind") if isinstance(operation, Mapping) else None for operation in operations] != expected_kinds:
+        raise _error("invalid_plan", "The removal plan operations do not match its reviewed mode.")
     allowed_kinds = {"remove_file", "regenerate_grub", "delete_partitions"}
     for operation in operations:
         if not isinstance(operation, Mapping) or operation.get("kind") not in allowed_kinds:
@@ -1025,6 +1275,8 @@ def validate_plan(value: Mapping[str, Any]) -> dict[str, Any]:
                 raise _error("invalid_plan", "Partition deletion is unavailable in menu-only mode.")
             if operation.get("disk_guid") != disk_guid or operation.get("partition_guids") != guids:
                 raise _error("invalid_plan", "The partition deletion identities are not journal-bound.")
+            if operation.get("owner") != "journal" or operation.get("data_policy") != DATA_DELETE:
+                raise _error("invalid_plan", "The partition deletion is not an explicit journal-owned data action.")
             if operation.get("argv") != [SGDISK, "--delete", "4", "--delete", "5", "--delete", "6", disk_path]:
                 raise _error("invalid_plan", "The partition deletion operation is not fixed.")
     supplied_digest = plan.pop("plan_digest", None)
@@ -1052,6 +1304,9 @@ def remove(
     confirmed_plan_id: str | None = None,
     executor: "RemovalExecutor" | None = None,
     apply: bool = False,
+    data_policy: str | None = None,
+    delete_data: bool | None = None,
+    preserve_data: bool | None = None,
     cancelled: bool = False,
     require_root: bool = True,
 ) -> dict[str, Any]:
@@ -1069,6 +1324,9 @@ def remove(
         mode=mode,
         destructive=destructive,
         confirm_plan_id=effective_confirm,
+        data_policy=data_policy,
+        delete_data=delete_data,
+        preserve_data=preserve_data,
         cancelled=cancelled,
         require_root=require_root,
     )
@@ -1284,6 +1542,10 @@ class RemovalExecutor:
             "disk_guid": plan["disk"]["guid"],
             "partition_guids": [item["guid"] for item in plan["zeus_partitions"]],
             "bootmenu_hash": plan["menu"]["recorded_sha256"],
+            "data_policy": plan["data_policy"],
+            "data_action": plan["data"]["action"],
+            "fedora_preserved": True,
+            "automatic_reclaim": False,
         }
         try:
             journal.write(updated)
@@ -1293,7 +1555,7 @@ class RemovalExecutor:
             raise _error("state_write_failed", "The removal state could not be recorded durably.") from exc
 
     def _run_fixed(self, argv: Any) -> None:
-        if not isinstance(argv, list):
+        if not isinstance(argv, list) or not argv:
             raise _error("invalid_plan", "The fixed command operation is invalid.")
         if argv[0] == GRUB2_MKCONFIG:
             expected = [GRUB2_MKCONFIG, GRUB_NO_GRUBENV_UPDATE, "-o", str(FEDORA_GRUB_CONFIG)]
@@ -1375,6 +1637,10 @@ validate_removal_plan = validate_plan
 
 
 __all__ = [
+    "DATA_DELETE",
+    "DATA_KEEP",
+    "DATA_POLICIES",
+    "DATA_RETAIN",
     "DESTRUCTIVE",
     "FEDORA_GRUB_CONFIG",
     "FEDORA_GRUB_DEFAULTS",

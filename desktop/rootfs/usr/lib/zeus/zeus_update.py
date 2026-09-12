@@ -27,11 +27,33 @@ ROOT = Path('/var/lib/zeus/updater')
 SHARE = Path('/usr/share/zeus')
 SERVICE = 'zeus-update-install.service'
 ADMIN = '/usr/libexec/zeus-update-admin'
+DEVELOPER_ROOT = Path('/var/lib/zeus/developer-mode')
+DEVELOPER_STATUS = DEVELOPER_ROOT / 'status.json'
+DEVELOPER_EXTENSIONS_ROOT = Path('/var/lib/extensions')
+DEVELOPER_ACTIVE_EXTENSION = DEVELOPER_EXTENSIONS_ROOT / 'zeus-developer.raw'
+# Match the Developer Mode runtime's fixed extension path.
+ACTIVE_EXTENSION = DEVELOPER_ACTIVE_EXTENSION
+DEVELOPER_ADMIN = '/usr/libexec/zeus-developer-admin'
+DEVELOPER_PAUSE_ACTION = 'pause-for-update'
+# Keep these aliases descriptive for callers that need to share the contract
+# without importing the implementation's storage layout.
+DEVELOPER_STATUS_PATH = DEVELOPER_STATUS
+DEVELOPER_STATUS_LIMIT = 128 * 1024
 BUSY = {'queued', 'downloading', 'verifying', 'staging'}
 SCHEMA = 1
 JSON_LIMIT = 128 * 1024
 BUILD_RE = re.compile(r'git-[0-9a-f]{12}\Z')
 SHA_RE = re.compile(r'[0-9a-f]{64}\Z')
+DEVELOPER_STATES = frozenset({
+    'off', 'disabled', 'inactive', 'enabled', 'active', 'applying',
+    'incompatible', 'attention', 'needs_rebuild', 'paused', 'error',
+    # These states are emitted by the Developer Mode runtime while a
+    # transaction is being recovered or needs operator attention.
+    'interrupted', 'needs_attention',
+})
+DEVELOPER_ACTIVE_STATES = frozenset({
+    'active', 'applying', 'interrupted', 'needs_attention', 'error',
+})
 
 
 def utc_now():
@@ -58,6 +80,199 @@ def read_json(path, *, required=False):
         raise trusted.UpdateError('missing_state', 'Update job state is unavailable.')
     except (OSError, ValueError, TypeError):
         raise trusted.UpdateError('invalid_state', 'Update state cannot be read safely.')
+
+
+def _active_extension_present(path, *, enforce_storage=True):
+    """Return whether the fixed active extension is safely present.
+
+    This is intentionally a metadata-only check.  The updater never reads or
+    executes the extension; it only refuses to treat a missing status file as
+    inactive while a root-owned extension is visible.
+    """
+    if path is None:
+        return False
+    path = Path(path)
+    if not path.is_absolute():
+        raise trusted.UpdateError(
+            'developer_extension_unavailable',
+            'The active Developer Mode extension path is not protected.',
+        )
+    current = Path(path.anchor)
+    for part in path.parts[1:-1]:
+        current /= part
+        try:
+            parent_info = current.lstat()
+        except FileNotFoundError:
+            continue
+        except OSError:
+            raise trusted.UpdateError(
+                'developer_extension_unavailable',
+                'The active Developer Mode extension cannot be checked safely.',
+            )
+        if not stat.S_ISDIR(parent_info.st_mode) or (
+            enforce_storage
+            and (parent_info.st_uid != 0 or parent_info.st_mode & 0o022)
+        ):
+            raise trusted.UpdateError(
+                'developer_extension_unavailable',
+                'The active Developer Mode extension path is not protected.',
+            )
+    try:
+        info = path.lstat()
+    except FileNotFoundError:
+        return False
+    except OSError:
+        raise trusted.UpdateError(
+            'developer_extension_unavailable',
+            'The active Developer Mode extension cannot be checked safely.',
+        )
+    if not stat.S_ISREG(info.st_mode) or (
+        enforce_storage and (info.st_uid != 0 or info.st_mode & 0o022)
+    ):
+        raise trusted.UpdateError(
+            'developer_extension_unavailable',
+            'The active Developer Mode extension is not protected.',
+        )
+    return True
+
+
+def read_developer_status(path=DEVELOPER_STATUS, *,
+                          active_extension_path=DEVELOPER_ACTIVE_EXTENSION,
+                          enforce_storage=True):
+    """Read the bounded public Developer Mode status contract.
+
+    The status is displayable by an unprivileged client, but it is also used by
+    the privileged updater as a safety gate.  Never follow a symlink and never
+    treat an unreadable or malformed status as inactive: an unknown extension
+    state must not be allowed to race an OS deployment.
+
+    ``enforce_storage`` is disabled only for unprivileged fixture tests that
+    use temporary directories owned by the test user.  The installed helper
+    always keeps the default root-owned check.
+    """
+    path = Path(path)
+    try:
+        # Distinguish a missing status from a dangling or otherwise unsafe
+        # entry.  The no-follow open below closes the replacement race.
+        initial_info = path.lstat()
+        if not stat.S_ISREG(initial_info.st_mode):
+            raise trusted.UpdateError(
+                'developer_status_unavailable',
+                'Developer Mode status is not protected.',
+            )
+    except FileNotFoundError:
+        if _active_extension_present(
+            active_extension_path,
+            enforce_storage=enforce_storage,
+        ):
+            raise trusted.UpdateError(
+                'developer_active',
+                'Developer Mode is active. Pause developer changes and continue before staging this update.',
+            )
+        return {'schema_version': SCHEMA, 'state': 'inactive', 'active': False}
+    except trusted.UpdateError:
+        raise
+    except OSError:
+        raise trusted.UpdateError(
+            'developer_status_unavailable',
+            'Developer Mode status cannot be read safely.',
+        )
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except FileNotFoundError:
+        raise trusted.UpdateError(
+            'developer_status_unavailable',
+            'Developer Mode status changed while it was being read.',
+        )
+    except OSError:
+        raise trusted.UpdateError(
+            'developer_status_unavailable',
+            'Developer Mode status cannot be read safely.',
+        )
+
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or (
+            enforce_storage and (info.st_uid != 0 or info.st_mode & 0o022)
+        ):
+            raise trusted.UpdateError(
+                'developer_status_unavailable',
+                'Developer Mode status is not protected.',
+            )
+        chunks = bytearray()
+        while len(chunks) <= DEVELOPER_STATUS_LIMIT:
+            chunk = os.read(fd, min(64 * 1024, DEVELOPER_STATUS_LIMIT + 1 - len(chunks)))
+            if not chunk:
+                break
+            chunks.extend(chunk)
+        if len(chunks) > DEVELOPER_STATUS_LIMIT:
+            raise ValueError('oversized status')
+        value = json.loads(bytes(chunks))
+    except trusted.UpdateError:
+        raise
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        raise trusted.UpdateError(
+            'developer_status_invalid',
+            'Developer Mode status cannot be read safely.',
+        )
+    finally:
+        os.close(fd)
+
+    if not isinstance(value, dict) or type(value.get('schema_version')) is not int:
+        raise trusted.UpdateError(
+            'developer_status_invalid',
+            'Developer Mode status cannot be read safely.',
+        )
+    if value['schema_version'] != SCHEMA:
+        raise trusted.UpdateError(
+            'developer_status_invalid',
+            'Developer Mode status uses an unsupported schema.',
+        )
+
+    state = value.get('state')
+    if not isinstance(state, str) or len(state) > 64:
+        raise trusted.UpdateError(
+            'developer_status_invalid',
+            'Developer Mode status cannot be read safely.',
+        )
+    state = state.strip().lower().replace('-', '_').replace(' ', '_')
+    if state not in DEVELOPER_STATES:
+        raise trusted.UpdateError(
+            'developer_status_invalid',
+            'Developer Mode status cannot be read safely.',
+        )
+    explicit_active = value.get('active')
+    if explicit_active is not None and not isinstance(explicit_active, bool):
+        raise trusted.UpdateError(
+            'developer_status_invalid',
+            'Developer Mode status cannot be read safely.',
+        )
+    # A transaction/recovery state is treated as active until the Developer
+    # helper has reconciled it.  This keeps an uncertain extension from
+    # being staged into a new base image.
+    extension_present = _active_extension_present(
+        active_extension_path,
+        enforce_storage=enforce_storage,
+    )
+    active = state in DEVELOPER_ACTIVE_STATES or explicit_active is True
+    if extension_present and not active:
+        # A stale or inconsistent status must not let a physically present
+        # system extension be merged into a new base image unnoticed.
+        active = True
+    # Return only the fields the updater needs.  This prevents arbitrary
+    # status content from leaking into the public update JSON contract.
+    return {'schema_version': SCHEMA, 'state': state, 'active': active}
+
+
+def developer_extension_active(path=DEVELOPER_STATUS, *,
+                              active_extension_path=DEVELOPER_ACTIVE_EXTENSION,
+                              enforce_storage=True):
+    """Return whether a verified Developer Mode extension is active."""
+    return read_developer_status(
+        path,
+        active_extension_path=active_extension_path,
+        enforce_storage=enforce_storage,
+    )['active']
 
 
 def atomic_json(path, value, mode=0o600):
@@ -108,11 +323,14 @@ def candidate_view(manifest):
 
 
 def public_result(current, state='idle', manifest=None, message='', error=None,
-                  progress=None, checked_at=None):
-    return {'schema_version': SCHEMA, 'ok': error is None, 'state': state,
-            'current': current, 'candidate': candidate_view(manifest),
-            'progress': progress, 'message': message, 'error': error,
-            'checked_at': checked_at}
+                  progress=None, checked_at=None, developer=None):
+    result = {'schema_version': SCHEMA, 'ok': error is None, 'state': state,
+              'current': current, 'candidate': candidate_view(manifest),
+              'progress': progress, 'message': message, 'error': error,
+              'checked_at': checked_at}
+    if developer is not None:
+        result['developer'] = developer
+    return result
 
 
 def newer(manifest, current, watermark=None):
@@ -134,10 +352,19 @@ def default_cache():
     return root / 'zeus/updater/check.json'
 
 
-def local_status(root=ROOT, share=SHARE, cache=None, this_boot=None):
+def local_status(root=ROOT, share=SHARE, cache=None, this_boot=None,
+                 developer_status_path=DEVELOPER_STATUS,
+                 developer_status_enforce_storage=True,
+                 active_extension_path=DEVELOPER_ACTIVE_EXTENSION):
     current = current_image(share)
     installed = None
+    developer = None
     try:
+        developer = read_developer_status(
+            developer_status_path,
+            active_extension_path=active_extension_path,
+            enforce_storage=developer_status_enforce_storage,
+        )
         job = read_json(Path(root) / 'status.json')
         if job:
             manifest = trusted.validate_manifest(job['manifest']) if job.get('manifest') else None
@@ -149,12 +376,12 @@ def local_status(root=ROOT, share=SHARE, cache=None, this_boot=None):
                 if job.get('boot_id') != (this_boot or boot_id()):
                     return public_result(current, 'interrupted', manifest,
                                          'The selected update is not running in this session. Check for updates to retry.',
-                                         'interrupted')
+                                         'interrupted', developer=developer)
                 return public_result(current, phase, manifest, job.get('message', ''),
-                                     progress=job.get('progress'))
+                                     progress=job.get('progress'), developer=developer)
             if phase in {'error', 'interrupted'}:
                 return public_result(current, phase, manifest, job.get('message', 'Update interrupted.'),
-                                     job.get('error', 'update_failed'))
+                                     job.get('error', 'update_failed'), developer=developer)
         remembered = read_json(cache or default_cache())
         if remembered:
             manifest = trusted.validate_manifest(remembered['manifest']) if remembered.get('manifest') else None
@@ -163,18 +390,49 @@ def local_status(root=ROOT, share=SHARE, cache=None, this_boot=None):
                        'The selected update is installed.' if installed else
                        'The last check found no newer build. Check again for current updates.')
             return public_result(current, state, manifest, message,
-                                 checked_at=remembered.get('checked_at'))
+                                 checked_at=remembered.get('checked_at'), developer=developer)
         if installed:
-            return public_result(current, 'up_to_date', installed, 'The selected update is installed.')
-        return public_result(current, message='Check for a newer signed Zeus OS build.')
-    except (trusted.UpdateError, KeyError, TypeError):
+            return public_result(current, 'up_to_date', installed, 'The selected update is installed.',
+                                 developer=developer)
+        return public_result(current, message='Check for a newer signed Zeus OS build.', developer=developer)
+    except trusted.UpdateError as error:
+        # Preserve local_status's historical invalid-state normalization for
+        # updater/cache records while exposing the explicit developer-status
+        # codes needed by the Updates window and diagnostics.
+        developer_error = error.code.startswith('developer_status_')
+        return public_result(
+            current,
+            'error',
+            message=str(error) if developer_error else 'Update information is unavailable. Check again.',
+            error=error.code if developer_error else 'invalid_state',
+            developer=developer,
+        )
+    except (KeyError, TypeError):
         return public_result(current, 'error', message='Update information is unavailable. Check again.',
-                             error='invalid_state')
+                             error='invalid_state', developer=developer)
 
 
-def check_updates(root=ROOT, share=SHARE, cache=None, fetch=None):
+def check_updates(root=ROOT, share=SHARE, cache=None, fetch=None,
+                  developer_status_path=DEVELOPER_STATUS,
+                  developer_status_enforce_storage=True,
+                  active_extension_path=DEVELOPER_ACTIVE_EXTENSION):
     current = current_image(share)
-    busy = local_status(root, share, cache)
+    try:
+        developer = read_developer_status(
+            developer_status_path,
+            active_extension_path=active_extension_path,
+            enforce_storage=developer_status_enforce_storage,
+        )
+    except trusted.UpdateError as error:
+        return public_result(current, 'error', message=str(error), error=error.code)
+    busy = local_status(
+        root,
+        share,
+        cache,
+        developer_status_path=developer_status_path,
+        developer_status_enforce_storage=developer_status_enforce_storage,
+        active_extension_path=active_extension_path,
+    )
     if busy['state'] in BUSY | {'ready'}:
         return busy
     try:
@@ -188,21 +446,28 @@ def check_updates(root=ROOT, share=SHARE, cache=None, fetch=None):
         atomic_json(destination, {'schema_version': SCHEMA, 'manifest': manifest,
                                   'checked_at': checked, 'message': message})
         # An install started in another window while this network check ran.
-        after = local_status(root, share, cache)
+        after = local_status(root, share, cache,
+                             developer_status_path=developer_status_path,
+                             developer_status_enforce_storage=developer_status_enforce_storage,
+                             active_extension_path=active_extension_path)
         if after['state'] in BUSY | {'ready'}:
             return after
         return public_result(current, 'available' if available else 'up_to_date', manifest,
-                             message, checked_at=checked)
+                             message, checked_at=checked, developer=developer)
     except trusted.UpdateError as error:
-        return public_result(current, 'error', message=str(error), error=error.code)
+        return public_result(current, 'error', message=str(error), error=error.code,
+                             developer=developer)
     except OSError:
-        return public_result(current, 'error', message='Update information could not be saved.', error='cache_error')
+        return public_result(current, 'error', message='Update information could not be saved.',
+                             error='cache_error', developer=developer)
 
 
 class Installer:
     """Root-only at the entry point; injected paths/runners are for fixture tests."""
     def __init__(self, root=ROOT, share=SHARE, *, runner=None, fetch=None,
-                 download=None, inspect=None, this_boot=None, storage_check=True):
+                 download=None, inspect=None, this_boot=None, storage_check=True,
+                 developer_status_path=DEVELOPER_STATUS,
+                 active_extension_path=DEVELOPER_ACTIVE_EXTENSION):
         self.root, self.share = Path(root), Path(share)
         self.runner = runner or subprocess.run
         self.fetch = fetch or trusted.fetch_manifest
@@ -210,6 +475,10 @@ class Installer:
         self.inspect = inspect or trusted.inspect_archive
         self.this_boot = this_boot or boot_id()
         self.storage_check = storage_check
+        self.developer_status_path = Path(developer_status_path)
+        self.active_extension_path = (
+            Path(active_extension_path) if active_extension_path is not None else None
+        )
 
     def prepare(self):
         self.root.mkdir(parents=True, exist_ok=True, mode=0o755)
@@ -288,6 +557,20 @@ class Installer:
             raise trusted.UpdateError('staged_update_exists', 'A different OS update is already staged. It has been preserved.')
         return digest is not None
 
+    def check_developer_mode(self):
+        """Fail closed while a desktop extension is merged into ``/usr``."""
+        status = read_developer_status(
+            self.developer_status_path,
+            active_extension_path=self.active_extension_path,
+            enforce_storage=self.storage_check,
+        )
+        if status['active']:
+            raise trusted.UpdateError(
+                'developer_active',
+                'Developer Mode is active. Pause developer changes and continue before staging this update.',
+            )
+        return status
+
     def state(self, phase, manifest, message, error=None, progress=None):
         value = {'schema_version': SCHEMA, 'phase': phase, 'manifest': manifest,
                  'message': message, 'error': error, 'progress': progress,
@@ -322,9 +605,14 @@ class Installer:
             manifest = self.fetch()
             self.selection(manifest, build, digest)
             self.eligibility(manifest)
-            if self.check_stage(manifest):
+            already_staged = self.check_stage(manifest)
+            self.check_developer_mode()
+            if already_staged:
                 self.state('ready', manifest, 'The verified update is ready. Restart when convenient.')
-                return local_status(self.root, self.share, this_boot=self.this_boot)
+                return local_status(self.root, self.share, this_boot=self.this_boot,
+                                    developer_status_path=self.developer_status_path,
+                                    developer_status_enforce_storage=self.storage_check,
+                                    active_extension_path=self.active_extension_path)
             atomic_json(self.root / 'request.json', {'schema_version': SCHEMA, 'build_id': build,
                         'archive_sha256': digest, 'boot_id': self.this_boot})
             atomic_json(self.root / 'trust.json', {'schema_version': SCHEMA,
@@ -334,7 +622,10 @@ class Installer:
             if started.returncode:
                 self.state('error', manifest, 'The installer could not start. Try again.', 'service_start_failed')
                 raise trusted.UpdateError('service_start_failed', 'The installer could not start. Try again.')
-            return local_status(self.root, self.share, this_boot=self.this_boot)
+            return local_status(self.root, self.share, this_boot=self.this_boot,
+                                developer_status_path=self.developer_status_path,
+                                developer_status_enforce_storage=self.storage_check,
+                                active_extension_path=self.active_extension_path)
 
     def private_file(self, path):
         info = path.lstat()
@@ -362,7 +653,9 @@ class Installer:
                 manifest = self.fetch()
                 self.selection(manifest, request['build_id'], request['archive_sha256'])
                 self.eligibility(manifest)
-                if self.check_stage(manifest):
+                already_staged = self.check_stage(manifest)
+                self.check_developer_mode()
+                if already_staged:
                     self.state('ready', manifest, 'The verified update is ready. Restart when convenient.')
                     return True
                 archive = manifest['archive']
@@ -399,6 +692,7 @@ class Installer:
                     raise trusted.UpdateError('wrong_image', 'The downloaded image manifest does not match the signed release.')
                 # Protect a deployment staged by another administrator during download.
                 if not self.check_stage(manifest):
+                    self.check_developer_mode()
                     self.state('staging', manifest, 'Installing the verified image for the next restart.')
                     result = self.command(['/usr/bin/bootc', 'switch', '--transport', 'oci-archive',
                                            '--retain', str(destination)], timeout=1800)

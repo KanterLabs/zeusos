@@ -1,0 +1,15 @@
+{
+  "active_status": "HIERARCHY EXTENSIONS         SINCE|/opt      none               -|/usr      zeus-qualification Fri 2026-09-11 01:43:19 UTC|",
+  "active_value": "0.1.0-preview.2+squashfs-qualified",
+  "apply_ms": 102.740496,
+  "broken_base_sha256": "efdd0f34e6cf518a11a700ba7bef68869236c8caaadf1e1e4f647b6f8ec47eca",
+  "broken_refresh_exit_code": 1,
+  "broken_refresh_output": "Failed to read metadata for image zeus-broken: Package not installed",
+  "broken_status": "HIERARCHY EXTENSIONS SINCE|/opt      none       -|/usr      none       -|",
+  "image_sha256": "73adaa74ec64909d9f38f844f698a791760af7a270d5179ac099af49c020bb89",
+  "phase": "squashfs_and_failure",
+  "restored_sha256": "efdd0f34e6cf518a11a700ba7bef68869236c8caaadf1e1e4f647b6f8ec47eca",
+  "safe_desktop_dry_run": "Desktop safe (dry run)|Would run: zeus-desktop-safe disable|Would return the shell to stock GNOME behavior by disabling the dock extension|Terminal remains available through ptyxis|Credentials and personal data would remain untouched|",
+  "schema_version": 1,
+  "sysext_avc_records": 0
+}

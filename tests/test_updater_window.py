@@ -7,7 +7,7 @@ import subprocess
 import sys
 import types
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -89,6 +89,23 @@ def candidate(**updates):
 
 
 class UpdateWindowLogic(unittest.TestCase):
+    def _window_for_install(self, developer=None):
+        window = object.__new__(WINDOW.UpdatesWindow)
+        window._closed = False
+        window._status = WINDOW._normalise_status(
+            {"state": "available", "candidate": candidate(), "developer": developer}
+        )
+        window._install_in_flight = False
+        window._developer_pause_in_flight = False
+        window._developer_pause_completed = False
+        window._check_in_flight = False
+        window._install_error = False
+        window._operation_notice = ""
+        window._operation_notice_kind = "info"
+        window._render_status = Mock()
+        window._show_toast = Mock()
+        return window
+
     def test_status_normalisation_clamps_progress_and_keeps_release_details(self):
         status = WINDOW._normalise_status(
             {
@@ -103,6 +120,125 @@ class UpdateWindowLogic(unittest.TestCase):
         self.assertEqual(status["progress"], {"bytes": 1000, "total": 1000})
         self.assertEqual(status["candidate"]["build_id"], "git-abcdef012345")
         self.assertTrue(status["candidate"]["installable"])
+
+    def test_developer_status_normalisation_distinguishes_active_inactive_and_malformed(self):
+        active = WINDOW._normalise_status(
+            {"state": "available", "candidate": candidate(), "developer": {"state": "active"}}
+        )
+        applying = WINDOW._normalise_status(
+            {"state": "available", "candidate": candidate(), "developer": {"state": "applying"}}
+        )
+        inactive = WINDOW._normalise_status(
+            {"state": "available", "candidate": candidate(), "developer": {"state": "inactive"}}
+        )
+        malformed = WINDOW._normalise_status(
+            {"state": "available", "candidate": candidate(), "developer": {"active": "yes"}}
+        )
+        self.assertTrue(active["developer"]["active"])
+        self.assertTrue(applying["developer"]["active"])
+        self.assertFalse(inactive["developer"]["active"])
+        self.assertFalse(malformed["developer"]["valid"])
+        self.assertFalse(WINDOW._developer_extension_active(malformed))
+
+    def test_active_developer_mode_requires_explicit_pause_confirmation(self):
+        window = self._window_for_install({"state": "active"})
+        window._show_developer_pause_dialog = Mock()
+        window._on_install_clicked(None)
+        window._show_developer_pause_dialog.assert_called_once_with()
+        window._show_toast.assert_not_called()
+
+    def test_canceling_developer_pause_leaves_update_untouched(self):
+        window = self._window_for_install({"state": "active"})
+        window._submit_async = Mock()
+        window._on_developer_pause_response(None, "cancel")
+        self.assertFalse(window._developer_pause_in_flight)
+        window._submit_async.assert_not_called()
+
+    def test_pause_failure_keeps_signed_candidate_available_and_does_not_install(self):
+        window = self._window_for_install({"state": "active"})
+        window._developer_pause_in_flight = True
+        window._submit_install_request = Mock()
+        outcome = WINDOW.CommandOutcome(
+            {"ok": False, "error": "pause_failed", "message": "Pause failed."},
+            1,
+            "Pause failed.",
+        )
+        window._after_developer_pause(outcome, None)
+        self.assertFalse(window._developer_pause_in_flight)
+        self.assertTrue(window._install_error)
+        self.assertEqual(window._status["state"], "available")
+        self.assertIn("Pause failed", window._operation_notice)
+        window._submit_install_request.assert_not_called()
+
+    def test_pause_without_success_acknowledgement_does_not_install(self):
+        window = self._window_for_install({"state": "active"})
+        window._developer_pause_in_flight = True
+        window._submit_install_request = Mock()
+        window._after_developer_pause(WINDOW.CommandOutcome({}, 0), None)
+        self.assertTrue(window._install_error)
+        window._submit_install_request.assert_not_called()
+
+    def test_pause_uses_fixed_privileged_action_then_retries_install(self):
+        window = self._window_for_install({"state": "active"})
+        submitted = []
+        window._submit_async = lambda operation, callback: submitted.append((operation, callback))
+        window._on_developer_pause_response(None, "pause")
+        self.assertEqual(len(submitted), 1)
+        operation, callback = submitted[0]
+        with patch.object(
+            WINDOW,
+            "_run_json_command",
+            return_value=WINDOW.CommandOutcome({"ok": True}, 0),
+        ) as run:
+            operation()
+        run.assert_called_once_with(WINDOW.DEVELOPER_PAUSE_COMMAND)
+        window._submit_install_request = Mock()
+        callback(WINDOW.CommandOutcome({"ok": True}, 0), None)
+        self.assertTrue(window._developer_pause_completed)
+        window._submit_install_request.assert_called_once_with()
+
+    def test_root_detected_active_developer_mode_stops_install_and_prompts(self):
+        window = self._window_for_install({"state": "inactive"})
+        window._show_developer_pause_dialog = Mock()
+        window._after_install(
+            WINDOW.CommandOutcome(
+                {
+                    "ok": False,
+                    "state": "error",
+                    "error": "developer_active",
+                    "message": "Developer Mode is active.",
+                },
+                1,
+                "Developer Mode is active.",
+            ),
+            None,
+        )
+        self.assertFalse(window._install_in_flight)
+        window._show_developer_pause_dialog.assert_called_once_with()
+
+    def test_inactive_developer_mode_preserves_normal_exact_install_command(self):
+        window = self._window_for_install({"state": "inactive"})
+        submitted = []
+        window._submit_async = lambda operation, callback: submitted.append((operation, callback))
+        window._on_install_clicked(None)
+        self.assertEqual(len(submitted), 1)
+        operation, _callback = submitted[0]
+        with patch.object(
+            WINDOW,
+            "_run_json_command",
+            return_value=WINDOW.CommandOutcome({"ok": True}, 0),
+        ) as run:
+            operation()
+        run.assert_called_once_with(
+            (
+                WINDOW.PKEXEC_COMMAND,
+                "--disable-internal-agent",
+                WINDOW.UPDATE_ADMIN_COMMAND,
+                "install",
+                "git-abcdef012345",
+                "a" * 64,
+            )
+        )
 
     def test_candidate_with_bad_digest_cannot_be_installed(self):
         status = WINDOW._normalise_status(
@@ -209,6 +345,8 @@ class UpdateWindowLogic(unittest.TestCase):
         self.assertIn("REFRESH_DEBOUNCE_MS", source)
         self.assertIn('UPDATE_COMMAND, "status", "--json"', source)
         self.assertIn('UPDATE_COMMAND, "check", "--json"', source)
+        self.assertIn("Pause developer changes and continue", source)
+        self.assertIn("pause-for-update", source)
         self.assertIn('"--disable-internal-agent"', source)
         self.assertIn('PKEXEC_COMMAND = "/usr/bin/pkexec"', source)
         self.assertIn("gnome-session-quit", source)

@@ -103,6 +103,7 @@ _OCI_LAYER_MEDIA_TYPES = frozenset(
     {
         "application/vnd.oci.image.layer.v1.tar",
         "application/vnd.oci.image.layer.v1.tar+gzip",
+        "application/vnd.oci.image.layer.v1.tar+zstd",
     }
 )
 

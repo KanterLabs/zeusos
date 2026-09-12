@@ -1,0 +1,16 @@
+{
+  "active_status": "HIERARCHY EXTENSIONS         SINCE|/opt      none               -|/usr      zeus-qualification Fri 2026-09-11 01:41:06 UTC|",
+  "active_value": "0.1.0-preview.2+sysext-qualified",
+  "apply_ms": 11.833103,
+  "base_sha256": "efdd0f34e6cf518a11a700ba7bef68869236c8caaadf1e1e4f647b6f8ec47eca",
+  "base_value": "0.1.0-preview.2",
+  "boot_avc_records": 0,
+  "boot_time": "Startup finished in 1.495s (kernel) + 2.379s (initrd) + 3.247s (userspace) = 7.122s  graphical.target reached after 3.244s in userspace. ",
+  "mismatch_status": "HIERARCHY EXTENSIONS SINCE|/opt      none       -|/usr      none       -|",
+  "mismatch_value": "0.1.0-preview.2",
+  "phase": "runtime",
+  "restored_sha256": "efdd0f34e6cf518a11a700ba7bef68869236c8caaadf1e1e4f647b6f8ec47eca",
+  "schema_version": 1,
+  "selinux": "Enforcing",
+  "unmerge_ms": 7.583882
+}

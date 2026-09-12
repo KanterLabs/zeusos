@@ -1,0 +1,20 @@
+[Unit]
+Description=Activate the verified Zeus Developer Mode extension
+After=local-fs.target systemd-sysext.service
+Before=graphical.target
+# Trigger only when there is an active reference or an interrupted transaction
+# to reconcile.  The leading pipes make these two conditions alternatives.
+ConditionPathExists=|/var/lib/zeus/developer-mode/active
+ConditionPathExists=|/var/lib/zeus/developer-mode/pending.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/zeus-developer-admin boot-activate
+TimeoutStartSec=120s
+UMask=0077
+
+# The unit is enabled in the image, but the trigger conditions keep Developer
+# Mode off until an authenticated action creates root-owned state.  The helper
+# exits after one bounded reconciliation; it is not a daemon.
+[Install]
+WantedBy=multi-user.target

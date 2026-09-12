@@ -55,7 +55,9 @@ COPY image/licenses/codex/ /usr/share/licenses/zeus-codex/
 COPY zeus/assets/welcome.py /usr/libexec/zeus-welcome
 COPY zeus/assets/org.zeus.Welcome.desktop /usr/share/applications/org.zeus.Welcome.desktop
 COPY image/inputs.json /usr/share/zeus/inputs.json
+COPY developer-mode/components.json /usr/share/zeus/developer-components.json
 COPY security/allowed_signers /usr/share/zeus/update-allowed-signers
+COPY security/developer_allowed_signers /usr/share/zeus/developer-allowed-signers
 COPY scripts/validate-bluetooth-audio.py /tmp/zeus-validate-bluetooth-audio.py
 COPY scripts/validate-browser.py /tmp/zeus-validate-browser.py
 COPY scripts/validate-codex.py /tmp/zeus-validate-codex.py
@@ -63,6 +65,10 @@ COPY scripts/validate-wifi.py /tmp/zeus-validate-wifi.py
 # Foreign-architecture build emulators register dozens of binfmt handlers at
 # every boot. They are optional development tools, not laptop runtime packages.
 RUN dnf remove -y --disable-repo='*' 'qemu-user-static*' && \
+    test -x /usr/bin/systemd-sysext && \
+    test -x /usr/bin/ssh-keygen && \
+    test -x /usr/bin/mount && \
+    test -x /usr/bin/umount && \
     ln -s /usr/lib/codex/bin/codex /usr/bin/codex && \
     python3 /tmp/zeus-validate-codex.py && \
     python3 /tmp/zeus-validate-bluetooth-audio.py --load-plugins --json && \
@@ -75,8 +81,14 @@ RUN dnf remove -y --disable-repo='*' 'qemu-user-static*' && \
     chmod 0755 /usr/libexec/zeus-browser-session && \
     chmod 0755 /usr/libexec/zeus-tailscale /usr/libexec/zeus-tailscale-admin && \
     chmod 0644 /usr/lib/zeus/tailscale_control.py /usr/share/polkit-1/actions/org.zeus.Tailscale.policy && \
+    find /usr/libexec -maxdepth 1 -type f -name 'zeus-developer*' -exec chmod 0755 {} + && \
+    find /usr/lib/zeus -maxdepth 1 -type f -name 'developer*' -exec chmod 0644 {} + && \
+    find /usr/share/polkit-1/actions -maxdepth 1 -type f -iname '*developer*.policy' -exec chmod 0644 {} + && \
+    find /usr/lib/tmpfiles.d -maxdepth 1 -type f -iname '*developer*.conf' -exec chmod 0644 {} + && \
+    find /usr/lib/systemd/system -maxdepth 1 -type f -iname '*developer*.service' -exec chmod 0644 {} + && \
     chmod 0644 /etc/xdg/autostart/zeus-browser.desktop /etc/xdg/mimeapps.list /etc/opt/chrome/policies/recommended/zeus.json && \
     chmod 0644 /usr/lib/zeus/settings_model.py /usr/share/applications/org.zeus.Settings.desktop /usr/share/icons/hicolor/scalable/apps/org.zeus.Settings.svg && \
+    chmod 0644 /usr/share/zeus/developer-components.json /usr/share/zeus/update-allowed-signers /usr/share/zeus/developer-allowed-signers && \
     glib-compile-schemas /usr/share/gnome-shell/extensions/zeus-shell@kanterlabs/schemas && \
     dconf update && \
     systemd-hwdb update --usr && \
@@ -87,12 +99,20 @@ RUN dnf remove -y --disable-repo='*' 'qemu-user-static*' && \
     systemctl enable gdm.service NetworkManager.service firewalld.service sshd.service power-profiles-daemon.service tailscaled.service && \
     systemctl enable cloud-init-local.service cloud-init-network.service cloud-init-main.service cloud-config.service cloud-final.service && \
     systemctl mask bootc-fetch-apply-updates.timer && \
-    systemctl enable zeus-tmpfiles.service zeus-temp-inspector.socket && \
+    systemctl enable zeus-tmpfiles.service zeus-temp-inspector.socket zeus-developer-activate.service && \
     mkdir -p /usr/share/zeus && \
     rpm -qa --qf '%{NAME}-%{EPOCHNUM}:%{VERSION}-%{RELEASE}.%{ARCH}\n' | sort > /usr/share/zeus/packages.lock && \
     printf '%s\n' "${VERSION}" > /usr/share/zeus/version && \
     printf '%s\n' "${SOURCE_COMMIT}" > /usr/share/zeus/source-commit && \
     printf '%s\n' "${BUILD_ID}" > /usr/share/zeus/build-id && \
     printf '%s\n' "${UPDATE_SEQUENCE}" > /usr/share/zeus/update-sequence && \
+    case "${BUILD_ID}" in \
+      ''|*[!a-z0-9._-]*) echo 'BUILD_ID must contain only lowercase letters, numbers, dots, underscores, and hyphens.' >&2; exit 1 ;; \
+    esac && \
+    if grep -q '^SYSEXT_LEVEL=' /usr/lib/os-release; then \
+      sed -i "s|^SYSEXT_LEVEL=.*$|SYSEXT_LEVEL=${BUILD_ID}|" /usr/lib/os-release; \
+    else \
+      printf 'SYSEXT_LEVEL=%s\n' "${BUILD_ID}" >> /usr/lib/os-release; \
+    fi && \
     sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="Zeus OS 0.1 Preview"/' /usr/lib/os-release && \
     bootc container lint

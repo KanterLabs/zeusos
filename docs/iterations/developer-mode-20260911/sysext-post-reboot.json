@@ -1,0 +1,17 @@
+{
+  "boot_active_status": "HIERARCHY EXTENSIONS         SINCE|/opt      none               -|/usr      zeus-qualification Fri 2026-09-11 01:41:30 UTC|",
+  "boot_active_value": "0.1.0-preview.2+sysext-qualified",
+  "boot_time": "Startup finished in 1.424s (kernel) + 2.372s (initrd) + 3.801s (userspace) = 7.598s  graphical.target reached after 3.800s in userspace. ",
+  "final_status": "HIERARCHY EXTENSIONS SINCE|/opt      none       -|/usr      none       -|",
+  "phase": "post_reboot",
+  "restored_sha256": "efdd0f34e6cf518a11a700ba7bef68869236c8caaadf1e1e4f647b6f8ec47eca",
+  "safe_desktop_selinux_context": "system_u:object_r:bin_t:s0",
+  "safe_desktop_sha256": "43e1247089f54ed25d8fbf3b5f51b532348ab9b0ab89dfac5840903f9db29577",
+  "schema_version": 1,
+  "selinux": "Enforcing",
+  "service_detail": "ActiveState=active|SubState=exited|ExecMainStartTimestampMonotonic=6312997|ExecMainExitTimestampMonotonic=6354829|MemoryCurrent=[not set]|CPUUsageNSec=21744000|",
+  "service_state": "active",
+  "sysext_avc_records": 0,
+  "sysext_boot_cost": "45ms systemd-sysext.service",
+  "sysext_processes_after_boot": 0
+}

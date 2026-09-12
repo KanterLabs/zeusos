@@ -70,7 +70,14 @@ def add_tar_file(archive, name, data):
     archive.addfile(member, io.BytesIO(data))
 
 
-def write_oci(path: Path, *, sequence: int | None = 42, extra=None, duplicate_index=False):
+def write_oci(
+    path: Path,
+    *,
+    sequence: int | None = 42,
+    extra=None,
+    duplicate_index=False,
+    layer_media_type="application/vnd.oci.image.layer.v1.tar",
+):
     config_labels = {
         "org.opencontainers.image.title": "Zeus OS",
         "org.opencontainers.image.source": "https://github.com/KanterLabs/zeusos",
@@ -100,7 +107,7 @@ def write_oci(path: Path, *, sequence: int | None = 42, extra=None, duplicate_in
         },
         "layers": [
             {
-                "mediaType": "application/vnd.oci.image.layer.v1.tar",
+                "mediaType": layer_media_type,
                 "digest": "sha256:" + layer_digest,
                 "size": len(layer_raw),
             }
@@ -408,6 +415,26 @@ class ArchiveTests(unittest.TestCase):
         path = self.directory / "historical.oci"
         write_oci(path, sequence=None)
         self.assertIsNone(updater.inspect_archive(path)["sequence"])
+
+    def test_standard_zstd_layers_are_accepted_but_unknown_compression_is_not(self):
+        zstd = self.directory / "zstd.oci"
+        digest = write_oci(
+            zstd,
+            layer_media_type="application/vnd.oci.image.layer.v1.tar+zstd",
+        )
+        self.assertEqual(
+            updater.inspect_archive(zstd)["manifest_digest"],
+            "sha256:" + digest,
+        )
+
+        unknown = self.directory / "unknown-compression.oci"
+        write_oci(
+            unknown,
+            layer_media_type="application/vnd.oci.image.layer.v1.tar+xz",
+        )
+        with self.assertRaises(updater.UpdateError) as context:
+            updater.inspect_archive(unknown)
+        self.assertEqual(context.exception.code, "archive_invalid")
 
 
 class DownloadTests(unittest.TestCase):

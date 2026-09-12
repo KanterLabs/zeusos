@@ -137,6 +137,17 @@ reboots on its own. When the Updates window reports **Ready**, save work and use
 If Temp is set to **On boot**, its eligible-file cleanup also runs for that
 update reboot.
 
+For the two-ESP installer layout, an update qualification must prove the
+release identity before the first restart and compare the same independent
+sentinels after both update and rollback. Fedora owns the first ESP and its
+`/boot`; Zeus owns the second ESP, its separate `/boot`, and its root/home.
+The update path must retain the previous Zeus deployment for rollback, leave
+Fedora's ESP/boot/BLS trees unchanged, and keep the selected Temp policy
+unchanged. A passing synthetic bootc rehearsal is not a released-update
+qualification. The current receipts record the synthetic VM117 lifecycle and
+the real Fedora VM118 kernel/GRUB update; a released signed Zeus update and a
+released rollback cycle remain pending (see the [qualification plan](iterations/installer-20260910/released-update-rollback-plan.md)).
+
 The implementation and command contract are recorded in the
 [updater feature notes](features/os-updater.md). Use the manual procedure below
 for bootstrap, recovery, or any image where the Updates app is not yet
@@ -271,6 +282,36 @@ sudo systemctl reboot
 
 Record the selected deployment and reboot. Do not use `dnf`, rpm layering, or a
 remote update service to repair this image.
+
+## Existing Zeus removal from Fedora
+
+Removal is an explicit Fedora-launched review, separate from update and
+rollback. The source review model in
+`installer/zeus_installer/launcher.py` presents two owner choices:
+
+1. **Remove boot-menu entry only (safe default).** The fixed planner removes
+   only the journal-owned `/etc/grub.d/42_zeus_dualboot` file, regenerates
+   Fedora's menu with `--no-grubenv-update`, and retains all Zeus partitions,
+   filesystems, and data. Fedora's ESP, `/boot`, root, existing entries, and
+   default boot path are preserved.
+2. **Remove Zeus completely.** This is a separately qualified destructive
+   operation. The review lists the exact journal-owned Zeus ESP, `/boot`, and
+   root GPT identities and requires typing the exact plan ID. Its data warning
+   says that all data on those three partitions is deleted with them. It first
+   proves Fedora is running, the three Zeus partitions are unmounted, the
+   target disk/GUIDs still match the journal, and a verified root-owned backup
+   plus VM qualification are present.
+
+Neither choice restores or rewrites Fedora's GRUB defaults, grubenv, EFI files,
+or unrelated menu scripts. Neither choice grows Fedora or automatically
+reclaims the freed sectors. Cancellation is a no-op. The removal plan and
+executor remain reviewable without GTK, commands, paths, and plan identities
+are fixed by the root-owned journal, and any changed identity fails closed.
+The VM118 menu-only rehearsal is the accepted live evidence; no destructive
+partition-removal command has been run. A real destructive qualification must
+use only the documented disposable VM and pre-change backup in the
+[qualification plan](iterations/installer-20260910/released-update-rollback-plan.md)
+and requires a separate owner-authorized run.
 
 ## Desktop and performance review
 

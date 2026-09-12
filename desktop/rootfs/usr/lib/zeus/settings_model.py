@@ -10,7 +10,9 @@ No value returned here is a control or a request to change device state.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from pathlib import Path
+from typing import Any, Mapping
 
 
 PRODUCT_VERSION = "0.1.0-preview.2"
@@ -18,6 +20,12 @@ DEFAULT_BUILD_ID = "development"
 GNOME_CONTROL_CENTER_COMMAND = "/usr/bin/gnome-control-center"
 VERSION_PATH = Path("/usr/share/zeus/version")
 BUILD_ID_PATH = Path("/usr/share/zeus/build-id")
+DEVELOPER_HELPER_PATH = "/usr/libexec/zeus-developer"
+DEVELOPER_ACTIONS = ("status", "enable", "apply", "undo", "disable")
+DEVELOPER_STATUS_STATES = frozenset(
+    {"off", "enabled", "active", "incompatible", "applying", "error"}
+)
+DEVELOPER_REQUIRED_ACTIONS = frozenset({"none", "restart", "logout", "reboot"})
 
 POWER_SUPPLY_PATH = Path("/sys/class/power_supply")
 BACKLIGHT_PATH = Path("/sys/class/backlight")
@@ -134,6 +142,298 @@ class HardwareState:
     backlight: bool | None
     wifi: bool | None
     bluetooth: bool | None
+
+
+@dataclass(frozen=True)
+class DeveloperStatus:
+    """The bounded public status returned by the Developer Mode helper.
+
+    The root helper owns the state file and authentication policy.  Settings
+    only renders this data, so unknown or malformed fields are reduced to
+    safe display fallbacks here.  ``focused_test_receipt`` is intentionally a
+    short human-readable receipt rather than arbitrary command output.
+    """
+
+    state: str = "off"
+    base_build: str = DEFAULT_BUILD_ID
+    active_commit: str = ""
+    artifact_digest: str = ""
+    required_action: str = "none"
+    focused_test_receipt: str = ""
+    applied_at: str = ""
+    message: str = ""
+    error: str = ""
+
+
+def _developer_text(value: Any, fallback: str = "", *, limit: int = 512) -> str:
+    """Convert one helper field to bounded text without leaking objects."""
+
+    if isinstance(value, str):
+        text = value.strip()
+    elif value is None:
+        return fallback
+    elif isinstance(value, (int, float, bool)):
+        text = str(value)
+    else:
+        # Receipts are occasionally represented as a small object by helper
+        # versions.  Keep only a compact JSON representation for display.
+        try:
+            text = json.dumps(value, sort_keys=True, separators=(",", ":"))
+        except (TypeError, ValueError):
+            return fallback
+    return text[:limit] if text else fallback
+
+
+def _developer_field(payload: Mapping[str, Any], *names: str) -> Any:
+    for name in names:
+        if name in payload:
+            return payload[name]
+    return None
+
+
+def _developer_state(value: Any, *, enabled: Any = None) -> str:
+    state = _developer_text(value).lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "disabled": "off",
+        "inactive": "off",
+        "needs_rebuild": "incompatible",
+        "needs_attention": "error",
+        "attention": "error",
+        "paused": "enabled",
+        "failed": "error",
+        "interrupted": "error",
+    }
+    state = aliases.get(state, state)
+    if not state:
+        state = "enabled" if enabled is True else "off"
+    return state if state in DEVELOPER_STATUS_STATES else "error"
+
+
+def _developer_receipt(value: Any) -> str:
+    if isinstance(value, Mapping):
+        # Accept the common receipt shapes while keeping the display concise.
+        result = _developer_text(_developer_field(value, "result", "status", "outcome"))
+        checked_at = _developer_text(_developer_field(value, "checked_at", "completed_at", "timestamp"))
+        if result and checked_at:
+            return f"{result} · {checked_at}"
+        if result:
+            return result
+    return _developer_text(value)
+
+
+def _developer_required_action(value: Any) -> str:
+    """Reduce one helper activation value or list to the public action."""
+
+    values = value if isinstance(value, (list, tuple)) else (value,)
+    for item in values:
+        action = _developer_text(item, limit=32).lower().replace("-", "_").replace(" ", "_")
+        if action in {"logout", "logout_login", "log_out", "log_out_in"}:
+            return "logout"
+        if action in {"reboot", "restart_system", "restart_os"}:
+            return "reboot"
+        if action.startswith("restart"):
+            return "restart"
+    return "none"
+
+
+def default_developer_status() -> DeveloperStatus:
+    """Return the safe status shown before the helper has answered."""
+
+    return DeveloperStatus()
+
+
+def developer_status_from_payload(value: Any) -> DeveloperStatus:
+    """Normalize one helper JSON object to the Settings display contract.
+
+    The helper may wrap the public object in ``status`` and may use the more
+    explicit ``*_id``/``source_commit`` names.  Supporting those aliases
+    keeps this unprivileged client compatible with the root contract while
+    retaining one stable model for the view and tests.
+    """
+
+    payload: Mapping[str, Any]
+    if isinstance(value, Mapping) and isinstance(value.get("status"), Mapping):
+        payload = value["status"]
+    elif isinstance(value, Mapping) and isinstance(value.get("developer"), Mapping):
+        payload = value["developer"]
+    elif isinstance(value, Mapping):
+        payload = value
+    else:
+        return DeveloperStatus(state="error", error="The Developer Mode helper returned an unreadable status.")
+
+    if not any(
+        key in payload
+        for key in ("state", "mode", "enabled", "active", "incompatible", "applying", "error")
+    ):
+        return DeveloperStatus(state="error", error="The Developer Mode helper returned an incomplete status.")
+
+    enabled = payload.get("enabled")
+    state = _developer_state(_developer_field(payload, "state", "mode"), enabled=enabled)
+    if payload.get("active") is True and state in {"off", "enabled"}:
+        state = "active"
+    if not _developer_text(_developer_field(payload, "state", "mode")):
+        if payload.get("incompatible") is True or payload.get("needs_rebuild") is True:
+            state = "incompatible"
+        elif payload.get("applying") is True:
+            state = "applying"
+        elif payload.get("active") is True:
+            state = "active"
+        elif _developer_text(_developer_field(payload, "error", "failure")):
+            state = "error"
+    required_action = _developer_required_action(
+        _developer_field(
+            payload,
+            "required_action",
+            "required_activation",
+            "activation_actions",
+            "activation",
+        )
+    )
+    if payload.get("required_logout") is True or payload.get("requires_logout") is True:
+        required_action = "logout"
+    elif payload.get("required_restart") is True or payload.get("requires_restart") is True:
+        required_action = "restart"
+    required_action = required_action if required_action in DEVELOPER_REQUIRED_ACTIONS else "none"
+    receipt = _developer_receipt(
+        _developer_field(
+            payload,
+            "focused_test_receipt",
+            "test_receipt",
+            "focused_tests",
+            "focused_test",
+            "tests_receipt",
+        )
+    )
+    return DeveloperStatus(
+        state=state,
+        base_build=_developer_text(
+            _developer_field(
+                payload,
+                "base_build",
+                "base_build_id",
+                "base_sysext_level",
+                "build_id",
+            ),
+            DEFAULT_BUILD_ID,
+            limit=128,
+        ),
+        active_commit=_developer_text(
+            _developer_field(payload, "active_commit", "source_commit", "commit"),
+            limit=128,
+        ),
+        artifact_digest=_developer_text(
+            _developer_field(
+                payload,
+                "artifact_digest",
+                "active_artifact_digest",
+                "active_digest",
+                "artifact",
+            ),
+            limit=128,
+        ),
+        required_action=required_action,
+        focused_test_receipt=receipt,
+        applied_at=_developer_text(
+            _developer_field(payload, "applied_at", "application_time", "applied_time"),
+            limit=128,
+        ),
+        message=_developer_text(_developer_field(payload, "message", "summary")),
+        error=_developer_text(_developer_field(payload, "error", "failure")),
+    )
+
+
+def developer_status_from_json(value: str) -> DeveloperStatus:
+    """Parse one bounded JSON response from ``zeus-developer status``."""
+
+    if not isinstance(value, str):
+        return DeveloperStatus(state="error", error="The Developer Mode helper returned an unreadable status.")
+    text = value.strip()
+    if not text:
+        return DeveloperStatus(state="error", error="The Developer Mode helper returned no status.")
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        # Permit a small amount of launcher noise without accepting arbitrary
+        # trailing content as a status object.
+        start = text.find("{")
+        end = text.rfind("}")
+        if start < 0 or end <= start:
+            return DeveloperStatus(state="error", error="The Developer Mode helper returned invalid JSON.")
+        try:
+            parsed = json.loads(text[start : end + 1])
+        except json.JSONDecodeError:
+            return DeveloperStatus(state="error", error="The Developer Mode helper returned invalid JSON.")
+    return developer_status_from_payload(parsed)
+
+
+def developer_argv(
+    action: str,
+    *,
+    json_status: bool = False,
+    artifact_digest: str | None = None,
+) -> tuple[str, ...]:
+    """Build the only argv accepted by the Developer Mode helper."""
+
+    if action not in DEVELOPER_ACTIONS:
+        raise ValueError(f"unknown Developer Mode action: {action}")
+    if json_status and action != "status":
+        raise ValueError("JSON output is available only for Developer Mode status")
+    if artifact_digest is not None:
+        if action != "apply" or len(artifact_digest) != 64 or any(
+            character not in "0123456789abcdef" for character in artifact_digest
+        ):
+            raise ValueError("Developer artifact selection must be a 64-hex digest for apply")
+    arguments = [DEVELOPER_HELPER_PATH, action]
+    if artifact_digest is not None:
+        arguments.append(artifact_digest)
+    if json_status:
+        arguments.append("--json")
+    return tuple(arguments)
+
+
+def developer_state_title(state: str) -> str:
+    """Return a short owner-facing title for a normalized state."""
+
+    return {
+        "off": "Developer Mode is off",
+        "enabled": "Developer Mode is enabled",
+        "active": "Developer Mode is active",
+        "incompatible": "Developer artifact needs a rebuild",
+        "applying": "Applying Developer Mode",
+        "error": "Developer Mode needs attention",
+    }.get(state, "Developer Mode status")
+
+
+def developer_state_description(status: DeveloperStatus) -> str:
+    """Return one concise description including actionable recovery context."""
+
+    if status.error:
+        return status.error
+    if status.message:
+        return status.message
+    return {
+        "off": "Enable it when you want to review a verified repository artifact.",
+        "enabled": "Administrator authentication is complete; apply a verified prepared artifact when ready.",
+        "active": "A verified repository artifact is active in the desktop.",
+        "incompatible": "The active artifact targets another base build. Rebuild it for this installation.",
+        "applying": "The helper is verifying and activating the selected artifact.",
+        "error": "The helper could not read a usable Developer Mode status.",
+    }.get(status.state, "Developer Mode status is unavailable.")
+
+
+def developer_status_summary(status: DeveloperStatus) -> str:
+    """Format the provenance fields for a compact card."""
+
+    details = [f"Base build: {status.base_build}"]
+    if status.active_commit:
+        details.append(f"Commit: {status.active_commit}")
+    else:
+        details.append("Commit: none")
+    if status.artifact_digest:
+        details.append(f"Artifact: {status.artifact_digest}")
+    else:
+        details.append("Artifact: none")
+    return " · ".join(details)
 
 
 def _directory_entries(path: Path) -> tuple[Path, ...] | None:
@@ -345,9 +645,14 @@ __all__ = [
     "BLUETOOTH_PATH",
     "BUILD_ID_PATH",
     "DEFAULT_BUILD_ID",
+    "DEVELOPER_ACTIONS",
+    "DEVELOPER_HELPER_PATH",
+    "DEVELOPER_REQUIRED_ACTIONS",
+    "DEVELOPER_STATUS_STATES",
     "DESTINATIONS",
     "DESTINATIONS_BY_KEY",
     "Destination",
+    "DeveloperStatus",
     "GNOME_CONTROL_CENTER_COMMAND",
     "HardwareState",
     "LOCAL_DESTINATIONS",
@@ -358,7 +663,14 @@ __all__ = [
     "PRODUCT_VERSION",
     "VERSION_PATH",
     "availability_text",
+    "default_developer_status",
     "destination",
+    "developer_argv",
+    "developer_state_description",
+    "developer_state_title",
+    "developer_status_from_json",
+    "developer_status_from_payload",
+    "developer_status_summary",
     "discover_hardware",
     "hardware_summary",
     "local_command",

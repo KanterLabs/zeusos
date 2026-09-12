@@ -26,6 +26,25 @@ cannot change the image selected by this installer.
 | Menu-only removal | The real installed Fedora journal selected only the owned Zeus menu script. Cancellation and repeated removal were harmless. The exact script and generated configuration were re-enabled afterward; Fedora defaults/grubenv, data sentinels and all partition identities remained unchanged. [Receipt](vm118-menu-removal.json), [rehearsal script](vm118-menu-removal.sh). |
 | Scoped EFI writes | Separate initial-install and ongoing-update probes restricted writes to the mounted Zeus ESP and preserved the earlier Fedora ESP. The ongoing probe used a synthetic byte/metadata mutation; it does not qualify a released shim update's bootability. [Contract and limits](efi-update-contract.md). |
 
+## ZOS-83 acceptance boundary
+
+The clean VM evidence proves the two-ESP geometry, a real Fedora kernel/GRUB
+update, and a menu-only removal rehearsal. The Zeus lifecycle receipt is a
+synthetic marker-only update/rollback; it is not a released signed Zeus
+artifact. Independent Fedora and Zeus homes are represented by the existing
+sentinels, but Temp isolation has not yet been recorded across a released
+update and rollback. The released signed lifecycle row therefore remains
+open until the owner-authorized sequence in the [qualification plan](released-update-rollback-plan.md)
+produces its required receipt.
+
+The removal source contract is now explicit: the safe default retains Zeus
+data and removes only the journal-owned Fedora menu script; full removal is a
+separate exact-plan-ID, backup- and VM-gated operation that deletes only the
+three journal-owned Zeus partitions. Both choices preserve Fedora's ESP,
+`/boot`, root, existing entries, and default boot path. Neither choice
+automatically reclaims or reallocates free space. The accepted VM118
+menu-only receipt is unchanged; no destructive partition deletion was run.
+
 The disposable VMs used 4 CPUs, 8 GiB RAM, UEFI with Secure Boot disabled, a
 931.5 GiB target disk, Fedora 43 Btrfs root/home and a separate sentinel disk.
 VM115, the normal Zeus desktop preview, was not an installer target.
@@ -65,8 +84,9 @@ The exact supported layout and verified-backup receipt requirement are in the
 [installer guide](../../../installer/README.md). No laptop partitions have
 been changed.
 
-The tested removal scope is the owned boot-menu entry. A graphical uninstaller
-and automatic partition-space reclamation are separate work. User data is
+The tested removal scope is the owned boot-menu entry. The graphical review
+model and explicit data choices are source-qualified, while a destructive
+partition-removal run remains separately gated and unperformed. User data is
 never discarded as part of an OS update or rollback.
 
 Installation timings and conditions are appended to the

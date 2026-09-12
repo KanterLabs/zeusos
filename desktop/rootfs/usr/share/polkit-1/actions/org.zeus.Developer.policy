@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD polkit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>Zeus OS</vendor>
+  <action id="org.zeus.Developer.manage">
+    <description>Change Zeus Developer Mode</description>
+    <message>Administrator authentication is required to change Developer Mode.</message>
+    <icon_name>applications-development</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/zeus-developer-admin</annotate>
+  </action>
+</policyconfig>

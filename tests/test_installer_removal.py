@@ -98,6 +98,18 @@ class RemovalPlanTests(unittest.TestCase):
         )
         self.assertTrue(result["menu"]["preserve_owner_settings"])
         self.assertTrue(result["menu"]["preserve_other_entries"])
+        self.assertEqual(result["data_policy"], removal.DATA_RETAIN)
+        self.assertEqual(result["data"]["action"], "preserve")
+        self.assertTrue(result["data"]["explicit_confirmation"])
+        self.assertEqual(
+            [item["number"] for item in result["data"]["resources"]],
+            [4, 5, 6],
+        )
+        self.assertEqual(
+            [(item["role"], item["number"]) for item in result["fedora_preservation"]["partitions"]],
+            [("esp", 1), ("boot", 2), ("root", 3)],
+        )
+        self.assertFalse(result["space"]["automatic_reclaim"])
 
     def test_unknown_disk_identity_refuses_before_any_operation(self) -> None:
         record, inventory = fixture()
@@ -173,6 +185,41 @@ class RemovalPlanTests(unittest.TestCase):
             result["operations"][-1]["partition_guids"],
             [str(uuid.UUID(int=index)) for index in (4, 5, 6)],
         )
+        self.assertEqual(result["data_policy"], removal.DATA_DELETE)
+        self.assertEqual(result["data"]["action"], "delete_with_partitions")
+        self.assertEqual(result["operations"][-1]["owner"], "journal")
+        self.assertEqual(result["operations"][-1]["data_policy"], removal.DATA_DELETE)
+
+    def test_data_policy_is_explicit_and_cannot_conflict_with_mode(self) -> None:
+        record, inventory = fixture()
+        with self.assertRaises(removal.RemovalError) as context:
+            removal.build_plan(record, inventory, data_policy=removal.DATA_DELETE)
+        self.assertEqual(context.exception.code, "data_policy_conflict")
+
+        record["executor_state"]["vm_tested"] = True
+        with self.assertRaises(removal.RemovalError) as context:
+            removal.build_plan(
+                record,
+                inventory,
+                mode=removal.DESTRUCTIVE,
+                data_policy=removal.DATA_RETAIN,
+                confirm_plan_id=record["operation_id"],
+            )
+        self.assertEqual(context.exception.code, "data_policy_conflict")
+
+    def test_plan_validation_rejects_space_reclaim_or_fedora_boot_mutation(self) -> None:
+        record, inventory = fixture()
+        result = removal.build_plan(record, inventory)
+        result["space"]["automatic_reclaim"] = True
+        with self.assertRaises(removal.RemovalError) as context:
+            removal.validate_plan(result)
+        self.assertEqual(context.exception.code, "invalid_plan")
+
+        result = removal.build_plan(record, inventory)
+        result["fedora_preservation"]["retain_esp"] = False
+        with self.assertRaises(removal.RemovalError) as context:
+            removal.validate_plan(result)
+        self.assertEqual(context.exception.code, "invalid_plan")
 
     def test_cancellation_is_a_noop_and_repeat_menu_removal_is_safe(self) -> None:
         record, inventory = fixture()
@@ -237,6 +284,67 @@ class RemovalPlanTests(unittest.TestCase):
         repeated = removal.remove(journal, {**inventory, "bootmenu": {"present": False}}, executor=executor, apply=True, require_root=False)
         self.assertTrue(repeated["idempotent"])
         self.assertEqual(commands, [[removal.GRUB2_MKCONFIG, removal.GRUB_NO_GRUBENV_UPDATE, "-o", str(removal.FEDORA_GRUB_CONFIG)]])
+
+    def test_qualified_destructive_hook_deletes_only_journal_owned_partitions(self) -> None:
+        record, inventory = fixture()
+        record["executor_state"]["vm_tested"] = True
+        commands: list[list[str]] = []
+
+        class MemoryJournal:
+            require_root = False
+
+            def __init__(self, value: dict[str, object]) -> None:
+                self.value = value
+
+            def load(self) -> dict[str, object]:
+                return self.value
+
+            def write(self, value: dict[str, object]) -> None:
+                self.value = copy.deepcopy(value)
+
+        class Runner:
+            def run(self, argv: list[str]) -> object:
+                commands.append(argv)
+                return type("Result", (), {"returncode": 0})()
+
+        journal = MemoryJournal(record)
+        plan = removal.build_plan(
+            record,
+            inventory,
+            mode=removal.DESTRUCTIVE,
+            data_policy=removal.DATA_DELETE,
+            confirm_plan_id=record["operation_id"],
+            require_root=False,
+        )
+        executor = removal.RemovalExecutor(
+            qualified=True,
+            reader=lambda _path: None,
+            remove_file=lambda _path: None,
+            runner=Runner(),
+            require_root=False,
+        )
+        result = removal.remove(
+            journal,
+            inventory,
+            mode=removal.DESTRUCTIVE,
+            data_policy=removal.DATA_DELETE,
+            confirm_plan_id=record["operation_id"],
+            executor=executor,
+            apply=True,
+            require_root=False,
+        )
+        self.assertEqual(result["state"], "partitions_removed")
+        self.assertEqual(
+            commands,
+            [
+                [removal.GRUB2_MKCONFIG, removal.GRUB_NO_GRUBENV_UPDATE, "-o", str(removal.FEDORA_GRUB_CONFIG)],
+                [removal.SGDISK, "--delete", "4", "--delete", "5", "--delete", "6", "/dev/nvme0n1"],
+            ],
+        )
+        self.assertEqual(journal.value["removal"]["data_policy"], removal.DATA_DELETE)
+        self.assertTrue(journal.value["removal"]["fedora_preserved"])
+        self.assertFalse(journal.value["removal"]["automatic_reclaim"])
+        self.assertEqual(plan["data"]["resources"], plan["zeus_resources"])
 
 
 if __name__ == "__main__":

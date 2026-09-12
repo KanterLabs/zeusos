@@ -175,6 +175,142 @@ exit 23
                     self.assertIn(f"update {action}", result.stderr)
                     self.assertIn("no reboot was requested", result.stderr)
 
+    def test_developer_actions_use_fixed_helper_argv_and_json_status(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            arguments_log = Path(temporary) / "developer-args"
+            helper = make_executable(
+                temporary,
+                "zeus-developer",
+                f'''#!/bin/sh
+printf '%s\\n' "$@" > "{arguments_log}"
+if [ "$1" = status ]; then
+  printf '{{"ok":true,"state":"active","base_build":"git-base","active_commit":"%s","artifact_digest":"sha256:%s","required_action":"logout"}}\\n' "$2" "$2"
+else
+  printf '{{"ok":true,"state":"%s"}}\\n' "$1"
+fi
+''',
+            )
+
+            for action in ("enable", "apply", "undo", "disable"):
+                with self.subTest(action=action):
+                    result = self.run_cli(
+                        "developer",
+                        action,
+                        env={"ZEUS_DEVELOPER_HELPER": helper},
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(arguments_log.read_text(encoding="utf-8").splitlines(), [action])
+
+            digest = "c" * 64
+            result = self.run_cli(
+                "developer",
+                "apply",
+                digest,
+                env={"ZEUS_DEVELOPER_HELPER": helper},
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(arguments_log.read_text(encoding="utf-8").splitlines(), ["apply", digest])
+
+            result = self.run_cli(
+                "developer",
+                "apply",
+                "A" * 64,
+                env={"ZEUS_DEVELOPER_HELPER": helper},
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("take no arguments", result.stderr)
+            self.assertEqual(arguments_log.read_text(encoding="utf-8").splitlines(), ["apply", digest])
+
+            result = self.run_cli(
+                "developer",
+                "status",
+                "--json",
+                env={"ZEUS_DEVELOPER_HELPER": helper},
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout)["state"], "active")
+            self.assertEqual(arguments_log.read_text(encoding="utf-8").splitlines(), ["status", "--json"])
+
+    def test_developer_rejects_options_for_mutating_actions(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            marker = Path(temporary) / "helper-called"
+            helper = make_executable(
+                temporary,
+                "zeus-developer",
+                f'#!/bin/sh\ntouch "{marker}"\n',
+            )
+            result = self.run_cli(
+                "developer",
+                "apply",
+                "--json",
+                env={"ZEUS_DEVELOPER_HELPER": helper},
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("other Developer Mode actions take no arguments", result.stderr)
+            self.assertFalse(marker.exists())
+
+    def test_developer_missing_helper_fails_without_falling_back_to_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            missing = Path(temporary) / "missing-zeus-developer"
+            result = self.run_cli(
+                "developer",
+                "status",
+                "--json",
+                env={"ZEUS_DEVELOPER_HELPER": missing},
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("/usr/libexec/zeus-developer is unavailable", result.stderr)
+
+    def test_doctor_json_and_version_include_developer_provenance_when_available(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            helper = make_executable(
+                temporary,
+                "zeus-developer",
+                '''#!/bin/sh
+printf '%s\\n' '{"ok":true,"state":"active","base_build":"git-base","active_commit":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","artifact_digest":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","required_action":"logout","focused_test_receipt":"passed","applied_at":"2026-09-11T01:00:00Z"}'
+''',
+            )
+            result = self.run_cli(
+                "doctor",
+                "--json",
+                env={"ZEUS_DEVELOPER_HELPER": helper},
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            report = json.loads(result.stdout)
+            self.assertTrue(report["developer"]["available"])
+            self.assertTrue(report["developer"]["active"])
+            self.assertEqual(report["developer"]["state"], "active")
+            self.assertEqual(report["developer"]["base_build"], "git-base")
+            self.assertEqual(report["developer"]["required_action"], "logout")
+
+            version = self.run_cli("version", env={"ZEUS_DEVELOPER_HELPER": helper})
+            self.assertEqual(version.returncode, 0, version.stderr)
+            self.assertIn("Developer Mode: active", version.stdout)
+            self.assertIn("Developer commit:", version.stdout)
+
+    def test_doctor_normalises_runtime_status_aliases_and_activation_array(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            helper = make_executable(
+                temporary,
+                "zeus-developer",
+                '''#!/bin/sh
+printf '%s\\n' '{"ok":true,"state":"disabled","base_sysext_level":"git-base","source_commit":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","active_digest":null,"required_activation":["restart-settings"]}'
+''',
+            )
+            result = self.run_cli(
+                "doctor",
+                "--json",
+                env={"ZEUS_DEVELOPER_HELPER": helper},
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            developer = json.loads(result.stdout)["developer"]
+            self.assertEqual(developer["state"], "off")
+            self.assertEqual(developer["base_build"], "git-base")
+            self.assertEqual(developer["base_build_id"], "git-base")
+            self.assertEqual(developer["active_commit"], "a" * 40)
+            self.assertEqual(developer["required_action"], "restart")
+            self.assertEqual(developer["indicator"], "")
+
     def test_dev_dry_run_uses_one_validated_ssh_destination(self):
         result = self.run_cli("dev", "--target", "dev.example", "--dry-run")
         self.assertEqual(result.returncode, 0, result.stderr)

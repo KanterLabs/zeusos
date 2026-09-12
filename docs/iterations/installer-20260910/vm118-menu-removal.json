@@ -29,6 +29,17 @@
       "path": "/dev/sda",
       "guid": "c7ca432a-3aa0-4c61-95c7-7c06037adabf"
     },
+    "data_policy": "retain",
+    "data_action": "preserve",
+    "zeus_resources_owner": "journal",
+    "fedora_preservation": {
+      "default_boot": "fedora",
+      "retains_esp": true,
+      "retains_boot": true,
+      "retains_root": true,
+      "other_entries_unchanged": true
+    },
+    "automatic_space_reclaim": false,
     "zeus_partitions": [
       {
         "number": 4,

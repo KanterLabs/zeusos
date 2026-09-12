@@ -31,10 +31,22 @@ from gi.repository import Adw, Gio, GLib, Gtk, Pango
 APPLICATION_ID = "org.zeus.Updates"
 UPDATE_COMMAND = "/usr/libexec/zeus-update"
 UPDATE_ADMIN_COMMAND = "/usr/libexec/zeus-update-admin"
+DEVELOPER_ADMIN_COMMAND = "/usr/libexec/zeus-developer-admin"
 PKEXEC_COMMAND = "/usr/bin/pkexec"
 STATUS_DIRECTORY = Path("/var/lib/zeus/updater")
 STATUS_FILENAME = "status.json"
 STATUS_PATH = STATUS_DIRECTORY / STATUS_FILENAME
+DEVELOPER_STATUS_DIRECTORY = Path("/var/lib/zeus/developer-mode")
+DEVELOPER_STATUS_FILENAME = "status.json"
+DEVELOPER_STATUS_PATH = DEVELOPER_STATUS_DIRECTORY / DEVELOPER_STATUS_FILENAME
+DEVELOPER_STATUS_LIMIT = 128 * 1024
+DEVELOPER_PAUSE_ACTION = "pause-for-update"
+DEVELOPER_PAUSE_COMMAND = (
+    PKEXEC_COMMAND,
+    "--disable-internal-agent",
+    DEVELOPER_ADMIN_COMMAND,
+    DEVELOPER_PAUSE_ACTION,
+)
 REBOOT_COMMAND = ("/usr/bin/gnome-session-quit", "--reboot")
 REFRESH_DEBOUNCE_MS = 250
 COMMAND_TIMEOUT_SECONDS = 120
@@ -60,6 +72,26 @@ AUTHORITATIVE_STATES = frozenset(
 BUSY_STATES = frozenset({"queued", "downloading", "verifying", "staging"})
 INSTALLABLE_BUILD_RE = re.compile(r"git-[0-9a-f]{12}\Z")
 SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
+DEVELOPER_STATES = frozenset(
+    {
+        "off",
+        "disabled",
+        "inactive",
+        "enabled",
+        "active",
+        "applying",
+        "incompatible",
+        "attention",
+        "needs_rebuild",
+        "paused",
+        "error",
+        "interrupted",
+        "needs_attention",
+    }
+)
+DEVELOPER_ACTIVE_STATES = frozenset(
+    {"active", "applying", "interrupted", "needs_attention", "error"}
+)
 
 
 def _read_text(path: Path, fallback: str) -> str:
@@ -154,6 +186,34 @@ def _normalise_progress(value: Any) -> dict[str, int] | None:
     return {"bytes": min(bytes_done, total), "total": total}
 
 
+def _normalise_developer_status(value: Any) -> dict[str, Any] | None:
+    """Reduce Developer Mode state to the fields the Updates UI needs."""
+
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        return {"state": "unknown", "active": False, "valid": False}
+    raw_state = _text(value.get("state"))
+    state = (
+        raw_state.lower().replace("-", "_").replace(" ", "_")
+        if raw_state
+        else "unknown"
+    )
+    explicit_active = value.get("active")
+    if explicit_active is not None and not isinstance(explicit_active, bool):
+        return {"state": "unknown", "active": False, "valid": False}
+    valid = state in DEVELOPER_STATES
+    active = state in DEVELOPER_ACTIVE_STATES or explicit_active is True
+    return {"state": state, "active": active, "valid": valid}
+
+
+def _developer_extension_active(status: Mapping[str, Any] | None) -> bool:
+    if not isinstance(status, Mapping):
+        return False
+    developer = status.get("developer")
+    return isinstance(developer, Mapping) and developer.get("active") is True
+
+
 def _normalise_status(value: Any) -> dict[str, Any] | None:
     """Keep the public JSON contract predictable before rendering it."""
 
@@ -175,6 +235,7 @@ def _normalise_status(value: Any) -> dict[str, Any] | None:
         "error": _text(value.get("error")),
         "checked_at": _text(value.get("checked_at")),
     }
+    status["developer"] = _normalise_developer_status(value.get("developer"))
     # Preserve only useful contract fields.  This lets a helper response
     # carry future metadata without allowing arbitrary values into the UI.
     return status
@@ -577,6 +638,8 @@ class UpdatesWindow(Adw.ApplicationWindow):
         self._status_in_flight = False
         self._check_in_flight = False
         self._install_in_flight = False
+        self._developer_pause_in_flight = False
+        self._developer_pause_completed = False
         self._refresh_source: int | None = None
         self._refresh_again = False
         self._status_file_dirty = False
@@ -1053,11 +1116,99 @@ class UpdatesWindow(Adw.ApplicationWindow):
         if not _candidate_is_installable(candidate):
             self._show_toast("This update is missing verified selection details. Check again to refresh it.")
             return
-        if self._install_in_flight or _is_authoritative_status(self._status):
+        if (
+            self._install_in_flight
+            or self._developer_pause_in_flight
+            or _is_authoritative_status(self._status)
+        ):
+            return
+        if _developer_extension_active(self._status):
+            self._show_developer_pause_dialog()
+            return
+        self._submit_install_request()
+
+    def _show_developer_pause_dialog(self):
+        if self._closed or self._developer_pause_in_flight or self._install_in_flight:
+            return
+        dialog = Adw.AlertDialog.new(
+            "Pause Developer Mode before updating?",
+            "An active Developer Mode extension changes system files. Pause developer "
+            "changes before staging this signed Zeus OS update. The extension will stay "
+            "inactive after the update until it is rebuilt for the new base.",
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("pause", "Pause developer changes and continue")
+        dialog.set_response_appearance("pause", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+        dialog.connect("response", self._on_developer_pause_response)
+        dialog.present(self)
+
+    def _on_developer_pause_response(self, _dialog: Adw.AlertDialog, response: str):
+        if response != "pause" or self._closed:
+            return
+        self._developer_pause_in_flight = True
+        self._operation_notice = "Authentication is required to pause Developer Mode before staging."
+        self._operation_notice_kind = "info"
+        self._render_status()
+        self._submit_async(
+            lambda: _run_json_command(DEVELOPER_PAUSE_COMMAND),
+            self._after_developer_pause,
+        )
+
+    def _after_developer_pause(
+        self,
+        outcome: CommandOutcome | None,
+        error: Exception | None,
+    ):
+        if self._closed:
+            return
+        self._developer_pause_in_flight = False
+        if error is not None:
+            self._set_install_failure(f"Developer Mode could not be paused: {error}")
+            return
+        if not isinstance(outcome, CommandOutcome):
+            self._set_install_failure("Developer Mode pause returned no result. The update was not started.")
+            return
+        if _is_authentication_denial(outcome):
+            self._set_install_failure(
+                "Authentication was canceled or denied. Developer Mode remains active and the update was not started."
+            )
+            return
+        if (
+            outcome.returncode != 0
+            or outcome.error is not None
+            or not isinstance(outcome.payload, Mapping)
+            or outcome.payload.get("ok") is not True
+        ):
+            self._set_install_failure(
+                outcome.error or "Developer Mode could not be paused. The update was not started."
+            )
+            return
+        developer = _normalise_developer_status(outcome.payload.get("developer"))
+        if developer is not None and developer.get("active") is True:
+            self._set_install_failure(
+                "Developer Mode is still active after the pause request. The update was not started."
+            )
+            return
+        self._developer_pause_completed = True
+        self._operation_notice = "Developer Mode paused. Authentication is required before the update can be staged."
+        self._operation_notice_kind = "info"
+        self._submit_install_request()
+
+    def _submit_install_request(self):
+        """Submit the exact signed selection to the privileged updater."""
+
+        if self._closed or self._install_in_flight or self._developer_pause_in_flight:
+            return
+        candidate = self._status.get("candidate")
+        if not _candidate_is_installable(candidate):
+            self._show_toast("This update is missing verified selection details. Check again to refresh it.")
             return
         build_id = str(candidate["build_id"])
         archive_sha256 = str(candidate["archive_sha256"])
-        self._operation_notice = "Authentication is required before the update can be staged."
+        if not self._operation_notice:
+            self._operation_notice = "Authentication is required before the update can be staged."
         self._operation_notice_kind = "info"
         self._install_error = False
         self._install_in_flight = True
@@ -1080,6 +1231,19 @@ class UpdatesWindow(Adw.ApplicationWindow):
         if self._closed:
             return
         self._install_in_flight = False
+        raw_payload = outcome.payload if isinstance(outcome, CommandOutcome) else None
+        if (
+            isinstance(raw_payload, Mapping)
+            and raw_payload.get("error") == "developer_active"
+        ):
+            if self._developer_pause_completed:
+                self._developer_pause_completed = False
+                self._set_install_failure(
+                    "Developer Mode is still active after the pause request. The update was not started."
+                )
+            else:
+                self._show_developer_pause_dialog()
+            return
         if error is not None:
             self._set_install_failure(f"The update request could not be started: {error}")
             return
@@ -1124,6 +1288,7 @@ class UpdatesWindow(Adw.ApplicationWindow):
             self._schedule_status_refresh()
 
     def _set_install_failure(self, message: str):
+        self._developer_pause_in_flight = False
         self._install_error = True
         self._operation_notice = message
         self._operation_notice_kind = "error"
@@ -1251,9 +1416,20 @@ class UpdatesWindow(Adw.ApplicationWindow):
             self._candidate_release.set_text(build_id)
 
         self._check_button.set_label("Checking…" if self._check_in_flight else "Check for Updates")
-        self._check_button.set_sensitive(not self._check_in_flight and not self._install_in_flight and not active)
+        self._check_button.set_sensitive(
+            not self._check_in_flight
+            and not self._install_in_flight
+            and not self._developer_pause_in_flight
+            and not active
+        )
         installable = _candidate_is_installable(candidate)
-        can_install = state == "available" and installable and not self._install_in_flight and not self._check_in_flight
+        can_install = (
+            state == "available"
+            and installable
+            and not self._install_in_flight
+            and not self._developer_pause_in_flight
+            and not self._check_in_flight
+        )
         self._install_button.set_label("Try Install Again" if self._install_error else "Install Update")
         self._install_button.set_sensitive(can_install)
         self._restart_button.set_visible(state == "ready")

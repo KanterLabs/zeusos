@@ -375,6 +375,22 @@ def main() -> dict:
         raise RuntimeError("menu-only plan emitted an unexpected operation")
     if plan.get("mode") != removal.MENU_ONLY or plan.get("backup") is not None:
         raise RuntimeError("menu-only plan crossed a destructive boundary")
+    if (
+        plan.get("data_policy") != removal.DATA_RETAIN
+        or plan.get("data", {}).get("action") != "preserve"
+        or plan.get("data", {}).get("owner") != "journal"
+    ):
+        raise RuntimeError("menu-only plan did not explicitly retain journal-owned Zeus data")
+    fedora_preservation = plan.get("fedora_preservation", {})
+    if (
+        fedora_preservation.get("default_boot") != "fedora"
+        or fedora_preservation.get("retain_esp") is not True
+        or fedora_preservation.get("retain_boot") is not True
+        or fedora_preservation.get("retain_root") is not True
+    ):
+        raise RuntimeError("menu-only plan did not retain Fedora boot resources")
+    if plan.get("space", {}).get("automatic_reclaim") is not False:
+        raise RuntimeError("menu-only plan requested automatic space reclamation")
     if any(
         operation.get("kind") in {"delete_partitions", "resize", "reallocate"}
         for operation in plan.get("operations", [])
@@ -567,6 +583,11 @@ def main() -> dict:
             "recorded_menu_sha256": plan.get("menu", {}).get("recorded_sha256"),
             "disk": plan.get("disk"),
             "zeus_partitions": plan.get("zeus_partitions"),
+            "zeus_resources": plan.get("zeus_resources"),
+            "data_policy": plan.get("data_policy"),
+            "data_action": plan.get("data", {}).get("action"),
+            "fedora_preservation": plan.get("fedora_preservation"),
+            "automatic_space_reclaim": plan.get("space", {}).get("automatic_reclaim"),
             "operations": plan.get("operations"),
             "backup": plan.get("backup"),
         },

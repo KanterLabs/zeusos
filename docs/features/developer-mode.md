@@ -1,6 +1,7 @@
 # Repository-backed Developer Mode
 
-Status: implementation plan. The active product version remains
+Status: desktop-extension foundation implemented for the next signed preview
+iteration. The active product version remains
 **0.1.0-preview.2**; developer iterations are identified by exact Git commits
 and never create a product version by themselves.
 
@@ -52,7 +53,7 @@ Developer Mode appears under **Settings → Advanced → Developer Mode**. It sh
 - the changed components and whether an app restart, logout, or OS reboot is
   required;
 - the most recent focused-test receipt and application time; and
-- **Apply current repo commit**, **Undo last apply**, and **Turn off Developer
+- **Apply prepared change**, **Undo last apply**, and **Turn off Developer
   Mode** actions.
 
 The Zeus status area displays a restrained **DEV** indicator whenever a
@@ -71,10 +72,13 @@ zeus developer undo
 zeus developer disable
 ```
 
-`apply` runs from a ZeusOS checkout. It refuses a dirty tree, detached
-unpublished commit, wrong remote, failed focused check, or commit that is not
-the exact tip pushed to its remote branch. It builds from the Git object with
-`git archive`, not by copying the mutable working tree.
+The unprivileged builder runs from a ZeusOS checkout before `apply`. It refuses
+a dirty tree, detached unpublished commit, wrong remote, failed focused check,
+or commit that is not the exact tip pushed to its remote branch. It builds from
+the Git object with `git archive`, not by copying the mutable working tree, and
+writes a bounded `prepared.json` selection into the caller's private runtime
+spool. `apply` consumes only that digest selection and the three fixed artifact
+filenames below it.
 
 ## Desktop extension design
 
@@ -152,9 +156,11 @@ outside the image and outside the repository.
 
 The root helper accepts only exact manifest identity and digest selections from
 a bounded local spool. It independently verifies the signature, archive hash,
-base identity, component allowlist, file hashes, types, modes and sizes. It
-does not accept a URL, shell command, target path, or executable from the
-desktop process.
+base identity, component allowlist, file hashes, types, modes and sizes. Before
+activation it mounts each SquashFS in a private read-only, no-exec location and
+matches the complete tree to the signed file list; unknown formats and extra
+files are rejected. It does not accept a URL, shell command, target path, or
+executable from the desktop process.
 
 Root-owned state lives below `/var/lib/zeus/developer-mode/`:
 
@@ -286,24 +292,24 @@ GitHub Actions will be split into:
 
 ## Implementation list
 
-- [ ] **DM00 — Qualify the extension mechanism.** Prove systemd-sysext on a
+- [x] **DM00 — Qualify the extension mechanism.** Prove systemd-sysext on a
   disposable Zeus VM, including runtime and boot activation, replacement,
   unmerge, SELinux, incompatible-base rejection, recovery and disabled-mode
   boot/idle cost. Do not expose the laptop toggle until this passes.
-- [ ] **DM01 — Define components, manifest and base compatibility.** Add the
+- [x] **DM01 — Define components, manifest and base compatibility.** Add the
   explicit component map and schemas, embed `SYSEXT_LEVEL` in image identity,
   define the separate developer signer policy, and reject dirty/unpushed source
   or a mismatched base.
-- [ ] **DM02 — Build deterministic developer artifacts.** Build from `git
+- [x] **DM02 — Build deterministic developer artifacts.** Build from `git
   archive`, select focused tests from changed paths, emit a signed receipt and
   reproducible read-only extension, and refuse unknown/disallowed files.
-- [ ] **DM03 — Implement transactional apply and undo.** Add the narrow
+- [x] **DM03 — Implement transactional apply and undo.** Add the narrow
   root helper, private content-addressed storage, operation locking, atomic
   active/previous references, sysext refresh/confirmation and failure rollback.
-- [ ] **DM04 — Add CLI, Settings and visible provenance.** Implement the
+- [x] **DM04 — Add CLI, Settings and visible provenance.** Implement the
   `zeus developer` commands, Settings page, DEV indicator, restart/logout
   guidance, status integration and terminal recovery instructions.
-- [ ] **DM05 — Coordinate Developer Mode with Updates.** Preserve normal update
+- [x] **DM05 — Coordinate Developer Mode with Updates.** Preserve normal update
   trust and staging, block conflicting transactions, pause overlays deliberately
   and leave incompatible artifacts inactive after a base update.
 - [ ] **DM06 — Add the full developer-image lane.** Build and sign an exact
@@ -315,20 +321,20 @@ GitHub Actions will be split into:
 
 ## Testing implementation list
 
-- [ ] **DT00 — Build the sysext lifecycle fixture.** Exercise the actual Fedora
+- [x] **DT00 — Build the sysext lifecycle fixture.** Exercise the actual Fedora
   44/systemd 259 commands in a disposable bootc guest and retain console,
   mount/status, timing and recovery evidence.
-- [ ] **DT01 — Source and manifest fixtures.** Cover dirty, uncommitted,
+- [x] **DT01 — Source and manifest fixtures.** Cover dirty, uncommitted,
   unpushed, wrong-remote and detached-source cases; prove artifacts contain
   files from the named Git object and reproduce byte-for-byte.
-- [ ] **DT02 — Trust and path-boundary tests.** Reject wrong signer/namespace,
+- [x] **DT02 — Trust and path-boundary tests.** Reject wrong signer/namespace,
   altered manifests, hash/size/mode mismatches, traversal, links, device files,
   unknown components, arbitrary targets, credentials and mutable-data paths.
-- [ ] **DT03 — Transaction and recovery tests.** Exercise concurrent apply,
+- [x] **DT03 — Transaction and recovery tests.** Exercise concurrent apply,
   interrupted copy/verify/refresh, failed merge confirmation, exact retry,
   undo, disable, full storage and status atomicity while retaining the previous
   working artifact.
-- [ ] **DT04 — Base/update compatibility tests.** Prove an extension activates
+- [x] **DT04 — Base/update compatibility tests.** Prove an extension activates
   only on its exact base build, becomes inactive after a normal image update,
   cannot replace a staged update/rollback, and can be rebuilt without changing
   user data.

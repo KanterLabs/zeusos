@@ -29,6 +29,7 @@ import settings_model
 APPLICATION_ID = "org.zeus.Settings"
 NATIVE_SETTINGS_DESKTOP_ID = "org.gnome.Settings.desktop"
 GNOME_CONTROL_CENTER_COMMAND = "/usr/bin/gnome-control-center"
+DEVELOPER_COMMAND = "/usr/libexec/zeus-developer"
 
 
 CSS = """
@@ -165,6 +166,73 @@ CSS = """
   margin-bottom: 10px;
 }
 
+.advanced-section {
+  margin-bottom: 10px;
+}
+
+.developer-card {
+  background: @card_bg_color;
+  border: 1px solid alpha(@window_fg_color, 0.10);
+  border-radius: 16px;
+  padding: 14px 16px;
+}
+
+.developer-card.active {
+  background: alpha(@accent_bg_color, 0.10);
+  border-color: alpha(@accent_color, 0.25);
+}
+
+.developer-card.error,
+.developer-card.incompatible {
+  background: alpha(@error_bg_color, 0.10);
+  border-color: alpha(@error_color, 0.24);
+}
+
+.developer-icon {
+  color: @accent_color;
+  margin-right: 11px;
+}
+
+.developer-title {
+  color: @window_fg_color;
+  font-size: 1.04em;
+  font-weight: 730;
+}
+
+.developer-state {
+  color: @window_fg_color;
+  font-weight: 720;
+  margin-top: 2px;
+}
+
+.developer-copy,
+.developer-meta,
+.developer-auth {
+  color: alpha(@window_fg_color, 0.67);
+  line-height: 1.32;
+  margin-top: 4px;
+}
+
+.developer-meta {
+  font-size: 0.88em;
+  margin-top: 8px;
+}
+
+.developer-auth {
+  font-size: 0.84em;
+  margin-top: 8px;
+}
+
+.developer-actions {
+  margin-top: 12px;
+}
+
+.developer-progress {
+  color: @accent_color;
+  font-size: 0.88em;
+  margin-top: 8px;
+}
+
 .footer {
   background: alpha(@window_fg_color, 0.045);
   border-top: 1px solid alpha(@window_fg_color, 0.08);
@@ -227,9 +295,22 @@ class SettingsWindow(Adw.ApplicationWindow):
         self._closed = False
         self._hardware = _safe_hardware_snapshot()
         self._version, self._build_id = settings_model.read_build_identity()
+        self._developer_status = settings_model.default_developer_status()
+        self._developer_status_in_flight = False
+        self._developer_action_in_flight = False
+        self._developer_action: str | None = None
+        self._developer_process = None
+        self._developer_cancellable = None
+        self._developer_notice = ""
+        self._developer_notice_kind = "info"
+        self._developer_preserve_notice = False
 
         self._install_css()
         self._build_window()
+        # The helper is queried once when the window opens.  Later reads happen
+        # after an explicit action or when the window becomes active; there is
+        # no timer or background polling while Settings is idle.
+        self._request_developer_status()
         # Hardware can change while the window is open (for example after a
         # dock or adapter is connected).  Refresh only on an activation signal;
         # there is no timer or background watcher while Settings is idle.
@@ -350,6 +431,21 @@ class SettingsWindow(Adw.ApplicationWindow):
         local.append(local_grid)
         content.append(local)
 
+        advanced = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        advanced.add_css_class("content-section")
+        advanced.add_css_class("advanced-section")
+        advanced.append(_label("Advanced", "section-heading"))
+        advanced.append(
+            _label(
+                "Optional repository-backed controls for verified desktop iterations.",
+                "section-copy",
+                wrap=True,
+                max_width_chars=82,
+            )
+        )
+        advanced.append(self._build_developer_card())
+        content.append(advanced)
+
         # Keep the actionable cards together; hardware notes remain useful
         # context below them and never displace Temp or Updates from the first
         # view at the normal window size.
@@ -372,6 +468,479 @@ class SettingsWindow(Adw.ApplicationWindow):
         bottom_space.add_css_class("bottom-space")
         content.append(bottom_space)
         return content
+
+    def _build_developer_card(self) -> Gtk.Widget:
+        """Build the compact Advanced → Developer Mode card."""
+
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        card.add_css_class("developer-card")
+        self._developer_card = card
+
+        top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        icon = Gtk.Image.new_from_icon_name("applications-development-symbolic")
+        icon.set_pixel_size(22)
+        icon.set_valign(Gtk.Align.START)
+        icon.add_css_class("developer-icon")
+        top.append(icon)
+
+        copy = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        copy.set_hexpand(True)
+        copy.append(_label("Developer Mode", "developer-title"))
+        self._developer_state_label = _label(
+            settings_model.developer_state_title(self._developer_status.state),
+            "developer-state",
+            wrap=True,
+        )
+        copy.append(self._developer_state_label)
+        self._developer_copy_label = _label(
+            settings_model.developer_state_description(self._developer_status),
+            "developer-copy",
+            wrap=True,
+            max_width_chars=86,
+        )
+        copy.append(self._developer_copy_label)
+        top.append(copy)
+        self._developer_spinner = Gtk.Spinner()
+        self._developer_spinner.set_size_request(22, 22)
+        self._developer_spinner.set_visible(False)
+        top.append(self._developer_spinner)
+        card.append(top)
+
+        self._developer_meta_label = _label(
+            settings_model.developer_status_summary(self._developer_status),
+            "developer-meta",
+            wrap=True,
+            max_width_chars=100,
+        )
+        card.append(self._developer_meta_label)
+        self._developer_activation_label = _label(
+            self._developer_activation_text(self._developer_status),
+            "developer-meta",
+            wrap=True,
+            max_width_chars=100,
+        )
+        card.append(self._developer_activation_label)
+        self._developer_receipt_label = _label(
+            self._developer_receipt_text(self._developer_status),
+            "developer-meta",
+            wrap=True,
+            max_width_chars=100,
+        )
+        card.append(self._developer_receipt_label)
+        self._developer_auth_label = _label(
+            "Administrator authentication may be requested. Cancel leaves Developer Mode unchanged.",
+            "developer-auth",
+            wrap=True,
+            max_width_chars=100,
+        )
+        card.append(self._developer_auth_label)
+        self._developer_notice_label = _label("", "developer-copy", wrap=True, max_width_chars=100)
+        card.append(self._developer_notice_label)
+
+        self._developer_progress_label = _label("", "developer-progress", wrap=True, max_width_chars=100)
+        self._developer_progress_label.set_visible(False)
+        card.append(self._developer_progress_label)
+
+        actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=7)
+        actions.add_css_class("developer-actions")
+        self._developer_enable_button = Gtk.Button(label="Enable Developer Mode")
+        self._developer_enable_button.set_tooltip_text("Enable Developer Mode after administrator authentication")
+        self._set_accessible_label(self._developer_enable_button, "Enable Developer Mode")
+        self._developer_enable_button.connect("clicked", self._on_developer_action_clicked, "enable")
+        actions.append(self._developer_enable_button)
+
+        self._developer_apply_button = Gtk.Button(label="Apply prepared change")
+        self._developer_apply_button.add_css_class("suggested-action")
+        self._developer_apply_button.set_tooltip_text(
+            "Apply the verified repository artifact prepared from the current commit"
+        )
+        self._set_accessible_label(self._developer_apply_button, "Apply prepared repository change")
+        self._developer_apply_button.connect("clicked", self._on_developer_action_clicked, "apply")
+        actions.append(self._developer_apply_button)
+
+        self._developer_undo_button = Gtk.Button(label="Undo last apply")
+        self._developer_undo_button.set_tooltip_text("Return to the preceding verified Developer Mode artifact")
+        self._set_accessible_label(self._developer_undo_button, "Undo last Developer Mode apply")
+        self._developer_undo_button.connect("clicked", self._on_developer_action_clicked, "undo")
+        actions.append(self._developer_undo_button)
+
+        self._developer_disable_button = Gtk.Button(label="Turn off Developer Mode")
+        self._developer_disable_button.set_tooltip_text("Turn off Developer Mode and leave the base image unchanged")
+        self._set_accessible_label(self._developer_disable_button, "Turn off Developer Mode")
+        self._developer_disable_button.connect("clicked", self._on_developer_action_clicked, "disable")
+        actions.append(self._developer_disable_button)
+
+        self._developer_cancel_button = Gtk.Button(label="Cancel")
+        self._developer_cancel_button.set_tooltip_text("Cancel the current request")
+        self._set_accessible_label(self._developer_cancel_button, "Cancel Developer Mode request")
+        self._developer_cancel_button.connect("clicked", self._on_developer_cancel_clicked)
+        self._developer_cancel_button.set_visible(False)
+        actions.append(self._developer_cancel_button)
+        card.append(actions)
+
+        self._render_developer_status()
+        return card
+
+    @staticmethod
+    def _developer_activation_text(status: settings_model.DeveloperStatus) -> str:
+        action = {
+            "none": "Activation: no restart or logout required.",
+            "restart": "Activation: restart the affected app after applying.",
+            "logout": "Activation: log out and back in after applying.",
+            "reboot": "Activation: restart the system after applying.",
+        }.get(status.required_action, "Activation: follow the helper's restart guidance.")
+        if status.applied_at:
+            return f"{action} Applied: {status.applied_at}"
+        return action
+
+    @staticmethod
+    def _developer_receipt_text(status: settings_model.DeveloperStatus) -> str:
+        receipt = status.focused_test_receipt or "No focused-test receipt recorded."
+        if status.applied_at:
+            return f"Focused tests: {receipt} · Applied: {status.applied_at}"
+        return f"Focused tests: {receipt}"
+
+    def _render_developer_status(self):
+        """Render status and action availability without starting any work."""
+
+        status = getattr(self, "_developer_status", settings_model.default_developer_status())
+        state = status.state
+        card = getattr(self, "_developer_card", None)
+        if card is not None:
+            for css_class in settings_model.DEVELOPER_STATUS_STATES:
+                try:
+                    card.remove_css_class(css_class)
+                except (AttributeError, RuntimeError, TypeError):
+                    pass
+            try:
+                card.add_css_class(state)
+            except (AttributeError, RuntimeError, TypeError):
+                pass
+
+        state_label = getattr(self, "_developer_state_label", None)
+        if state_label is not None:
+            state_label.set_text(settings_model.developer_state_title(state))
+        copy_label = getattr(self, "_developer_copy_label", None)
+        if copy_label is not None:
+            copy_label.set_text(settings_model.developer_state_description(status))
+        meta_label = getattr(self, "_developer_meta_label", None)
+        if meta_label is not None:
+            meta_label.set_text(settings_model.developer_status_summary(status))
+        activation_label = getattr(self, "_developer_activation_label", None)
+        if activation_label is not None:
+            activation_label.set_text(self._developer_activation_text(status))
+        receipt_label = getattr(self, "_developer_receipt_label", None)
+        if receipt_label is not None:
+            receipt_label.set_text(self._developer_receipt_text(status))
+
+        notice = getattr(self, "_developer_notice", "")
+        notice_label = getattr(self, "_developer_notice_label", None)
+        if notice_label is not None:
+            notice_label.set_text(notice)
+            notice_label.set_visible(bool(notice))
+            try:
+                notice_label.remove_css_class("error")
+                if getattr(self, "_developer_notice_kind", "info") == "error":
+                    notice_label.add_css_class("error")
+            except (AttributeError, RuntimeError, TypeError):
+                pass
+
+        busy = bool(
+            getattr(self, "_developer_status_in_flight", False)
+            or getattr(self, "_developer_action_in_flight", False)
+        )
+        progress_label = getattr(self, "_developer_progress_label", None)
+        if progress_label is not None:
+            if busy:
+                action = getattr(self, "_developer_action", None)
+                progress_label.set_text(
+                    "Reading Developer Mode status…"
+                    if action is None
+                    else "Administrator authentication may appear; verifying the request…"
+                )
+            progress_label.set_visible(busy)
+        spinner = getattr(self, "_developer_spinner", None)
+        if spinner is not None:
+            spinner.set_visible(busy)
+            try:
+                if busy:
+                    spinner.start()
+                else:
+                    spinner.stop()
+            except (AttributeError, RuntimeError, TypeError):
+                pass
+
+        availability = {
+            "enable": state in {"off", "error"},
+            "apply": state in {"enabled", "active", "incompatible", "error"},
+            "undo": state == "active",
+            "disable": state in {"enabled", "active", "incompatible", "error"},
+        }
+        for action, available in availability.items():
+            button = getattr(self, f"_developer_{action}_button", None)
+            if button is not None:
+                button.set_sensitive(bool(available and not busy))
+        cancel_button = getattr(self, "_developer_cancel_button", None)
+        if cancel_button is not None:
+            cancel_button.set_visible(busy)
+            cancel_button.set_sensitive(busy)
+
+    def _request_developer_status(self, *, preserve_notice: bool = False):
+        if self._closed or getattr(self, "_developer_status_in_flight", False):
+            return
+        if getattr(self, "_developer_action_in_flight", False):
+            return
+        self._developer_status_in_flight = True
+        self._developer_action = None
+        self._developer_preserve_notice = bool(preserve_notice)
+        if not preserve_notice:
+            self._developer_notice = ""
+            self._developer_notice_kind = "info"
+        self._render_developer_status()
+        self._start_developer_process("status", True, self._after_developer_status)
+
+    @staticmethod
+    def _developer_output_text(value: Any, fallback: str = "") -> str:
+        if isinstance(value, str):
+            text = value.strip()
+        else:
+            text = "" if value is None else str(value).strip()
+        return text[:512] if text else fallback
+
+    def _start_developer_process(self, action: str, json_status: bool, callback):
+        """Start the fixed helper argv and report completion through Gio."""
+
+        if action not in settings_model.DEVELOPER_ACTIONS or (json_status and action != "status"):
+            callback(False, "", "", "Invalid Developer Mode action.", False)
+            return
+        arguments = (DEVELOPER_COMMAND, action) + (("--json",) if json_status else ())
+
+        subprocess_flags = getattr(Gio, "SubprocessFlags", None)
+        if subprocess_flags is None:
+            flags = 0
+        else:
+            flags = getattr(subprocess_flags, "STDOUT_PIPE", 0) | getattr(
+                subprocess_flags, "STDERR_PIPE", 0
+            )
+        try:
+            process = Gio.Subprocess.new(list(arguments), flags)
+        except (AttributeError, GLib.Error, OSError, TypeError, ValueError) as error:
+            callback(False, "", "", f"Could not start Developer Mode: {error}", False)
+            return
+
+        self._developer_process = process
+        try:
+            self._developer_cancellable = Gio.Cancellable()
+        except (AttributeError, GLib.Error, TypeError):
+            self._developer_cancellable = None
+
+        context = (action, callback)
+        communicate = getattr(process, "communicate_utf8_async", None)
+        if communicate is not None:
+            try:
+                communicate(None, self._developer_cancellable, self._on_developer_process_finished, context)
+                return
+            except (AttributeError, GLib.Error, OSError, TypeError, ValueError) as error:
+                self._finish_developer_process(action, callback, False, "", "", str(error), False)
+                return
+
+        wait_async = getattr(process, "wait_check_async", None)
+        if wait_async is None:
+            self._finish_developer_process(
+                action,
+                callback,
+                False,
+                "",
+                "",
+                "Developer Mode helper cannot report completion.",
+                False,
+            )
+            return
+        try:
+            wait_async(
+                GLib.PRIORITY_DEFAULT,
+                self._developer_cancellable,
+                self._on_developer_wait_finished,
+                context,
+            )
+        except (AttributeError, GLib.Error, OSError, TypeError, ValueError) as error:
+            self._finish_developer_process(action, callback, False, "", "", str(error), False)
+
+    def _on_developer_process_finished(self, process, result, context):
+        action, callback = context
+        try:
+            outcome = process.communicate_utf8_finish(result)
+            communicated = bool(outcome[0]) if isinstance(outcome, tuple) else bool(outcome)
+            stdout = outcome[1] if isinstance(outcome, tuple) and len(outcome) > 1 else ""
+            stderr = outcome[2] if isinstance(outcome, tuple) and len(outcome) > 2 else ""
+            error = ""
+            # ``communicate_utf8_finish`` reports whether I/O completed; a
+            # helper that returned a structured failure can still make that
+            # value true.  Prefer Gio's child-status result when available so
+            # the action cannot be shown as successful after auth denial or a
+            # failed transactional operation.
+            get_successful = getattr(process, "get_successful", None)
+            if callable(get_successful):
+                try:
+                    succeeded = bool(get_successful())
+                except (AttributeError, GLib.Error, OSError, TypeError, ValueError):
+                    succeeded = communicated
+            else:
+                succeeded = communicated
+        except (AttributeError, GLib.Error, OSError, TypeError, ValueError) as caught:
+            succeeded, stdout, stderr, error = False, "", "", str(caught)
+        self._finish_developer_process(action, callback, succeeded, stdout, stderr, error, self._developer_was_cancelled())
+
+    def _on_developer_wait_finished(self, process, result, context):
+        action, callback = context
+        try:
+            succeeded = bool(process.wait_check_finish(result))
+            error = ""
+        except (AttributeError, GLib.Error, OSError, TypeError, ValueError) as caught:
+            succeeded, error = False, str(caught)
+        self._finish_developer_process(action, callback, succeeded, "", "", error, self._developer_was_cancelled())
+
+    def _developer_was_cancelled(self) -> bool:
+        cancellable = getattr(self, "_developer_cancellable", None)
+        is_cancelled = getattr(cancellable, "is_cancelled", None)
+        if callable(is_cancelled):
+            try:
+                return bool(is_cancelled())
+            except (AttributeError, GLib.Error, TypeError):
+                return False
+        return False
+
+    def _finish_developer_process(
+        self,
+        action: str,
+        callback,
+        succeeded: bool,
+        stdout: str,
+        stderr: str,
+        error: str,
+        canceled: bool,
+    ):
+        self._developer_process = None
+        self._developer_cancellable = None
+        callback(
+            bool(succeeded),
+            self._developer_output_text(stdout),
+            self._developer_output_text(stderr),
+            self._developer_output_text(error),
+            bool(canceled),
+        )
+
+    def _after_developer_status(
+        self,
+        succeeded: bool,
+        stdout: str,
+        stderr: str,
+        error: str,
+        canceled: bool,
+    ):
+        if self._closed:
+            return
+        self._developer_status_in_flight = False
+        self._developer_action = None
+        if canceled:
+            self._developer_notice = "Status request canceled."
+            self._developer_notice_kind = "info"
+        else:
+            parsed = settings_model.developer_status_from_json(stdout)
+            if stdout.strip() and parsed.state != "error":
+                self._developer_status = parsed
+                if not getattr(self, "_developer_preserve_notice", False):
+                    self._developer_notice = ""
+                    self._developer_notice_kind = "info"
+            elif stdout.strip() and parsed.error and not stderr:
+                self._developer_status = parsed
+                self._developer_notice = parsed.error
+                self._developer_notice_kind = "error"
+            else:
+                detail = error or stderr or "The Developer Mode status is unavailable."
+                self._developer_status = settings_model.DeveloperStatus(state="error", error=detail)
+                self._developer_notice = detail
+                self._developer_notice_kind = "error"
+        self._developer_preserve_notice = False
+        self._render_developer_status()
+
+    def _after_developer_action(
+        self,
+        succeeded: bool,
+        stdout: str,
+        stderr: str,
+        error: str,
+        canceled: bool,
+    ):
+        if self._closed:
+            return
+        action = self._developer_action or "request"
+        self._developer_action_in_flight = False
+        self._developer_action = None
+        if canceled:
+            self._developer_notice = "Request canceled. Developer Mode was not changed."
+            self._developer_notice_kind = "info"
+        elif not succeeded:
+            parsed = settings_model.developer_status_from_json(stdout)
+            self._developer_notice = (
+                error
+                or stderr
+                or parsed.message
+                or parsed.error
+                or f"Developer Mode {action} failed."
+            )
+            self._developer_notice_kind = "error"
+        else:
+            self._developer_notice = f"Developer Mode {action} completed; refreshing status."
+            self._developer_notice_kind = "info"
+        self._render_developer_status()
+        # Status is refreshed only after an explicit action, so an accepted
+        # apply/undo/disable becomes visible without idle polling.
+        self._request_developer_status(preserve_notice=True)
+
+    def _on_developer_action_clicked(self, _button: Gtk.Button, action: str):
+        if self._closed or action not in settings_model.DEVELOPER_ACTIONS or action == "status":
+            return
+        if getattr(self, "_developer_action_in_flight", False):
+            return
+        self._developer_action_in_flight = True
+        self._developer_action = action
+        self._developer_notice = (
+            "Administrator authentication is required to enable Developer Mode."
+            if action == "enable"
+            else f"Administrator authentication may be requested before {action}."
+        )
+        self._developer_notice_kind = "info"
+        self._render_developer_status()
+        self._start_developer_process(action, False, self._after_developer_action)
+
+    def _on_developer_cancel_clicked(self, _button: Gtk.Button):
+        action_in_flight = bool(getattr(self, "_developer_action_in_flight", False))
+        status_in_flight = bool(getattr(self, "_developer_status_in_flight", False))
+        if not action_in_flight and not status_in_flight:
+            return
+        cancellable = getattr(self, "_developer_cancellable", None)
+        cancel = getattr(cancellable, "cancel", None)
+        if callable(cancel):
+            try:
+                cancel()
+            except (AttributeError, GLib.Error, RuntimeError, TypeError):
+                pass
+        else:
+            process = getattr(self, "_developer_process", None)
+            force_exit = getattr(process, "force_exit", None)
+            if callable(force_exit):
+                try:
+                    force_exit()
+                except (AttributeError, GLib.Error, OSError, RuntimeError, TypeError):
+                    pass
+        self._developer_notice = (
+            "Canceling Developer Mode request…"
+            if action_in_flight
+            else "Canceling Developer Mode status request…"
+        )
+        self._developer_notice_kind = "info"
+        self._render_developer_status()
 
     def _build_hardware_card(self) -> Gtk.Widget:
         section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -414,15 +983,19 @@ class SettingsWindow(Adw.ApplicationWindow):
             except (AttributeError, RuntimeError, TypeError):
                 pass
         state = _safe_hardware_snapshot()
-        if state == self._hardware:
-            return
-        self._hardware = state
-        summary_label = getattr(self, "_hardware_summary_label", None)
-        if summary_label is not None:
-            summary_label.set_text(settings_model.hardware_summary(state))
-        brightness_label = getattr(self, "_brightness_label", None)
-        if brightness_label is not None:
-            brightness_label.set_text(self._brightness_text())
+        if state != self._hardware:
+            self._hardware = state
+            summary_label = getattr(self, "_hardware_summary_label", None)
+            if summary_label is not None:
+                summary_label.set_text(settings_model.hardware_summary(state))
+            brightness_label = getattr(self, "_brightness_label", None)
+            if brightness_label is not None:
+                brightness_label.set_text(self._brightness_text())
+        # Re-read the bounded public receipt when the Settings window becomes
+        # active again.  This catches a Developer Mode change made by the CLI
+        # or a second Settings instance without introducing an idle poll.
+        if hasattr(self, "_developer_status"):
+            self._request_developer_status(preserve_notice=True)
 
     def _brightness_text(self) -> str:
         if self._hardware.backlight is True:
@@ -606,6 +1179,20 @@ class SettingsWindow(Adw.ApplicationWindow):
 
     def shutdown(self):
         self._closed = True
+        cancellable = getattr(self, "_developer_cancellable", None)
+        cancel = getattr(cancellable, "cancel", None)
+        if callable(cancel):
+            try:
+                cancel()
+            except (AttributeError, GLib.Error, RuntimeError, TypeError):
+                pass
+        process = getattr(self, "_developer_process", None)
+        force_exit = getattr(process, "force_exit", None)
+        if callable(force_exit):
+            try:
+                force_exit()
+            except (AttributeError, GLib.Error, OSError, RuntimeError, TypeError):
+                pass
 
 
 class SettingsApplication(Adw.Application):

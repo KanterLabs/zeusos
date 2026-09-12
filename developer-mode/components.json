@@ -1,0 +1,354 @@
+{
+  "schema_version": 1,
+  "product": "zeusos",
+  "artifact_kind": "systemd-sysext",
+  "extension_name": "zeus-developer",
+  "repository": "https://github.com/KanterLabs/zeusos.git",
+  "architecture": "x86_64",
+  "components": [
+    {
+      "name": "settings-ui",
+      "activation": "restart-settings",
+      "tests": [
+        "tests/test_settings_window.py"
+      ],
+      "files": [
+        {
+          "source": "desktop/rootfs/usr/libexec/zeus-settings-window",
+          "target": "/usr/libexec/zeus-settings-window",
+          "type": "regular",
+          "mode": "0755",
+          "max_size": 131072
+        },
+        {
+          "source": "desktop/rootfs/usr/lib/zeus/settings_model.py",
+          "target": "/usr/lib/zeus/settings_model.py",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 65536
+        },
+        {
+          "source": "desktop/rootfs/usr/share/applications/org.zeus.Settings.desktop",
+          "target": "/usr/share/applications/org.zeus.Settings.desktop",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 8192
+        },
+        {
+          "source": "desktop/rootfs/usr/share/icons/hicolor/scalable/apps/org.zeus.Settings.svg",
+          "target": "/usr/share/icons/hicolor/scalable/apps/org.zeus.Settings.svg",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 16384
+        }
+      ]
+    },
+    {
+      "name": "temp-ui",
+      "activation": "restart-temp",
+      "tests": [
+        "tests/test_temp_window.py"
+      ],
+      "files": [
+        {
+          "source": "desktop/rootfs/usr/libexec/zeus-temp-window",
+          "target": "/usr/libexec/zeus-temp-window",
+          "type": "regular",
+          "mode": "0755",
+          "max_size": 131072
+        },
+        {
+          "source": "desktop/rootfs/usr/share/applications/org.zeus.Temp.desktop",
+          "target": "/usr/share/applications/org.zeus.Temp.desktop",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 8192
+        },
+        {
+          "source": "desktop/rootfs/usr/share/icons/Zeus/scalable/apps/org.zeus.Temp.svg",
+          "target": "/usr/share/icons/Zeus/scalable/apps/org.zeus.Temp.svg",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 16384
+        }
+      ]
+    },
+    {
+      "name": "updates-ui",
+      "activation": "restart-updates",
+      "tests": [
+        "tests/test_updater_window.py"
+      ],
+      "files": [
+        {
+          "source": "desktop/rootfs/usr/libexec/zeus-update-window",
+          "target": "/usr/libexec/zeus-update-window",
+          "type": "regular",
+          "mode": "0755",
+          "max_size": 131072
+        },
+        {
+          "source": "desktop/rootfs/usr/share/applications/org.zeus.Updates.desktop",
+          "target": "/usr/share/applications/org.zeus.Updates.desktop",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 8192
+        },
+        {
+          "source": "desktop/rootfs/usr/share/icons/hicolor/scalable/apps/org.zeus.Updates.svg",
+          "target": "/usr/share/icons/hicolor/scalable/apps/org.zeus.Updates.svg",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 16384
+        }
+      ]
+    },
+    {
+      "name": "welcome-ui",
+      "activation": "restart-welcome",
+      "tests": [
+        "tests/test_desktop_interactions.py"
+      ],
+      "files": [
+        {
+          "source": "zeus/assets/welcome.py",
+          "target": "/usr/libexec/zeus-welcome",
+          "type": "regular",
+          "mode": "0755",
+          "source_mode": "0644",
+          "max_size": 131072
+        },
+        {
+          "source": "zeus/assets/org.zeus.Welcome.desktop",
+          "target": "/usr/share/applications/org.zeus.Welcome.desktop",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 8192
+        },
+        {
+          "source": "desktop/rootfs/usr/share/icons/hicolor/scalable/apps/org.zeus.Welcome.svg",
+          "target": "/usr/share/icons/hicolor/scalable/apps/org.zeus.Welcome.svg",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 16384
+        }
+      ]
+    },
+    {
+      "name": "theme-artwork",
+      "activation": "restart-apps",
+      "tests": [
+        "tests/test_style_preservation.py",
+        "tests/test_desktop_interactions.py"
+      ],
+      "files": [
+        {
+          "source": "desktop/rootfs/usr/share/backgrounds/zeus/zeus-city-new-york-dusk.png",
+          "target": "/usr/share/backgrounds/zeus/zeus-city-new-york-dusk.png",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 4194304
+        },
+        {
+          "source": "desktop/rootfs/usr/share/backgrounds/zeus/zeus-wallpaper-dark.svg",
+          "target": "/usr/share/backgrounds/zeus/zeus-wallpaper-dark.svg",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 16384
+        },
+        {
+          "source": "desktop/rootfs/usr/share/backgrounds/zeus/zeus-wallpaper-light.svg",
+          "target": "/usr/share/backgrounds/zeus/zeus-wallpaper-light.svg",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 16384
+        },
+        {
+          "source": "desktop/rootfs/usr/share/backgrounds/zeus/zeus.xml",
+          "target": "/usr/share/backgrounds/zeus/zeus.xml",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 8192
+        },
+        {
+          "source": "desktop/rootfs/usr/share/gnome-background-properties/zeus.xml",
+          "target": "/usr/share/gnome-background-properties/zeus.xml",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 8192
+        },
+        {
+          "source": "desktop/rootfs/usr/share/icons/Zeus/index.theme",
+          "target": "/usr/share/icons/Zeus/index.theme",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 8192
+        },
+        {
+          "source": "desktop/rootfs/usr/share/icons/Zeus/scalable/apps/org.gnome.Nautilus.svg",
+          "target": "/usr/share/icons/Zeus/scalable/apps/org.gnome.Nautilus.svg",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 16384
+        },
+        {
+          "source": "desktop/rootfs/usr/share/icons/Zeus/scalable/apps/org.gnome.Ptyxis.svg",
+          "target": "/usr/share/icons/Zeus/scalable/apps/org.gnome.Ptyxis.svg",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 16384
+        },
+        {
+          "source": "desktop/rootfs/usr/share/icons/Zeus/scalable/apps/org.gnome.Settings.svg",
+          "target": "/usr/share/icons/Zeus/scalable/apps/org.gnome.Settings.svg",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 16384
+        },
+        {
+          "source": "desktop/rootfs/usr/share/icons/Zeus/scalable/apps/org.zeus.Welcome.svg",
+          "target": "/usr/share/icons/Zeus/scalable/apps/org.zeus.Welcome.svg",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 16384
+        },
+        {
+          "source": "desktop/rootfs/usr/share/themes/Zeus/assets/close-hover.svg",
+          "target": "/usr/share/themes/Zeus/assets/close-hover.svg",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 16384
+        },
+        {
+          "source": "desktop/rootfs/usr/share/themes/Zeus/assets/close.svg",
+          "target": "/usr/share/themes/Zeus/assets/close.svg",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 16384
+        },
+        {
+          "source": "desktop/rootfs/usr/share/themes/Zeus/assets/maximize-hover.svg",
+          "target": "/usr/share/themes/Zeus/assets/maximize-hover.svg",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 16384
+        },
+        {
+          "source": "desktop/rootfs/usr/share/themes/Zeus/assets/maximize.svg",
+          "target": "/usr/share/themes/Zeus/assets/maximize.svg",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 16384
+        },
+        {
+          "source": "desktop/rootfs/usr/share/themes/Zeus/assets/minimize-hover.svg",
+          "target": "/usr/share/themes/Zeus/assets/minimize-hover.svg",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 16384
+        },
+        {
+          "source": "desktop/rootfs/usr/share/themes/Zeus/assets/minimize.svg",
+          "target": "/usr/share/themes/Zeus/assets/minimize.svg",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 16384
+        },
+        {
+          "source": "desktop/rootfs/usr/share/themes/Zeus/assets/restore-hover.svg",
+          "target": "/usr/share/themes/Zeus/assets/restore-hover.svg",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 16384
+        },
+        {
+          "source": "desktop/rootfs/usr/share/themes/Zeus/assets/restore.svg",
+          "target": "/usr/share/themes/Zeus/assets/restore.svg",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 16384
+        },
+        {
+          "source": "desktop/rootfs/usr/share/themes/Zeus/gtk-3.0/gtk-dark.css",
+          "target": "/usr/share/themes/Zeus/gtk-3.0/gtk-dark.css",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 65536
+        },
+        {
+          "source": "desktop/rootfs/usr/share/themes/Zeus/gtk-3.0/gtk.css",
+          "target": "/usr/share/themes/Zeus/gtk-3.0/gtk.css",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 65536
+        },
+        {
+          "source": "desktop/rootfs/usr/share/themes/Zeus/gtk-4.0/gtk-dark.css",
+          "target": "/usr/share/themes/Zeus/gtk-4.0/gtk-dark.css",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 65536
+        },
+        {
+          "source": "desktop/rootfs/usr/share/themes/Zeus/gtk-4.0/gtk.css",
+          "target": "/usr/share/themes/Zeus/gtk-4.0/gtk.css",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 65536
+        },
+        {
+          "source": "desktop/rootfs/usr/share/themes/Zeus/index.theme",
+          "target": "/usr/share/themes/Zeus/index.theme",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 8192
+        }
+      ]
+    },
+    {
+      "name": "shell-presentation",
+      "activation": "logout-login",
+      "tests": [
+        "tests/test_desktop_interactions.py",
+        "tests/test_style_preservation.py"
+      ],
+      "files": [
+        {
+          "source": "desktop/rootfs/usr/share/gnome-shell/extensions/zeus-lock-background@kanterlabs/extension.js",
+          "target": "/usr/share/gnome-shell/extensions/zeus-lock-background@kanterlabs/extension.js",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 131072
+        },
+        {
+          "source": "desktop/rootfs/usr/share/gnome-shell/extensions/zeus-lock-background@kanterlabs/metadata.json",
+          "target": "/usr/share/gnome-shell/extensions/zeus-lock-background@kanterlabs/metadata.json",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 8192
+        },
+        {
+          "source": "desktop/rootfs/usr/share/gnome-shell/extensions/zeus-shell@kanterlabs/extension.js",
+          "target": "/usr/share/gnome-shell/extensions/zeus-shell@kanterlabs/extension.js",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 131072
+        },
+        {
+          "source": "desktop/rootfs/usr/share/gnome-shell/extensions/zeus-shell@kanterlabs/metadata.json",
+          "target": "/usr/share/gnome-shell/extensions/zeus-shell@kanterlabs/metadata.json",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 8192
+        },
+        {
+          "source": "desktop/rootfs/usr/share/gnome-shell/extensions/zeus-shell@kanterlabs/stylesheet.css",
+          "target": "/usr/share/gnome-shell/extensions/zeus-shell@kanterlabs/stylesheet.css",
+          "type": "regular",
+          "mode": "0644",
+          "max_size": 65536
+        }
+      ]
+    }
+  ]
+}

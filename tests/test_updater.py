@@ -34,6 +34,8 @@ class UpdaterTransactions(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.base = Path(self.temporary.name)
         self.root, self.share = self.base / 'state', self.base / 'share'
+        self.developer_status_path = self.base / 'developer-mode' / 'status.json'
+        self.developer_extension_path = self.base / 'extensions' / 'zeus-developer.raw'
         self.share.mkdir()
         self.current = release(100, 'a' * 40)
         self.install_identity(self.current)
@@ -48,7 +50,9 @@ class UpdaterTransactions(unittest.TestCase):
         self.downloads = 0
         self.installer = update.Installer(self.root, self.share, runner=self.runner,
             fetch=lambda: copy.deepcopy(self.manifest), download=self.download,
-            inspect=self.inspect, this_boot='boot-one', storage_check=False)
+            inspect=self.inspect, this_boot='boot-one', storage_check=False,
+            developer_status_path=self.developer_status_path,
+            active_extension_path=self.developer_extension_path)
         # Populated owner state lives outside the additive updater directory.
         self.owner = self.base / 'home'
         self.owner.mkdir()
@@ -99,6 +103,13 @@ class UpdaterTransactions(unittest.TestCase):
     def job(self):
         return update.read_json(self.root / 'status.json')
 
+    def write_developer_status(self, state, *, active=None):
+        value = {'schema_version': 1, 'state': state}
+        if active is not None:
+            value['active'] = active
+        self.developer_status_path.parent.mkdir(parents=True, exist_ok=True)
+        update.atomic_json(self.developer_status_path, value)
+
     def assert_error(self, code, action):
         with self.assertRaises(update.trusted.UpdateError) as caught:
             action()
@@ -141,11 +152,94 @@ class UpdaterTransactions(unittest.TestCase):
     def test_different_stage_and_queued_rollback_are_preserved(self):
         self.status['staged'] = {'image': {'imageDigest': 'sha256:' + 'f' * 64}}
         preserved = copy.deepcopy(self.status)
+        self.write_developer_status('active')
         self.assert_error('staged_update_exists', self.request)
         self.assertEqual(self.status, preserved)
+        self.assertEqual(update.read_developer_status(self.developer_status_path, enforce_storage=False)['state'], 'active')
         self.status['staged'] = None
         self.status['rollbackQueued'] = True
         self.assert_error('rollback_queued', self.request)
+
+    def test_active_developer_extension_blocks_request_before_state_or_service_changes(self):
+        for state in ('active', 'applying', 'interrupted', 'needs_attention'):
+            self.write_developer_status(state)
+            self.assert_error('developer_active', self.request)
+        self.assertFalse(any(c[1] == 'start' for c in self.commands))
+        self.assertFalse((self.root / 'request.json').exists())
+        self.assertFalse((self.root / 'trust.json').exists())
+
+    def test_same_staged_update_still_checks_active_developer_mode_on_request(self):
+        self.status['staged'] = {
+            'image': {'imageDigest': self.manifest['archive']['manifest_digest']}
+        }
+        preserved = copy.deepcopy(self.status)
+        self.write_developer_status('active')
+        self.assert_error('developer_active', self.request)
+        self.assertEqual(self.status, preserved)
+        self.assertFalse((self.root / 'status.json').exists())
+
+    def test_same_staged_update_still_checks_active_developer_mode_in_worker(self):
+        self.assertEqual(self.request()['state'], 'queued')
+        self.status['staged'] = {
+            'image': {'imageDigest': self.manifest['archive']['manifest_digest']}
+        }
+        preserved = copy.deepcopy(self.status)
+        self.write_developer_status('active')
+        self.assertFalse(self.installer.run())
+        self.assertEqual(self.job()['error'], 'developer_active')
+        self.assertEqual(self.status, preserved)
+        self.assertEqual(self.downloads, 0)
+
+    def test_inactive_developer_status_allows_the_existing_exact_transaction(self):
+        self.write_developer_status('inactive')
+        self.assertEqual(self.request()['state'], 'queued')
+        self.assertTrue(self.installer.run())
+        self.assertEqual(self.job()['phase'], 'ready')
+        self.assertEqual(
+            update.read_developer_status(self.developer_status_path, enforce_storage=False)['state'],
+            'inactive',
+        )
+
+    def test_malformed_developer_status_fails_closed_without_overwriting_it(self):
+        self.developer_status_path.parent.mkdir(parents=True, exist_ok=True)
+        original = b'{"schema_version":1,"state":'
+        self.developer_status_path.write_bytes(original)
+        self.assert_error('developer_status_invalid', self.request)
+        self.assertEqual(self.developer_status_path.read_bytes(), original)
+        self.assertFalse(any(c[1] == 'start' for c in self.commands))
+
+    def test_missing_developer_status_fails_closed_when_active_extension_exists(self):
+        self.developer_extension_path.parent.mkdir(parents=True, exist_ok=True)
+        self.developer_extension_path.write_bytes(b'active extension')
+        self.assert_error('developer_active', self.request)
+        self.assertFalse(any(c[1] == 'start' for c in self.commands))
+        self.assertFalse((self.root / 'request.json').exists())
+
+    def test_missing_developer_status_fails_closed_when_active_extension_is_unsafe(self):
+        self.developer_extension_path.parent.mkdir(parents=True, exist_ok=True)
+        self.developer_extension_path.symlink_to(self.owner / 'Documents')
+        self.assert_error('developer_extension_unavailable', self.request)
+        self.assertFalse(any(c[1] == 'start' for c in self.commands))
+        self.assertFalse((self.root / 'request.json').exists())
+
+    def test_worker_rechecks_active_developer_extension_before_staging(self):
+        self.assertEqual(self.request()['state'], 'queued')
+        self.write_developer_status('active')
+        self.assertFalse(self.installer.run())
+        self.assertEqual(self.job()['error'], 'developer_active')
+        self.assertEqual(self.downloads, 0)
+        self.assertFalse(any(c[1] == 'switch' for c in self.commands))
+
+    def test_paused_extension_is_never_reapplied_by_normal_update(self):
+        self.write_developer_status('paused')
+        self.assertEqual(self.request()['state'], 'queued')
+        self.assertTrue(self.installer.run())
+        self.assertEqual(self.job()['phase'], 'ready')
+        self.assertEqual(
+            update.read_developer_status(self.developer_status_path, enforce_storage=False)['state'],
+            'paused',
+        )
+        self.assertFalse(any('developer' in argument for command in self.commands for argument in command))
 
     def test_concurrent_lock_or_running_service_rejects_second_request(self):
         with self.installer.lock():

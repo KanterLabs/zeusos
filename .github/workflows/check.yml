@@ -49,6 +49,11 @@ jobs:
         run: |
           python3 -m py_compile desktop/rootfs/usr/lib/zeus/update_manifest.py desktop/rootfs/usr/lib/zeus/zeus_update.py desktop/rootfs/usr/libexec/zeus-update-window scripts/make-update-manifest.py deploy/homelab-updates/configure-cloudflare-dns.py
           bash -n scripts/publish-homelab-artifact.sh deploy/homelab-updates/zeus-publish-artifact
+      - name: Verify repository-backed Developer Mode
+        run: |
+          python3 -m unittest discover -s tests -p 'test_developer*.py' -v
+          python3 -m py_compile scripts/build-developer-extension.py desktop/rootfs/usr/lib/zeus/developer_manifest.py desktop/rootfs/usr/lib/zeus/zeus_developer.py desktop/rootfs/usr/libexec/zeus-developer desktop/rootfs/usr/libexec/zeus-developer-admin
+          bash -n scripts/qualify-developer-sysext.sh
       - name: Check welcome application syntax
         run: python3 -m py_compile zeus/assets/welcome.py scripts/build-greeter-theme.py scripts/measure-*.py scripts/validate-*.py
       - name: Verify native laptop Settings

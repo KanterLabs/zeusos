@@ -19,11 +19,14 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 // installed extension and avoids inventing a second shell module to disable.
 const DOCK_EXTENSION: &str = "dash-to-dock@micxgx.gmail.com";
 const UPDATE_HELPER_PATH: &str = "/usr/libexec/zeus-update";
+const DEVELOPER_HELPER_PATH: &str = "/usr/libexec/zeus-developer";
 const MAX_OUTPUT_BYTES: u64 = 128 * 1024;
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(15);
 const UPDATE_STATUS_TIMEOUT: Duration = Duration::from_secs(15);
 const UPDATE_CHECK_TIMEOUT: Duration = Duration::from_secs(90);
 const UPDATE_INSTALL_TIMEOUT: Duration = Duration::from_secs(300);
+const DEVELOPER_STATUS_TIMEOUT: Duration = Duration::from_secs(15);
+const DEVELOPER_ACTION_TIMEOUT: Duration = Duration::from_secs(300);
 const DEV_TIMEOUT: Duration = Duration::from_secs(60 * 60);
 
 const HELP: &str = "\
@@ -38,6 +41,8 @@ USAGE:
     zeus update check [--json]
     zeus update install [--json]
     zeus dev [--target TARGET] [--dry-run]
+    zeus developer status [--json]
+    zeus developer enable|apply [ARTIFACT_DIGEST]|undo|disable
 
 The preview also reserves these commands for later releases:
     zeus restore              profile restore is not available yet
@@ -47,6 +52,8 @@ The desktop actions keep credentials and personal data in place.  `dev`
 opens one validated SSH destination and never accepts a remote command.
 Update checks and installs use the signed system updater; installing starts a
 background job and never reboots automatically.
+Developer Mode actions use the fixed local helper and require administrator
+authentication where the helper requests it; they never invoke a shell.
 ";
 
 #[derive(Debug)]
@@ -104,6 +111,39 @@ struct BootcProbe {
     summary: String,
 }
 
+#[derive(Debug)]
+struct DeveloperProbe {
+    available: bool,
+    active: bool,
+    state: String,
+    base_build: String,
+    active_commit: String,
+    artifact_digest: String,
+    required_action: String,
+    focused_test_receipt: String,
+    applied_at: String,
+    message: String,
+    error: String,
+}
+
+impl Default for DeveloperProbe {
+    fn default() -> Self {
+        Self {
+            available: false,
+            active: false,
+            state: "off".to_string(),
+            base_build: String::new(),
+            active_commit: String::new(),
+            artifact_digest: String::new(),
+            required_action: "none".to_string(),
+            focused_test_receipt: String::new(),
+            applied_at: String::new(),
+            message: String::new(),
+            error: String::new(),
+        }
+    }
+}
+
 fn main() -> ExitCode {
     match run() {
         Ok(()) => ExitCode::SUCCESS,
@@ -137,6 +177,7 @@ fn run() -> Result<(), CliError> {
         "desktop" => command_desktop(rest),
         "update" => command_update(rest),
         "dev" => command_dev(rest),
+        "developer" => command_developer(rest),
         "restore" => Err(unsupported(
             "restore",
             "profile restore is reserved for a later preview",
@@ -167,6 +208,9 @@ fn command_version(arguments: &[String]) -> Result<(), CliError> {
         if let Ok(build) = std::fs::read_to_string("/usr/share/zeus/build-id") {
             println!("Build {}", build.trim());
         }
+        if let Some(developer) = probe_developer_status() {
+            print_developer_human_status(&developer);
+        }
         return Ok(());
     }
     if arguments.len() == 1 && (arguments[0] == "-h" || arguments[0] == "--help") {
@@ -192,6 +236,7 @@ fn command_doctor(arguments: &[String]) -> Result<(), CliError> {
     let session = session_info();
     let terminal = find_terminal();
     let bootc = probe_bootc();
+    let developer = probe_developer_status().unwrap_or_default();
 
     if json {
         let terminal_name = terminal
@@ -204,7 +249,7 @@ fn command_doctor(arguments: &[String]) -> Result<(), CliError> {
             .map(|value| value.to_string())
             .unwrap_or_else(|| "null".to_string());
         println!(
-            "{{\"version\":{},\"session\":{{\"desktop\":{},\"type\":{},\"ready\":{}}},\"terminal\":{{\"command\":{},\"available\":{}}},\"bootc\":{{\"available\":{},\"status\":{},\"exit_code\":{},\"summary\":{}}},\"safe_desktop\":{{\"credentials_untouched\":true,\"personal_data_untouched\":true}}}}",
+            "{{\"version\":{},\"session\":{{\"desktop\":{},\"type\":{},\"ready\":{}}},\"terminal\":{{\"command\":{},\"available\":{}}},\"bootc\":{{\"available\":{},\"status\":{},\"exit_code\":{},\"summary\":{}}},\"developer\":{},\"safe_desktop\":{{\"credentials_untouched\":true,\"personal_data_untouched\":true}}}}",
             json_string(VERSION),
             json_string(&session.desktop),
             json_string(&session.session_type),
@@ -215,6 +260,7 @@ fn command_doctor(arguments: &[String]) -> Result<(), CliError> {
             json_string(&bootc.status),
             exit_code,
             json_string(&bootc.summary),
+            developer_json(&developer),
         );
         return Ok(());
     }
@@ -246,6 +292,7 @@ fn command_doctor(arguments: &[String]) -> Result<(), CliError> {
             println!("Bootc: status command failed; inspect the local installation before updating")
         }
     }
+    print_developer_human_status(&developer);
     println!("Safe desktop actions leave credentials and personal data untouched.");
     Ok(())
 }
@@ -515,6 +562,122 @@ fn update_status_bootc_fallback(json: bool) -> Result<(), CliError> {
     }
 }
 
+fn command_developer(arguments: &[String]) -> Result<(), CliError> {
+    let Some(action) = arguments.first() else {
+        return Err(CliError::usage(
+            "`developer` requires one of `status`, `enable`, `apply`, `undo`, or `disable`",
+        ));
+    };
+
+    if action == "-h" || action == "--help" {
+        print_developer_help();
+        return Ok(());
+    }
+
+    let mut json = false;
+    let mut artifact_digest: Option<String> = None;
+    for argument in &arguments[1..] {
+        match argument.as_str() {
+            "--json" if action == "status" => json = true,
+            digest if action == "apply" && artifact_digest.is_none() && is_developer_digest(digest) => {
+                artifact_digest = Some(digest.to_string());
+            }
+            "-h" | "--help" => {
+                print_developer_help();
+                return Ok(());
+            }
+            _ => {
+                return Err(CliError::usage(
+                    "`developer status` accepts only `--json`; other Developer Mode actions take no arguments",
+                ))
+            }
+        }
+    }
+
+    let timeout = if action == "status" {
+        DEVELOPER_STATUS_TIMEOUT
+    } else {
+        DEVELOPER_ACTION_TIMEOUT
+    };
+    match action.as_str() {
+        "status" | "enable" | "apply" | "undo" | "disable" => {
+            run_developer_action(action, json, artifact_digest.as_deref(), timeout)
+        }
+        _ => Err(CliError::usage(
+            "`developer` requires one of `status`, `enable`, `apply`, `undo`, or `disable`",
+        )),
+    }
+}
+
+fn print_developer_help() {
+    println!("zeus developer status [--json] — inspect Developer Mode provenance");
+    println!("zeus developer enable|apply [ARTIFACT_DIGEST]|undo|disable — run one authenticated local Developer Mode action");
+    println!("Actions are delegated to the installed /usr/libexec/zeus-developer helper.");
+}
+
+fn run_developer_action(
+    action: &str,
+    json: bool,
+    artifact_digest: Option<&str>,
+    timeout: Duration,
+) -> Result<(), CliError> {
+    let Some(helper) = resolve_developer_helper() else {
+        return Err(CliError::operation(format!(
+            "{} is unavailable; `zeus developer {}` could not run",
+            DEVELOPER_HELPER_PATH, action
+        )));
+    };
+
+    let mut arguments = vec![action];
+    if let Some(digest) = artifact_digest {
+        arguments.push(digest);
+    }
+    if json {
+        arguments.push("--json");
+    }
+    let result = run_capture(&helper, &arguments, timeout)?;
+
+    if !result.stdout.is_empty() {
+        print!("{}", result.stdout);
+    }
+    if !result.stderr.is_empty() {
+        eprint!("{}", result.stderr);
+    }
+
+    if result.status.success() {
+        Ok(())
+    } else {
+        Err(CliError::operation(format!(
+            "zeus developer {} failed (exit {})",
+            action,
+            exit_code_text(result.status)
+        )))
+    }
+}
+
+fn is_developer_digest(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn resolve_developer_helper() -> Option<PathBuf> {
+    // The environment override is intentionally test/development-only.  The
+    // installed image always uses the fixed helper path below, and all
+    // arguments remain a Rust argv array with no shell interpolation.
+    if let Some(value) = env::var_os("ZEUS_DEVELOPER_HELPER") {
+        let path = PathBuf::from(value);
+        if path.components().count() > 1 || path.is_absolute() {
+            return is_executable(&path).then_some(path);
+        }
+        return find_executable(path.to_str().unwrap_or_default());
+    }
+
+    let path = Path::new(DEVELOPER_HELPER_PATH);
+    is_executable(path).then(|| path.to_path_buf())
+}
+
 fn command_dev(arguments: &[String]) -> Result<(), CliError> {
     let mut target: Option<String> = None;
     let mut dry_run = false;
@@ -687,6 +850,295 @@ fn probe_bootc() -> BootcProbe {
             summary: sanitize_output(&error.message),
         },
     }
+}
+
+fn probe_developer_status() -> Option<DeveloperProbe> {
+    let helper = resolve_developer_helper()?;
+    let result = match run_capture(&helper, &["status", "--json"], DEVELOPER_STATUS_TIMEOUT) {
+        Ok(result) => result,
+        Err(error) => {
+            return Some(DeveloperProbe {
+                available: true,
+                active: false,
+                state: "error".to_string(),
+                error: sanitize_output(&error.message),
+                ..DeveloperProbe::default()
+            })
+        }
+    };
+
+    let output = result.stdout.trim();
+    let state_value = json_first_string(output, &["state", "mode"]);
+    let error = json_first_string(output, &["error", "failure"]).unwrap_or_else(|| {
+        if result.status.success() {
+            String::new()
+        } else {
+            sanitize_output(&result.stderr)
+        }
+    });
+    let explicit_active = json_bool_field(output, "active").unwrap_or(false);
+    let state = state_value
+        .map(|value| normalize_developer_state(&value))
+        .or_else(|| explicit_active.then(|| "active".to_string()))
+        .or_else(|| {
+            json_bool_field(output, "incompatible")
+                .unwrap_or(false)
+                .then(|| "incompatible".to_string())
+        })
+        .or_else(|| {
+            json_bool_field(output, "applying")
+                .unwrap_or(false)
+                .then(|| "applying".to_string())
+        })
+        .or_else(|| {
+            json_bool_field(output, "enabled")
+                .unwrap_or(false)
+                .then(|| "enabled".to_string())
+        })
+        .unwrap_or_else(|| "error".to_string());
+    let active = explicit_active || state == "active";
+    Some(DeveloperProbe {
+        available: true,
+        active,
+        state,
+        base_build: json_first_string(
+            output,
+            &[
+                "base_build",
+                "base_build_id",
+                "base_sysext_level",
+                "build_id",
+            ],
+        )
+        .unwrap_or_default(),
+        active_commit: json_first_string(output, &["active_commit", "source_commit", "commit"])
+            .unwrap_or_default(),
+        artifact_digest: json_first_string(
+            output,
+            &[
+                "artifact_digest",
+                "active_artifact_digest",
+                "active_digest",
+                "artifact",
+            ],
+        )
+        .unwrap_or_default(),
+        required_action: json_first_required_action(output),
+        focused_test_receipt: json_first_string(
+            output,
+            &[
+                "focused_test_receipt",
+                "test_receipt",
+                "focused_tests",
+                "focused_test",
+            ],
+        )
+        .unwrap_or_default(),
+        applied_at: json_first_string(output, &["applied_at", "application_time", "applied_time"])
+            .unwrap_or_default(),
+        message: json_first_string(output, &["message", "summary"]).unwrap_or_default(),
+        error,
+    })
+}
+
+fn print_developer_human_status(status: &DeveloperProbe) {
+    if !status.available {
+        return;
+    }
+    if status.state.is_empty() {
+        println!("Developer Mode: unavailable");
+        return;
+    }
+    println!(
+        "Developer Mode: {}{}",
+        status.state,
+        if status.active { " (DEV)" } else { "" }
+    );
+    if !status.base_build.is_empty() {
+        println!("Developer base: {}", status.base_build);
+    }
+    if !status.active_commit.is_empty() {
+        println!("Developer commit: {}", status.active_commit);
+    }
+    if !status.artifact_digest.is_empty() {
+        println!("Developer artifact: {}", status.artifact_digest);
+    }
+    if !status.required_action.is_empty() && status.required_action != "none" {
+        println!("Developer activation: {}", status.required_action);
+    }
+    if !status.focused_test_receipt.is_empty() {
+        println!("Developer focused tests: {}", status.focused_test_receipt);
+    }
+    if !status.applied_at.is_empty() {
+        println!("Developer applied: {}", status.applied_at);
+    }
+    if !status.message.is_empty() {
+        println!("Developer note: {}", status.message);
+    }
+    if !status.error.is_empty() {
+        println!("Developer error: {}", status.error);
+    }
+}
+
+fn developer_json(status: &DeveloperProbe) -> String {
+    format!(
+        "{{\"available\":{},\"active\":{},\"indicator\":{},\"state\":{},\"base_build\":{},\"base_build_id\":{},\"active_commit\":{},\"artifact_digest\":{},\"active_artifact_digest\":{},\"required_action\":{},\"focused_test_receipt\":{},\"applied_at\":{},\"message\":{},\"error\":{}}}",
+        json_bool(status.available),
+        json_bool(status.active),
+        json_string(if status.active { "DEV" } else { "" }),
+        json_string(&status.state),
+        json_string(&status.base_build),
+        json_string(&status.base_build),
+        json_string(&status.active_commit),
+        json_string(&status.artifact_digest),
+        json_string(&status.artifact_digest),
+        json_string(&status.required_action),
+        json_string(&status.focused_test_receipt),
+        json_string(&status.applied_at),
+        json_string(&status.message),
+        json_string(&status.error),
+    )
+}
+
+fn json_first_string(value: &str, keys: &[&str]) -> Option<String> {
+    keys.iter().find_map(|key| json_string_field(value, key))
+}
+
+fn json_first_required_action(value: &str) -> String {
+    if json_bool_field(value, "required_logout").unwrap_or(false)
+        || json_bool_field(value, "requires_logout").unwrap_or(false)
+    {
+        return "logout".to_string();
+    }
+    if json_bool_field(value, "required_restart").unwrap_or(false)
+        || json_bool_field(value, "requires_restart").unwrap_or(false)
+    {
+        return "restart".to_string();
+    }
+    let candidate = json_first_string(
+        value,
+        &[
+            "required_action",
+            "activation",
+            "required_restart",
+            "requires_restart",
+        ],
+    )
+    .or_else(|| {
+        ["required_activation", "activation_actions"]
+            .iter()
+            .find_map(|key| json_array_first_string_field(value, key))
+    })
+    .unwrap_or_else(|| "none".to_string());
+    normalize_developer_action(&candidate)
+}
+
+fn normalize_developer_state(value: &str) -> String {
+    let state = value
+        .to_ascii_lowercase()
+        .replace('-', "_")
+        .replace(' ', "_");
+    match state.as_str() {
+        "disabled" | "inactive" => "off".to_string(),
+        "needs_rebuild" => "incompatible".to_string(),
+        "needs_attention" | "attention" | "failed" | "interrupted" => "error".to_string(),
+        "paused" => "enabled".to_string(),
+        "off" | "enabled" | "active" | "incompatible" | "applying" | "error" => state,
+        _ => "error".to_string(),
+    }
+}
+
+fn normalize_developer_action(value: &str) -> String {
+    let action = value
+        .to_ascii_lowercase()
+        .replace('-', "_")
+        .replace(' ', "_");
+    if matches!(
+        action.as_str(),
+        "logout" | "logout_login" | "log_out" | "log_out_in"
+    ) {
+        return "logout".to_string();
+    }
+    if matches!(action.as_str(), "reboot" | "restart_system" | "restart_os") {
+        return "reboot".to_string();
+    }
+    if action.starts_with("restart") {
+        return "restart".to_string();
+    }
+    if action == "none" {
+        return action;
+    }
+    "none".to_string()
+}
+
+fn json_bool_field(value: &str, key: &str) -> Option<bool> {
+    let needle = format!("\"{}\"", key);
+    let position = value.find(&needle)?;
+    let rest = &value[position + needle.len()..];
+    let colon = rest.find(':')?;
+    let scalar = rest[colon + 1..].trim_start();
+    if scalar.starts_with("true") {
+        Some(true)
+    } else if scalar.starts_with("false") {
+        Some(false)
+    } else {
+        None
+    }
+}
+
+fn json_string_field(value: &str, key: &str) -> Option<String> {
+    let needle = format!("\"{}\"", key);
+    let position = value.find(&needle)?;
+    let rest = &value[position + needle.len()..];
+    let colon = rest.find(':')?;
+    let scalar = rest[colon + 1..].trim_start();
+    if scalar.starts_with("null") {
+        return None;
+    }
+    json_quoted_string(scalar)
+}
+
+fn json_array_first_string_field(value: &str, key: &str) -> Option<String> {
+    let needle = format!("\"{}\"", key);
+    let position = value.find(&needle)?;
+    let rest = &value[position + needle.len()..];
+    let colon = rest.find(':')?;
+    let scalar = rest[colon + 1..].trim_start();
+    let scalar = scalar.strip_prefix('[')?.trim_start();
+    if scalar.starts_with(']') {
+        return None;
+    }
+    json_quoted_string(scalar)
+}
+
+fn json_quoted_string(scalar: &str) -> Option<String> {
+    let mut characters = scalar.chars();
+    if characters.next()? != '"' {
+        return None;
+    }
+
+    let mut output = String::new();
+    let mut escaped = false;
+    for character in characters {
+        if escaped {
+            output.push(match character {
+                'n' => '\n',
+                'r' => '\r',
+                't' => '\t',
+                '\\' => '\\',
+                '"' => '"',
+                other => other,
+            });
+            escaped = false;
+        } else if character == '\\' {
+            escaped = true;
+        } else if character == '"' {
+            return Some(output);
+        } else {
+            output.push(character);
+        }
+    }
+    None
 }
 
 fn summarize_output(value: &str) -> String {
