@@ -1034,13 +1034,14 @@ class ArtifactPinTests(unittest.TestCase):
             signature,
             ROOT / "installer" / "zeus_installer" / "data" / "update-allowed-signers",
         )
-        self.assertEqual(manifest["build_id"], "git-4b8e9fae3ae6")
-        self.assertEqual(artifacts.validate_release(manifest)["sequence"], 1789231706)
+        self.assertEqual(manifest["build_id"], "git-89de745be436")
+        self.assertEqual(artifacts.validate_release(manifest)["sequence"], 1789233176)
 
     def test_installer_fetch_uses_immutable_feed_and_bounded_metadata(self) -> None:
         trusted = artifacts._trusted()
-        raw = (ROOT / "updates" / "preview.json").read_bytes()
-        signature = (ROOT / "updates" / "preview.json.sig").read_bytes()
+        fixture = ROOT / "tests" / "fixtures" / "update-bootstrap-git-4b8e9fae3ae6.json"
+        raw = fixture.read_bytes()
+        signature = fixture.with_suffix(".json.sig").read_bytes()
         seen_urls: list[str] = []
 
         class Response:
