@@ -16,3 +16,14 @@ and a repository restricted to `google-chrome-stable`. It enables this repositor
 only during an image build. Review future key changes against Google's published
 fingerprint and update the trust test; never work around a verification failure
 by disabling checks. Browser RPMs keep Google's license, branding and sandbox.
+
+## Tailscale
+
+`tailscale.asc` was downloaded from Tailscale's official Fedora repository on
+2026-09-12. Its primary fingerprint is
+`2596A99EAAB33821893C0A79458CA832957F5868` and its SHA-256 is
+`53c6f7dfbd774839d9f37e6c5022ba952108aba9a0e556a56f292a9eb605d7cf`.
+
+The disabled build repository requires signed metadata and RPMs over HTTPS and
+is restricted to the `tailscale` package. Installed clients receive Tailscale
+updates only through signed Zeus OS images; no vendor self-updater is enabled.

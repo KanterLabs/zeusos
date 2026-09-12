@@ -1,4 +1,5 @@
 import Clutter from 'gi://Clutter';
+import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Meta from 'gi://Meta';
@@ -13,6 +14,9 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 const KEYBINDING_NAME = 'spotlight-keybinding';
 const MAX_RESULTS = 10;
 const SEARCH_REFRESH_DELAY = 80;
+const TAILSCALE_HELPER = '/usr/libexec/zeus-tailscale';
+const TAILSCALE_REFRESH_SECONDS = 15;
+const MAX_TAILSCALE_RESPONSE = 64 * 1024;
 
 function actorNamed(actor, name) {
     if (!actor)
@@ -111,12 +115,43 @@ class ZeusMenuButton extends PanelMenu.Button {
                 Main.overview.toggle();
         });
         this.menu.addMenuItem(overviewItem);
+
+        this._tailscaleState = 'checking';
+        this._tailscaleSerial = 0;
+        this._tailscaleRefreshId = 0;
+        this._tailscaleBusy = false;
+        this._tailscaleMenu = new PopupMenu.PopupSubMenuMenuItem('Tailscale · Checking…');
+        this._tailscaleStatusItem = new PopupMenu.PopupMenuItem('Checking status…', {
+            reactive: false,
+            can_focus: false,
+        });
+        this._tailscaleDetailsItem = new PopupMenu.PopupMenuItem('', {
+            reactive: false,
+            can_focus: false,
+        });
+        this._tailscaleActionItem = new PopupMenu.PopupMenuItem('Connect…');
+        this._tailscaleActionItem.connect('activate', () => this._toggleTailscale());
+        const tailscaleRefreshItem = new PopupMenu.PopupMenuItem('Refresh Status');
+        tailscaleRefreshItem.connect('activate', () => this._refreshTailscaleStatus());
+        this._tailscaleMenu.menu.addMenuItem(this._tailscaleStatusItem);
+        this._tailscaleMenu.menu.addMenuItem(this._tailscaleDetailsItem);
+        this._tailscaleMenu.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        this._tailscaleMenu.menu.addMenuItem(this._tailscaleActionItem);
+        this._tailscaleMenu.menu.addMenuItem(tailscaleRefreshItem);
+        this.menu.addMenuItem(this._tailscaleMenu);
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
         this._addLauncher('Files', 'org.gnome.Nautilus.desktop');
         this._addLauncher('Zeus Settings', 'org.zeus.Settings.desktop');
         this._addLauncher('GNOME Settings', 'org.gnome.Settings.desktop');
         this._addLauncher('Terminal', 'org.gnome.Ptyxis.desktop');
+
+        this._menuOpenSignalId = this.menu.connect('open-state-changed', (_menu, open) => {
+            if (open)
+                this._startTailscaleRefresh();
+            else
+                this._stopTailscaleRefresh();
+        });
     }
 
     _addLauncher(label, desktopId) {
@@ -126,6 +161,151 @@ class ZeusMenuButton extends PanelMenu.Button {
             this._extension.launchDesktopId(desktopId);
         });
         this.menu.addMenuItem(item);
+    }
+
+    destroy() {
+        this._stopTailscaleRefresh();
+        ++this._tailscaleSerial;
+        if (this._menuOpenSignalId) {
+            this.menu.disconnect(this._menuOpenSignalId);
+            this._menuOpenSignalId = 0;
+        }
+        super.destroy();
+    }
+
+    _startTailscaleRefresh() {
+        this._refreshTailscaleStatus();
+        if (this._tailscaleRefreshId)
+            return;
+        this._tailscaleRefreshId = GLib.timeout_add_seconds(
+            GLib.PRIORITY_DEFAULT,
+            TAILSCALE_REFRESH_SECONDS,
+            () => {
+                this._refreshTailscaleStatus();
+                return GLib.SOURCE_CONTINUE;
+            });
+        GLib.Source.set_name_by_id(
+            this._tailscaleRefreshId, '[zeus-shell] refresh Tailscale status');
+    }
+
+    _stopTailscaleRefresh() {
+        if (!this._tailscaleRefreshId)
+            return;
+        GLib.source_remove(this._tailscaleRefreshId);
+        this._tailscaleRefreshId = 0;
+    }
+
+    _refreshTailscaleStatus() {
+        if (this._tailscaleBusy)
+            return;
+        const serial = ++this._tailscaleSerial;
+        this._runTailscaleCommand('status', payload => {
+            if (serial === this._tailscaleSerial)
+                this._applyTailscaleStatus(payload);
+        });
+    }
+
+    _toggleTailscale() {
+        if (this._tailscaleBusy)
+            return;
+        const action = this._tailscaleState === 'connected' ? 'disconnect' : 'connect';
+        const serial = ++this._tailscaleSerial;
+        this._tailscaleBusy = true;
+        this._tailscaleActionItem.setSensitive(false);
+        this._tailscaleStatusItem.label.text =
+            action === 'connect' ? 'Connecting…' : 'Disconnecting…';
+        this._runTailscaleCommand(action, payload => {
+            if (serial !== this._tailscaleSerial)
+                return;
+            this._tailscaleBusy = false;
+            this._applyTailscaleStatus(payload);
+            const loginUrl = typeof payload?.login_url === 'string'
+                ? payload.login_url
+                : '';
+            if (/^https:\/\/login\.tailscale\.com\//.test(loginUrl)) {
+                try {
+                    Gio.AppInfo.launch_default_for_uri(loginUrl, null);
+                } catch (error) {
+                    console.error(`Zeus could not open Tailscale sign-in: ${error.message}`);
+                }
+            }
+        });
+    }
+
+    _runTailscaleCommand(action, callback) {
+        try {
+            const process = Gio.Subprocess.new(
+                [TAILSCALE_HELPER, action],
+                Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+            process.communicate_utf8_async(null, null, (source, result) => {
+                try {
+                    const [, stdout] = source.communicate_utf8_finish(result);
+                    if (typeof stdout !== 'string' || stdout.length > MAX_TAILSCALE_RESPONSE)
+                        throw new Error('invalid response size');
+                    const payload = JSON.parse(stdout);
+                    if (!payload || payload.schema_version !== 1)
+                        throw new Error('invalid response schema');
+                    callback(payload);
+                } catch {
+                    callback({
+                        schema_version: 1,
+                        ok: false,
+                        state: 'error',
+                        message: 'Tailscale status is unavailable.',
+                    });
+                }
+            });
+        } catch {
+            callback({
+                schema_version: 1,
+                ok: false,
+                state: 'unavailable',
+                message: 'Tailscale is not installed.',
+            });
+        }
+    }
+
+    _applyTailscaleStatus(payload) {
+        const states = new Set([
+            'connected', 'connecting', 'disconnected', 'needs_login', 'needs_approval',
+            'service_stopped', 'unavailable', 'error',
+        ]);
+        const state = states.has(payload?.state) ? payload.state : 'error';
+        this._tailscaleState = state;
+
+        const headings = {
+            connected: payload?.online === false ? 'Connected · Offline' : 'Connected',
+            connecting: 'Connecting…',
+            disconnected: 'Disconnected',
+            needs_login: 'Sign In Required',
+            needs_approval: 'Approval Required',
+            service_stopped: 'Service Stopped',
+            unavailable: 'Unavailable',
+            error: 'Status Unavailable',
+        };
+        this._tailscaleMenu.label.text = `Tailscale · ${headings[state]}`;
+        this._tailscaleStatusItem.label.text = typeof payload?.message === 'string'
+            ? payload.message.slice(0, 240)
+            : 'Tailscale status is unavailable.';
+
+        const details = [];
+        if (typeof payload?.device_name === 'string' && payload.device_name)
+            details.push(payload.device_name.slice(0, 80));
+        if (Array.isArray(payload?.addresses) && typeof payload.addresses[0] === 'string')
+            details.push(payload.addresses[0].slice(0, 64));
+        if (typeof payload?.tailnet === 'string' && payload.tailnet)
+            details.push(payload.tailnet.slice(0, 100));
+        this._tailscaleDetailsItem.label.text = details.join(' · ');
+        if (details.length > 0)
+            this._tailscaleDetailsItem.show();
+        else
+            this._tailscaleDetailsItem.hide();
+
+        this._tailscaleActionItem.label.text = state === 'connected'
+            ? 'Disconnect'
+            : state === 'needs_approval' ? 'Waiting for Approval' : 'Connect…';
+        this._tailscaleActionItem.setSensitive(
+            !this._tailscaleBusy && !['unavailable', 'connecting', 'needs_approval'].includes(state));
     }
 });
 

@@ -5,6 +5,10 @@ window. Open it from **Welcome → Open Settings**, the **Zeus → Settings** me
 or application search. **All Settings** retains access to GNOME's complete
 control center, including in the safe desktop.
 
+The top-panel **Zeus → Tailscale** submenu is a separate compact network status
+surface. It shows this device's connection state and provides fixed Connect,
+Disconnect and Refresh actions; see [Built-in Tailscale](tailscale.md).
+
 Network, Bluetooth, display, power, sound and appearance changes use the existing
 GNOME panels. Temp and Updates open their existing native apps. The window shows
 the locally installed version and build; opening it does not check for an update,

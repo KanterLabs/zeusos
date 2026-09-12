@@ -43,6 +43,7 @@ fzf
 jq
 curl
 rsync
+tailscale
 firewalld
 fwupd
 mokutil

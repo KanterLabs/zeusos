@@ -3,12 +3,16 @@ FROM ${BASE_IMAGE} AS desktop-base
 COPY image/packages.txt /tmp/zeus-packages.txt
 COPY image/repos/google-chrome.repo /etc/yum.repos.d/google-chrome.repo
 COPY image/keys/google-linux.asc /etc/pki/rpm-gpg/RPM-GPG-KEY-google-linux
-RUN dnf install -y --enable-repo=google-chrome --setopt=install_weak_deps=False $(cat /tmp/zeus-packages.txt) && \
+COPY image/repos/tailscale.repo /etc/yum.repos.d/tailscale.repo
+COPY image/keys/tailscale.asc /etc/pki/rpm-gpg/RPM-GPG-KEY-tailscale
+RUN dnf install -y --enable-repo=google-chrome --enable-repo=tailscale-stable --setopt=install_weak_deps=False $(cat /tmp/zeus-packages.txt) && \
     dnf clean all && rm -f /tmp/zeus-packages.txt /etc/cron.daily/google-chrome && \
     printf 'repo_add_once="false"\n' > /etc/default/google-chrome
-# Chrome's RPM configures its own repo. Keep the verified, restricted build repo;
-# the running immutable OS receives browser upgrades through signed Zeus Updates.
+# Vendor RPMs can configure their own repositories. Keep only the verified,
+# restricted, disabled build repositories; the running immutable OS receives
+# Chrome and Tailscale upgrades through signed Zeus Updates.
 COPY image/repos/google-chrome.repo /etc/yum.repos.d/google-chrome.repo
+COPY image/repos/tailscale.repo /etc/yum.repos.d/tailscale.repo
 
 FROM desktop-base AS codex-package
 COPY image/codex.lock.json /tmp/codex.lock.json
@@ -69,6 +73,8 @@ RUN dnf remove -y --disable-repo='*' 'qemu-user-static*' && \
     chmod 0644 /usr/share/gnome-shell/extensions/zeus-lock-background@kanterlabs/extension.js /usr/share/gnome-shell/extensions/zeus-lock-background@kanterlabs/metadata.json && \
     chmod 0755 /usr/libexec/zeus-welcome /usr/libexec/zeus-settings-window && \
     chmod 0755 /usr/libexec/zeus-browser-session && \
+    chmod 0755 /usr/libexec/zeus-tailscale /usr/libexec/zeus-tailscale-admin && \
+    chmod 0644 /usr/lib/zeus/tailscale_control.py /usr/share/polkit-1/actions/org.zeus.Tailscale.policy && \
     chmod 0644 /etc/xdg/autostart/zeus-browser.desktop /etc/xdg/mimeapps.list /etc/opt/chrome/policies/recommended/zeus.json && \
     chmod 0644 /usr/lib/zeus/settings_model.py /usr/share/applications/org.zeus.Settings.desktop /usr/share/icons/hicolor/scalable/apps/org.zeus.Settings.svg && \
     glib-compile-schemas /usr/share/gnome-shell/extensions/zeus-shell@kanterlabs/schemas && \
@@ -78,7 +84,7 @@ RUN dnf remove -y --disable-repo='*' 'qemu-user-static*' && \
     gtk-update-icon-cache --force --ignore-theme-index /usr/share/icons/Zeus && \
     systemctl set-default graphical.target && \
     systemctl disable nfs-client.target && \
-    systemctl enable gdm.service NetworkManager.service firewalld.service sshd.service power-profiles-daemon.service && \
+    systemctl enable gdm.service NetworkManager.service firewalld.service sshd.service power-profiles-daemon.service tailscaled.service && \
     systemctl enable cloud-init-local.service cloud-init-network.service cloud-init-main.service cloud-config.service cloud-final.service && \
     systemctl mask bootc-fetch-apply-updates.timer && \
     systemctl enable zeus-tmpfiles.service zeus-temp-inspector.socket && \

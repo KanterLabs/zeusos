@@ -19,7 +19,7 @@ deployment and preservation evidence.
 
 ![New York desktop on the deployed preview](docs/iterations/git-31f0851a9d07/desktop.png)
 
-**Zeus Settings** remains available from the Zeus menu, Welcome or application search for network, Bluetooth, displays, power, sound, appearance, Temp and Updates. Physical battery remains unmeasured on the review VM; see the [metrics history](docs/metrics.md).
+**Zeus Settings** remains available from the Zeus menu, Welcome or application search for network, Bluetooth, displays, power, sound, appearance, Temp and Updates. The Zeus menu also includes bounded [Tailscale status and connection controls](docs/features/tailscale.md). Physical battery remains unmeasured on the review VM; see the [metrics history](docs/metrics.md).
 
 Deployment and measured results are recorded in the [preview VM runbook](docs/preview-vm.md) and [release notes](docs/releases/preview-2.md). An image build alone is not a graphical or performance test.
 
@@ -62,6 +62,11 @@ The output `out/disk/qcow2/disk.qcow2` contains no owner password or SSH key. In
 your project and run `codex`, then sign in with your own account. This command
 runs locally; the full remote T3/Codex launcher remains planned. No Node runtime
 or Codex boot service is added. See [Codex packaging and usage](docs/features/codex-cli.md).
+
+**Tailscale** is built into the image. Open **Zeus → Tailscale** to see this
+device's connection state, connect or disconnect, and open the normal browser
+sign-in when enrollment is needed. The menu never lists peers or accepts auth
+keys. See the [Tailscale UI and security contract](docs/features/tailscale.md).
 
 ```sh
 codex --version

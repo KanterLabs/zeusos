@@ -6,6 +6,6 @@
   "builder": "ghcr.io/osbuild/bootc-image-builder@sha256:027bf9d6c53d4ed98a0b46a5864d8acae6e2cd589023dfd20d6b1cb8332969a0",
   "builder_source": "https://github.com/osbuild/image-builder",
   "resolved_at": "2026-09-08",
-  "rpm_policy": "Signed Fedora repositories and Google's official signed Chrome Stable repository (restricted to google-chrome-stable, including metadata verification); resolved NEVRAs are recorded in every built image and release evidence. Repository snapshots are not yet pinned, so a rebuild may resolve newer RPMs.",
+  "rpm_policy": "Signed Fedora repositories plus official signed Chrome Stable and Tailscale repositories, each restricted to its named package with metadata verification; resolved NEVRAs are recorded in every built image and release evidence. Repository snapshots are not yet pinned, so a rebuild may resolve newer RPMs.",
   "builder_version": "v82.0.0"
 }

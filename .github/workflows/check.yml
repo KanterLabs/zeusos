@@ -37,6 +37,7 @@ jobs:
       - name: Verify desktop interaction and battery measurement contracts
         run: |
           python3 -m unittest discover -s tests -p test_desktop_interactions.py -v
+          python3 -m unittest discover -s tests -p test_tailscale.py -v
           python3 -m unittest discover -s tests -p test_battery_measurement.py -v
       - name: Check build script syntax
         run: bash -n scripts/build.sh scripts/build-disk.sh scripts/export-iteration.sh
