@@ -1,10 +1,11 @@
 # ZOS-83 released update, rollback, and removal qualification plan
 
-Status: source and review-contract work complete; live released-update and
-rollback qualification is pending. Destructive data removal remains outside
-this run because it requires separate, explicit authorization. This document
-separates accepted evidence from the remaining state-changing qualification
-so a reviewer cannot mistake the synthetic rehearsal for a released claim.
+Status: accepted on disposable VM118. A released signed update, retained-image
+rollback, roll-forward, Fedora-default boot, Zeus menu boot, and the final
+signed UI-fix update all passed through the native updater. The machine-readable
+receipt is [`vm118-released-update-rollback.json`](vm118-released-update-rollback.json).
+Destructive data removal remains outside this run because it requires separate,
+explicit authorization; the accepted live removal scope is menu-only.
 
 ## Known evidence and exact disposable target
 
@@ -32,20 +33,21 @@ The VM117 update/rollback receipt is useful lifecycle evidence, but its
 candidate is explicitly a synthetic marker-only fixture:
 [`vm117-update-rollback.json`](vm117-update-rollback.json).
 
-VM118 currently boots installed release `git-ad091ecc2978`. At the start of
-this qualification the promoted signed feed identifies
-`git-89de745be436` (version `0.1.0-preview.2`, archive SHA-256
-`37b81a53e32a7f8a87db509c2493e7c5950441cbee9a80fef6945c62ac1396a3`).
-The feed will advance again when the integrated image is published. Record the
-exact final archive checksum, signed metadata verification output, and booted
-manifest in a new receipt before calling a release run accepted.
+VM118 started from installed release `git-ad091ecc2978`. A signed compatibility
+bridge (`git-4b8e9fae3ae6`) first brought the released client onto the current
+updater path. The rollback cycle then used released build `git-eaabf4da5796`
+(archive SHA-256
+`be0ff5fbfbfc4bd9bdf3add927cae5edb06db32377f19d5f3b746cf3da6dc726`),
+and the final promoted UI-fix build is `git-97da2a1116c4` (archive SHA-256
+`faca3e804737daa9856aca45196882441bd5d26f591d7b18fd4e30096eecb720`).
+Both 2,132,291,072-byte artifacts passed signed metadata verification and a
+full public Cloudflare download checksum. VM118 now boots the final build.
 
 ## Released signed Zeus update and rollback
 
-The owner-authorized operator should run this sequence only after checking
-that VM118 is the target and the backup above is still available. These are
-state-changing commands and are a qualification plan, not commands run by
-this source-review task.
+The owner-authorized operator ran this sequence after checking VM118's exact
+identity and the verified backup above. The steps remain the reusable contract
+for a future candidate.
 
 1. Capture a read-only baseline from Fedora and Zeus: exact GPT table and
    partition GUIDs, both ESP tree hashes, both `/boot` trees, Fedora BLS and
@@ -97,10 +99,11 @@ temp_fedora_isolated_rollback
 temp_zeus_isolated_rollback
 ```
 
-The source contract deliberately leaves this receipt open: the existing
-`vm117-update-rollback.json` sets `released_efi_artifact` false and calls its
-candidate synthetic. No released signed Zeus update/rollback has been claimed
-here.
+The earlier `vm117-update-rollback.json` remains explicitly synthetic. It is
+superseded for the released lifecycle row by
+[`vm118-released-update-rollback.json`](vm118-released-update-rollback.json),
+which records the signed artifacts, native staging, explicit restarts, both
+boot choices, rollback/forward builds, and preservation comparisons.
 
 ## Safe removal qualification
 

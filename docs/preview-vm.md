@@ -25,7 +25,8 @@ preview candidates.
 | Build guest | VM **116**, builder address `10.0.0.56` |
 
 The Proxmox host and the guest are private-network resources. The owner-triggered
-updater reads a public, signed preview feed and immutable release assets, but
+updater reads a public, signed preview feed and immutable release assets through
+the Cloudflare-backed homelab origin, but
 that publication path does not expose SSH, Proxmox, VM, or guest access. Use the
 Proxmox console for the native GDM path and `ssh shane@10.0.0.95` for non-GUI
 checks when the address is current.
@@ -144,9 +145,10 @@ sentinels after both update and rollback. Fedora owns the first ESP and its
 The update path must retain the previous Zeus deployment for rollback, leave
 Fedora's ESP/boot/BLS trees unchanged, and keep the selected Temp policy
 unchanged. A passing synthetic bootc rehearsal is not a released-update
-qualification. The current receipts record the synthetic VM117 lifecycle and
-the real Fedora VM118 kernel/GRUB update; a released signed Zeus update and a
-released rollback cycle remain pending (see the [qualification plan](iterations/installer-20260910/released-update-rollback-plan.md)).
+qualification. The VM118 [released receipt](iterations/installer-20260910/vm118-released-update-rollback.json)
+records the signed native update, retained rollback, roll-forward, both boot
+choices, final promoted build, and preservation comparisons (see the reusable
+[qualification plan](iterations/installer-20260910/released-update-rollback-plan.md)).
 
 The implementation and command contract are recorded in the
 [updater feature notes](features/os-updater.md). Use the manual procedure below

@@ -1,0 +1,679 @@
+{
+  "boot": {
+    "activation_source": "systemd-sysext.service",
+    "claim": "not_observed",
+    "observed_boot_change": false,
+    "post_boot_id": "",
+    "pre_boot_id": "b2078efa-b415-49b4-9626-c3b6c29f3cc0",
+    "reboot_required": true
+  },
+  "cases": [
+    {
+      "duration_seconds": 0.078094,
+      "ended_monotonic_ns": 150813726856,
+      "id": "safe_desktop_recovery",
+      "message": "safe-desktop recovery remained reachable and preserved terminal, credentials, and personal data",
+      "started_monotonic_ns": 150735632895,
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 0.01426,
+      "ended_monotonic_ns": 150846282646,
+      "id": "protected_scope",
+      "message": "only the fixed extension, qualification state, evidence, and optional unit are writable",
+      "started_monotonic_ns": 150832022301,
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 0.014266,
+      "ended_monotonic_ns": 150874899707,
+      "id": "selinux_enforcing",
+      "message": "SELinux is enforcing for the fixture",
+      "started_monotonic_ns": 150860633252,
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 0.250995,
+      "ended_monotonic_ns": 166254815225,
+      "id": "runtime_merge_override",
+      "message": "compatible extension merged and replaced the dedicated sentinel",
+      "started_monotonic_ns": 166003820112,
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 0.079802,
+      "ended_monotonic_ns": 166346245727,
+      "id": "runtime_unmerge_restoration",
+      "message": "unmerge restored sentinel bytes, mode, owner, group, and SELinux context",
+      "started_monotonic_ns": 166266443466,
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 0.255301,
+      "ended_monotonic_ns": 166613994080,
+      "id": "runtime_remerge",
+      "message": "the same extension merged again after an exact unmerge",
+      "started_monotonic_ns": 166358693557,
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 0.220262,
+      "ended_monotonic_ns": 166845074346,
+      "id": "incompatible_version_rejected",
+      "message": "extension without matching VERSION_ID stayed inactive",
+      "started_monotonic_ns": 166624812260,
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 0.148183,
+      "ended_monotonic_ns": 167003754652,
+      "id": "incompatible_sysext_level_rejected",
+      "message": "extension with incompatible SYSEXT_LEVEL stayed inactive",
+      "started_monotonic_ns": 166855571665,
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 0.011076,
+      "ended_monotonic_ns": 182624575349,
+      "id": "selinux_no_avc",
+      "message": "no AVC denial was recorded during fixture operations",
+      "started_monotonic_ns": 182613499480,
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 0.010876,
+      "ended_monotonic_ns": 182646447889,
+      "id": "metrics_recorded",
+      "message": "monotonic timing and baseline/merged idle samples were recorded",
+      "started_monotonic_ns": 182635571666,
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 0.011142,
+      "ended_monotonic_ns": 182679836361,
+      "id": "reboot_boundary",
+      "message": "prepare never claims reboot success; run verify after an operator-controlled reboot",
+      "started_monotonic_ns": 182668694345,
+      "status": "pending"
+    }
+  ],
+  "commands": [
+    {
+      "argv": [
+        "/usr/sbin/systemd-sysext",
+        "--version"
+      ],
+      "duration_seconds": 0.018404,
+      "ended_monotonic_ns": 150479191632,
+      "expected": "must-succeed",
+      "label": "systemd-sysext version",
+      "returncode": 0,
+      "started_monotonic_ns": 150460787754,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "fca3e68ee886ab0d2eba4eb39de1e125f76e1750c3e9fd6f684eb28c04ef7330"
+    },
+    {
+      "argv": [
+        "/usr/sbin/getenforce"
+      ],
+      "duration_seconds": 0.017214,
+      "ended_monotonic_ns": 150540976813,
+      "expected": "must-succeed",
+      "label": "SELinux enforcing state",
+      "returncode": 0,
+      "started_monotonic_ns": 150523762993,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "4fefafd0dcddf54b31a0fef448083e7b77576d86a9ec97c14bfd92479c404290"
+    },
+    {
+      "argv": [
+        "/usr/sbin/systemd-sysext",
+        "list"
+      ],
+      "duration_seconds": 0.017513,
+      "ended_monotonic_ns": 150609411346,
+      "expected": "must-succeed",
+      "label": "baseline systemd-sysext list",
+      "returncode": 0,
+      "started_monotonic_ns": 150591898594,
+      "stderr_sha256": "bde6d33ede3999604995d68e58c38daebfa56476956ef8001db6629ef879b30f",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "/usr/bin/systemd-analyze",
+        "time"
+      ],
+      "duration_seconds": 0.023046,
+      "ended_monotonic_ns": 150673755270,
+      "expected": "must-succeed",
+      "label": "disabled boot timing",
+      "returncode": 0,
+      "started_monotonic_ns": 150650708851,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "57b7d78fba3405cf7e3f80ce0216b49e8cd92221428654744fd9dcbbb6999964"
+    },
+    {
+      "argv": [
+        "/usr/sbin/zeus",
+        "desktop",
+        "safe",
+        "--dry-run"
+      ],
+      "duration_seconds": 0.017792,
+      "ended_monotonic_ns": 150767292871,
+      "expected": "must-succeed",
+      "label": "safe-desktop recovery dry run",
+      "returncode": 0,
+      "started_monotonic_ns": 150749500441,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "5bb6095cbb3748b3e4b11d186b900f9083f2cae90b01c5fe4f9145b2411d91f2"
+    },
+    {
+      "argv": [
+        "/usr/sbin/systemd-sysext",
+        "refresh"
+      ],
+      "duration_seconds": 0.026648,
+      "ended_monotonic_ns": 166042066218,
+      "expected": "must-succeed",
+      "label": "systemd-sysext refresh compatible fixture",
+      "returncode": 0,
+      "started_monotonic_ns": 166015418211,
+      "stderr_sha256": "00e696932011923936bd048e2dee6e15854f4041f91877dd36ba9c85e4f9a940",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "/usr/bin/findmnt",
+        "--noheadings",
+        "--output",
+        "FSTYPE",
+        "--target",
+        "/usr"
+      ],
+      "duration_seconds": 0.015355,
+      "ended_monotonic_ns": 166101490708,
+      "expected": "must-succeed",
+      "label": "observe merged usr overlay",
+      "returncode": 0,
+      "started_monotonic_ns": 166086135896,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "5971fc5991ae2b514c4e25cbfaa154aa191b4230c4201e33c00da182209f53fd"
+    },
+    {
+      "argv": [
+        "/usr/sbin/systemd-sysext",
+        "--json=short",
+        "status"
+      ],
+      "duration_seconds": 0.016253,
+      "ended_monotonic_ns": 166157437170,
+      "expected": "must-succeed",
+      "label": "systemd-sysext status after compatible merge",
+      "returncode": 0,
+      "started_monotonic_ns": 166141184550,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "05b0420bb0fbb1ac9db741b30c7555602bd0b538b161c104a8d4a9568e838806"
+    },
+    {
+      "argv": [
+        "/usr/sbin/systemd-sysext",
+        "list"
+      ],
+      "duration_seconds": 0.0159,
+      "ended_monotonic_ns": 166215609963,
+      "expected": "must-succeed",
+      "label": "systemd-sysext list after compatible merge",
+      "returncode": 0,
+      "started_monotonic_ns": 166199710361,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "3a140504c0a055bdbeeae0d1bdf410a9833ae277b6ca56fc5f741ff0c34b6591"
+    },
+    {
+      "argv": [
+        "/usr/sbin/systemd-sysext",
+        "unmerge"
+      ],
+      "duration_seconds": 0.020623,
+      "ended_monotonic_ns": 166299686218,
+      "expected": "must-succeed",
+      "label": "systemd-sysext unmerge fixture",
+      "returncode": 0,
+      "started_monotonic_ns": 166279063091,
+      "stderr_sha256": "617b5e5f33cc93d9d99273742d4a46edf60893f5c6197a07fea9e47f104b6561",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "/usr/sbin/systemd-sysext",
+        "refresh"
+      ],
+      "duration_seconds": 0.02901,
+      "ended_monotonic_ns": 166399607519,
+      "expected": "must-succeed",
+      "label": "systemd-sysext refresh compatible fixture",
+      "returncode": 0,
+      "started_monotonic_ns": 166370597208,
+      "stderr_sha256": "00e696932011923936bd048e2dee6e15854f4041f91877dd36ba9c85e4f9a940",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "/usr/bin/findmnt",
+        "--noheadings",
+        "--output",
+        "FSTYPE",
+        "--target",
+        "/usr"
+      ],
+      "duration_seconds": 0.015805,
+      "ended_monotonic_ns": 166461722187,
+      "expected": "must-succeed",
+      "label": "observe merged usr overlay",
+      "returncode": 0,
+      "started_monotonic_ns": 166445917394,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "5971fc5991ae2b514c4e25cbfaa154aa191b4230c4201e33c00da182209f53fd"
+    },
+    {
+      "argv": [
+        "/usr/sbin/systemd-sysext",
+        "--json=short",
+        "status"
+      ],
+      "duration_seconds": 0.016853,
+      "ended_monotonic_ns": 166519741957,
+      "expected": "must-succeed",
+      "label": "systemd-sysext status after compatible merge",
+      "returncode": 0,
+      "started_monotonic_ns": 166502888649,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "e4b7f4f0674fc4ecd0678393fdb3580f916709a46b8e3d7079df6550ad7bfd01"
+    },
+    {
+      "argv": [
+        "/usr/sbin/systemd-sysext",
+        "list"
+      ],
+      "duration_seconds": 0.016494,
+      "ended_monotonic_ns": 166575466544,
+      "expected": "must-succeed",
+      "label": "systemd-sysext list after compatible merge",
+      "returncode": 0,
+      "started_monotonic_ns": 166558972454,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "3a140504c0a055bdbeeae0d1bdf410a9833ae277b6ca56fc5f741ff0c34b6591"
+    },
+    {
+      "argv": [
+        "/usr/sbin/systemd-sysext",
+        "unmerge"
+      ],
+      "duration_seconds": 0.017284,
+      "ended_monotonic_ns": 166653143954,
+      "expected": "must-succeed",
+      "label": "systemd-sysext unmerge fixture",
+      "returncode": 0,
+      "started_monotonic_ns": 166635860119,
+      "stderr_sha256": "617b5e5f33cc93d9d99273742d4a46edf60893f5c6197a07fea9e47f104b6561",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "/usr/sbin/systemd-sysext",
+        "refresh"
+      ],
+      "duration_seconds": 0.018421,
+      "ended_monotonic_ns": 166729994041,
+      "expected": "expected-rejection",
+      "label": "refresh incompatible VERSION_ID fixture",
+      "returncode": 0,
+      "started_monotonic_ns": 166711573364,
+      "stderr_sha256": "8598205f6cd00720af52461bd41da2dbe21c597ae1d03488e7ee362ac63f8ac1",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "/usr/sbin/systemd-sysext",
+        "refresh"
+      ],
+      "duration_seconds": 0.017701,
+      "ended_monotonic_ns": 166797894394,
+      "expected": "must-succeed",
+      "label": "restore base after incompatible VERSION_ID fixture",
+      "returncode": 0,
+      "started_monotonic_ns": 166780193827,
+      "stderr_sha256": "ff8b74bb78fd635d5e4fbc60d195e3fce9de449ff1aa380124b2c83e0f2c20fc",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "/usr/sbin/systemd-sysext",
+        "refresh"
+      ],
+      "duration_seconds": 0.018654,
+      "ended_monotonic_ns": 166896648977,
+      "expected": "expected-rejection",
+      "label": "refresh incompatible SYSEXT_LEVEL fixture",
+      "returncode": 0,
+      "started_monotonic_ns": 166877995135,
+      "stderr_sha256": "8598205f6cd00720af52461bd41da2dbe21c597ae1d03488e7ee362ac63f8ac1",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "/usr/sbin/systemd-sysext",
+        "refresh"
+      ],
+      "duration_seconds": 0.016185,
+      "ended_monotonic_ns": 166960367269,
+      "expected": "must-succeed",
+      "label": "restore base after incompatible SYSEXT_LEVEL fixture",
+      "returncode": 0,
+      "started_monotonic_ns": 166944182379,
+      "stderr_sha256": "ff8b74bb78fd635d5e4fbc60d195e3fce9de449ff1aa380124b2c83e0f2c20fc",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "/usr/sbin/systemd-sysext",
+        "refresh"
+      ],
+      "duration_seconds": 0.022701,
+      "ended_monotonic_ns": 167049862537,
+      "expected": "must-succeed",
+      "label": "systemd-sysext refresh compatible fixture",
+      "returncode": 0,
+      "started_monotonic_ns": 167027161783,
+      "stderr_sha256": "00e696932011923936bd048e2dee6e15854f4041f91877dd36ba9c85e4f9a940",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "/usr/bin/findmnt",
+        "--noheadings",
+        "--output",
+        "FSTYPE",
+        "--target",
+        "/usr"
+      ],
+      "duration_seconds": 0.013549,
+      "ended_monotonic_ns": 167104153383,
+      "expected": "must-succeed",
+      "label": "observe merged usr overlay",
+      "returncode": 0,
+      "started_monotonic_ns": 167090603972,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "5971fc5991ae2b514c4e25cbfaa154aa191b4230c4201e33c00da182209f53fd"
+    },
+    {
+      "argv": [
+        "/usr/sbin/systemd-sysext",
+        "--json=short",
+        "status"
+      ],
+      "duration_seconds": 0.014924,
+      "ended_monotonic_ns": 167156525283,
+      "expected": "must-succeed",
+      "label": "systemd-sysext status after compatible merge",
+      "returncode": 0,
+      "started_monotonic_ns": 167141601608,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "4f166defa9759d80ddf36a8b58ef48d99f6817cc8347dc1c5f1d4150a80c2bb3"
+    },
+    {
+      "argv": [
+        "/usr/sbin/systemd-sysext",
+        "list"
+      ],
+      "duration_seconds": 0.014366,
+      "ended_monotonic_ns": 167204974484,
+      "expected": "must-succeed",
+      "label": "systemd-sysext list after compatible merge",
+      "returncode": 0,
+      "started_monotonic_ns": 167190608050,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "d5a1b32b906ada46e266811f19b6e40f76f50abe4f9b4fa01d57ddb4f016a00d"
+    },
+    {
+      "argv": [
+        "/usr/bin/journalctl",
+        "-b",
+        "0",
+        "--no-pager",
+        "--output=json"
+      ],
+      "duration_seconds": 0.189818,
+      "ended_monotonic_ns": 182504504244,
+      "expected": "must-succeed",
+      "label": "operation journal scan",
+      "returncode": 0,
+      "started_monotonic_ns": 182314685810,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "c4dae0f10e2993abaef3c73667a5b504702ed01d135bf577614a3de80f7521dd"
+    }
+  ],
+  "errors": [],
+  "extension": {
+    "cleanup_required": true,
+    "directory": "/var/lib/extensions/zeus-qualification-fixture",
+    "format": "directory",
+    "mutable_data_touched": false,
+    "name": "zeus-qualification-fixture",
+    "preexisting_list_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "release_metadata": "/var/lib/extensions/zeus-qualification-fixture/usr/lib/extension-release.d/extension-release.zeus-qualification-fixture"
+  },
+  "fixture_version": 1,
+  "guest": {
+    "architecture": "x86-64",
+    "id": "fedora",
+    "selinux": "Enforcing",
+    "sysext_level": "git-97da2a1116c4",
+    "systemd_version": "systemd 259 (259.8-1.fc44)+PAM +AUDIT +SELINUX -APPARMOR +IMA +IPE +SMACK +SECCOMP -GCRYPT +GNUTLS +OPENSSL +ACL +BLKID +CURL +ELFUTILS +FIDO2 +IDN2 -IDN +KMOD +LIBCRYPTSETUP +LIBCRYPTSETUP_PLUGINS +LIBFDISK +PCRE2 +PWQUALITY +P11KIT +QRENCODE +TPM2 +BZIP2 +LZ4 +XZ +ZLIB +ZSTD +BPF_FRAMEWORK +BTF +XKBCOMMON +UTMP +SYSVINIT +LIBARCHIVE",
+    "version_id": "44"
+  },
+  "metrics": {
+    "boot_timings": [
+      {
+        "clock": "CLOCK_MONOTONIC",
+        "label": "disabled",
+        "output_sha256": "57b7d78fba3405cf7e3f80ce0216b49e8cd92221428654744fd9dcbbb6999964",
+        "summary": "Startup finished in 1.532s (kernel) + 3.450s (initrd) + 4.977s (userspace) = 9.960s graphical.target reached after 4.900s in userspace."
+      }
+    ],
+    "clock": "CLOCK_MONOTONIC",
+    "cpu_definition": "guest aggregate busy percentage from /proc/stat deltas",
+    "disabled_mode": {
+      "boot_claim": "observed_before_apply",
+      "boot_timing_labels": [
+        "disabled"
+      ],
+      "idle_claim": "not_observed",
+      "idle_labels": [
+        "baseline"
+      ]
+    },
+    "idle": {
+      "baseline": {
+        "boot_id": "b2078efa-b415-49b4-9626-c3b6c29f3cc0",
+        "clock": "CLOCK_MONOTONIC",
+        "label": "baseline",
+        "measurement_ended_monotonic_ns": 165967027103,
+        "measurement_started_monotonic_ns": 155964899835,
+        "median_cpu_percent": 0.249,
+        "median_memory_used_mib": 848.3,
+        "memory_definition": "MemTotal minus MemAvailable; includes non-reclaimable guest memory",
+        "requested_seconds": 10,
+        "sample_interval_seconds": 2,
+        "samples": [
+          {
+            "cpu_percent": 0.373,
+            "memory_used_mib": 848.3,
+            "monotonic_ns": 157965406549,
+            "sample": 1
+          },
+          {
+            "cpu_percent": 0.0,
+            "memory_used_mib": 848.3,
+            "monotonic_ns": 159965808227,
+            "sample": 2
+          },
+          {
+            "cpu_percent": 0.743,
+            "memory_used_mib": 848.3,
+            "monotonic_ns": 161966220533,
+            "sample": 3
+          },
+          {
+            "cpu_percent": 0.249,
+            "memory_used_mib": 848.3,
+            "monotonic_ns": 163966561923,
+            "sample": 4
+          },
+          {
+            "cpu_percent": 0.125,
+            "memory_used_mib": 848.3,
+            "monotonic_ns": 165966920965,
+            "sample": 5
+          }
+        ],
+        "settle_seconds": 5
+      },
+      "merged": {
+        "boot_id": "b2078efa-b415-49b4-9626-c3b6c29f3cc0",
+        "clock": "CLOCK_MONOTONIC",
+        "label": "merged",
+        "measurement_ended_monotonic_ns": 182277712829,
+        "measurement_started_monotonic_ns": 172275135601,
+        "median_cpu_percent": 0.373,
+        "median_memory_used_mib": 846.2,
+        "memory_definition": "MemTotal minus MemAvailable; includes non-reclaimable guest memory",
+        "requested_seconds": 10,
+        "sample_interval_seconds": 2,
+        "samples": [
+          {
+            "cpu_percent": 0.496,
+            "memory_used_mib": 846.2,
+            "monotonic_ns": 174275844646,
+            "sample": 1
+          },
+          {
+            "cpu_percent": 0.373,
+            "memory_used_mib": 846.2,
+            "monotonic_ns": 176276335631,
+            "sample": 2
+          },
+          {
+            "cpu_percent": 0.248,
+            "memory_used_mib": 846.2,
+            "monotonic_ns": 178276728713,
+            "sample": 3
+          },
+          {
+            "cpu_percent": 0.496,
+            "memory_used_mib": 846.2,
+            "monotonic_ns": 180277236443,
+            "sample": 4
+          },
+          {
+            "cpu_percent": 0.249,
+            "memory_used_mib": 846.2,
+            "monotonic_ns": 182277632827,
+            "sample": 5
+          }
+        ],
+        "settle_seconds": 5
+      }
+    },
+    "idle_memory_definition": "MemTotal minus MemAvailable; includes non-reclaimable guest memory",
+    "phases": [
+      {
+        "duration_seconds": 15.0658,
+        "ended_at_utc": "2026-09-12T20:10:21.294Z",
+        "ended_monotonic_ns": 165981079888,
+        "name": "idle_baseline",
+        "started_monotonic_ns": 150915279981
+      },
+      {
+        "duration_seconds": 15.051403,
+        "ended_at_utc": "2026-09-12T20:10:37.605Z",
+        "ended_monotonic_ns": 182292044051,
+        "name": "idle_merged",
+        "started_monotonic_ns": 167240640899
+      },
+      {
+        "duration_seconds": 32.311436,
+        "ended_at_utc": "2026-09-12T20:10:38.004Z",
+        "ended_monotonic_ns": 182691198228,
+        "name": "prepare",
+        "started_monotonic_ns": 150379762627
+      }
+    ]
+  },
+  "mode": "prepare",
+  "qualification_passed": false,
+  "result": "pre_reboot_ready",
+  "safe_desktop": {
+    "claim": "dry_run_contract",
+    "command": [
+      "zeus",
+      "desktop",
+      "safe",
+      "--dry-run"
+    ],
+    "credentials_untouched": true,
+    "helper": "/usr/libexec/zeus-desktop-safe",
+    "helper_selinux_context": "system_u:object_r:bin_t:s0",
+    "helper_sha256": "43e1247089f54ed25d8fbf3b5f51b532348ab9b0ab89dfac5840903f9db29577",
+    "mutation_performed": false,
+    "output_sha256": "5bb6095cbb3748b3e4b11d186b900f9083f2cae90b01c5fe4f9145b2411d91f2",
+    "personal_data_untouched": true,
+    "terminal_available": true
+  },
+  "schema": "zeus-developer-sysext-qualification-v1",
+  "schema_version": 1,
+  "scope": {
+    "allowed_mutation_paths": [
+      "/var/lib/zeus/qualification/developer-sysext-final-97da",
+      "/var/lib/extensions/zeus-qualification-fixture",
+      "/etc/systemd/system/zeus-developer-sysext-qualification.service"
+    ],
+    "bootloader_touched": false,
+    "owner_data_touched": false,
+    "protected_write_prefixes": [
+      "/home",
+      "/var/home",
+      "/var/lib/zeus/updates",
+      "/boot",
+      "/boot/efi",
+      "/efi",
+      "/var/lib/bootc",
+      "/usr",
+      "/etc",
+      "/proc",
+      "/sys",
+      "/dev"
+    ],
+    "proxmox_operated_by_script": false,
+    "reboot_requested_by_script": false,
+    "updater_touched": false
+  },
+  "selinux": {
+    "avc_denials_during_boot_activation": 0,
+    "avc_denials_during_operations": 0,
+    "avc_scan_note": "journal entries were filtered by monotonic range and sysext unit fields; raw journal text is intentionally excluded from evidence",
+    "enforcing": true
+  },
+  "sentinel": {
+    "base_gid": 0,
+    "base_mode": "664",
+    "base_selinux_context": "system_u:object_r:usr_t:s0",
+    "base_sha256": "70e49c3f91657ba395a7ebd809ecfb2cc1ed5a6bea45d54a151edebb763dce2e",
+    "base_uid": 0,
+    "override_content_label": "fixed fixture string; raw content is not copied into evidence",
+    "override_sha256": "6cf43c5c300373ec8cdae47b32338393c53b0025f7f63f4f652fdb6f75d4b8e4",
+    "path": "/usr/share/zeus/developer-mode-qualification-sentinel",
+    "restoration": "exact bytes, mode, owner, group, and SELinux context"
+  }
+}

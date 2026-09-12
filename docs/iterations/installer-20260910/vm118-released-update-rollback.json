@@ -1,0 +1,86 @@
+{
+  "schema": "zeus-vm118-released-update-rollback-v1",
+  "schema_version": 1,
+  "recorded_date": "2026-09-12",
+  "accepted": true,
+  "target": {
+    "vmid": 118,
+    "dmi_uuid": "29f40b00-bc18-4ff3-82da-1d9006d7db4c",
+    "layout": "two-esp-six-partition",
+    "fedora_partitions": [1, 2, 3],
+    "zeus_partitions": [4, 5, 6],
+    "default_boot_owner": "fedora"
+  },
+  "backup": {
+    "path": "/mnt/pve/sata-ssd/dump/vzdump-qemu-118-2026_09_12-02_55_35.vma.zst",
+    "compressed_bytes": 26310457372,
+    "uncompressed_bytes": 31834179072,
+    "zstd_integrity_verified": true,
+    "restore_performed": false
+  },
+  "released_update_cycle": {
+    "previous_build": "git-4b8e9fae3ae6",
+    "updated_build": "git-eaabf4da5796",
+    "source_commit": "eaabf4da5796da79d82df253f330500ed7a54124",
+    "archive_sha256": "be0ff5fbfbfc4bd9bdf3add927cae5edb06db32377f19d5f3b746cf3da6dc726",
+    "archive_size_bytes": 2132291072,
+    "manifest_digest": "sha256:4ca65d807073db1b2a79137406177520ff8cac482a7228f4e488795ae28a7bf5",
+    "signature_verified": true,
+    "public_cloudflare_download_sha256_verified": true,
+    "native_updater_download_and_stage": "passed",
+    "explicit_restart": true,
+    "post_update_build": "git-eaabf4da5796",
+    "rollback_build": "git-4b8e9fae3ae6",
+    "roll_forward_build": "git-eaabf4da5796"
+  },
+  "final_promoted_update": {
+    "build": "git-97da2a1116c4",
+    "source_commit": "97da2a1116c40c383d0bb980712da2fbae1a9439",
+    "sequence": 1789243124,
+    "archive_sha256": "faca3e804737daa9856aca45196882441bd5d26f591d7b18fd4e30096eecb720",
+    "archive_size_bytes": 2132291072,
+    "manifest_digest": "sha256:8da541cd32e7939c59837b535b2009134ff0e0ee3db1c1c30c4087419aed220e",
+    "signature_verified": true,
+    "public_cloudflare_download_sha256_verified": true,
+    "native_updater_download_and_stage": "passed",
+    "booted": true
+  },
+  "boot_choices": {
+    "fedora_after_update": "passed; kernel 7.2.4-100.fc43",
+    "zeus_after_update": "passed; git-eaabf4da5796",
+    "fedora_after_rollback": "passed; kernel 7.2.4-100.fc43",
+    "zeus_after_rollback": "passed; git-4b8e9fae3ae6",
+    "fedora_after_final_update": "passed; kernel 7.2.4-100.fc43",
+    "zeus_after_final_update": "passed; git-97da2a1116c4"
+  },
+  "preservation": {
+    "gpt_and_partition_identities_unchanged_all_phases": true,
+    "fedora_esp_tree_unchanged_all_phases": true,
+    "fedora_boot_tree_unchanged_all_phases": true,
+    "fedora_bls_tree_unchanged_bridge_through_final": true,
+    "fedora_home_sentinel_and_512_mib_fixture_unchanged_all_phases": true,
+    "zeus_home_sentinel_unchanged_all_phases": true,
+    "zeus_esp_tree_unchanged_all_phases": true,
+    "temp_policy_absent_default_all_zeus_phases": true,
+    "fedora_home_untouched_by_temp_all_phases": true,
+    "failed_units_after_final_boot": 0
+  },
+  "removal": {
+    "accepted_live_scope": "menu-only",
+    "journal_owned_menu_entry_removed_and_restored": true,
+    "fedora_boot_and_all_data_preserved": true,
+    "automatic_space_reclaim": false,
+    "destructive_partition_removal_performed": false,
+    "limit": "Deleting the three Zeus partitions remains separately gated by an exact plan ID, a verified backup, disposable-VM qualification, and explicit authorization."
+  },
+  "ci": {
+    "source_commit_run": 34715716594,
+    "promotion_commit_run": 34715968555,
+    "source_commit_passed": true,
+    "promotion_commit_passed": true
+  },
+  "limits": [
+    "This qualifies the disposable VM118 two-ESP layout, not the physical laptop.",
+    "The destructive full-removal path was not executed without separate explicit authorization."
+  ]
+}

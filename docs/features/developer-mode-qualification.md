@@ -1,9 +1,9 @@
 # Developer Mode systemd-sysext qualification
 
-Status: the disposable-guest fixture and evidence contract are checked in;
-the measurements below are an observed Fedora 44 guest qualification. The
-Developer Mode product path remains gated on this qualification and its
-feature-specific tests.
+Status: accepted for final preview build `git-97da2a1116c4`. The reusable
+fixture, evidence contract, installed CLI/Settings path, and exact-image Fedora
+44 VM qualification all passed. The final records and before/after UI proof are
+in the [2026-09-12 qualification](../iterations/developer-mode-20260912/README.md).
 
 This record covers the reversible systemd-sysext mechanism used by the
 Developer Mode desktop lane. It does not qualify the owner laptop, a normal
@@ -150,6 +150,14 @@ pre-apply boot timing observation, and
 `safe_desktop.mutation_performed: false`.
 
 ## Observed disposable guest measurement: VM119
+
+The exact final-image run on 2026-09-12 supersedes the older mechanism-only
+run for release acceptance. Its [prepare](../iterations/developer-mode-20260912/prepare.json)
+and [verify](../iterations/developer-mode-20260912/verify.json) records show
+`SYSEXT_LEVEL=git-97da2a1116c4`, a changed boot ID, successful boot activation,
+exact restoration, both incompatible-base rejection cases, enforcing SELinux,
+zero relevant AVCs, and merged/disabled idle samples. The installed status was
+cleanly disabled after cleanup.
 
 The following values come from the parent qualification run on disposable
 **VM119**. The sanitized machine-readable records are

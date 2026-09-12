@@ -880,3 +880,29 @@ Evidence: [qualification record](features/developer-mode-qualification.md),
 [runtime JSON](iterations/developer-mode-20260911/sysext-runtime.json),
 [post-reboot JSON](iterations/developer-mode-20260911/sysext-post-reboot.json),
 and [SquashFS JSON](iterations/developer-mode-20260911/sysext-squashfs.json).
+
+### 2026-09-12 — Developer Mode exact final image
+
+- Recorded at (UTC): `2026-09-12T20:14:00Z` (entry transcription)
+- Measurement date: `2026-09-12`
+- Version: `0.1.0-preview.2`; build: `git-97da2a1116c4`; source
+  `97da2a1116c40c383d0bb980712da2fbae1a9439`
+- Environment: disposable VM119, 4 vCPUs, 8 GiB RAM, Fedora 44,
+  systemd 259.8, SELinux enforcing
+- Prepare idle protocol: five seconds settle and five samples across ten
+  seconds. Base/disabled median: **0.249% CPU, 848.3 MiB**. Runtime merged
+  median: **0.373% CPU, 846.2 MiB**.
+- Post-reboot idle protocol: the same settle/sample window. Boot-merged median:
+  **0.496% CPU, 889.1 MiB**. Post-cleanup disabled median: **0.373% CPU,
+  870.4 MiB**.
+- Active boot observation: **8.301 s** total (1.713 s kernel + 2.373 s initrd
+  + 4.214 s userspace). This has no same-condition disabled cold-boot pair.
+- Runtime merge/unmerge/remerge, incompatible `VERSION_ID` and
+  `SYSEXT_LEVEL` rejection, reboot activation, exact restoration, safe-desktop
+  dry-run, and final cleanup passed. Relevant AVC denials: **0**.
+- These short guest samples are mechanism evidence. They do not establish a
+  performance change, physical power use, or laptop battery runtime.
+
+Evidence: [final qualification](iterations/developer-mode-20260912/README.md),
+[prepare JSON](iterations/developer-mode-20260912/prepare.json), and
+[verify JSON](iterations/developer-mode-20260912/verify.json).
