@@ -1034,8 +1034,26 @@ class ArtifactPinTests(unittest.TestCase):
             signature,
             ROOT / "installer" / "zeus_installer" / "data" / "update-allowed-signers",
         )
+        self.assertEqual(manifest["build_id"], "git-4b8e9fae3ae6")
+        self.assertEqual(artifacts.validate_release(manifest)["sequence"], 1789231706)
+
+    def test_signed_homelab_candidate_can_be_verified_with_bundled_policy(self) -> None:
+        candidate = ROOT / "updates" / "candidates" / "update-git-89de745be436.json"
+        raw = candidate.read_bytes()
+        signature = candidate.with_suffix(".json.sig").read_bytes()
+        trusted = artifacts._trusted()
+        manifest = trusted.verify_manifest(
+            raw,
+            signature,
+            ROOT / "installer" / "zeus_installer" / "data" / "update-allowed-signers",
+        )
         self.assertEqual(manifest["build_id"], "git-89de745be436")
         self.assertEqual(artifacts.validate_release(manifest)["sequence"], 1789233176)
+        self.assertEqual(
+            manifest["archive"]["url"],
+            "https://updates.shanekanterman.dev/zeusos/preview/"
+            "v0.1.0-preview.2/zeusos-0.1.0-preview.2-git-89de745be436.oci",
+        )
 
     def test_installer_fetch_uses_immutable_feed_and_bounded_metadata(self) -> None:
         trusted = artifacts._trusted()

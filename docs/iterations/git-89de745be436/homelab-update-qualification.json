@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-12T17:26:14Z",
+  "source_commit": "89de745be436550174e74bb219ad70d37344b758",
+  "build_id": "git-89de745be436",
+  "archive": {
+    "size": 2187005952,
+    "sha256": "37b81a53e32a7f8a87db509c2493e7c5950441cbee9a80fef6945c62ac1396a3",
+    "manifest_digest": "sha256:f232eb93604c269402e00356634c3547f38d45286ff9bd2ce2def5e7a0b4b5ac",
+    "origin": "https://updates.shanekanterman.dev/zeusos/preview/v0.1.0-preview.2/zeusos-0.1.0-preview.2-git-89de745be436.oci",
+    "github_asset_present": false
+  },
+  "edge": {
+    "cloudflare_cache_status": "DYNAMIC",
+    "cache_control": "no-store, no-transform",
+    "origin_listener": "127.0.0.1:19101",
+    "storage_mount": "/srv/zeusos",
+    "storage_size_gib": 64
+  },
+  "limit_proof": {
+    "size": 2148532224,
+    "sha256": "f9c84696d71513c7ee5fc3cb4e4638fb906157d2cc38332319228136721656bf",
+    "elapsed_seconds": 251.03,
+    "result": "passed",
+    "cleanup": "temporary probe removed from the retention and edge stores"
+  },
+  "bootstrap": {
+    "build_id": "git-4b8e9fae3ae6",
+    "size": 2131030528,
+    "sha256": "dc010812c3a1e92694985f9aaef7125389a69d9a2b2112af3ff4ab60c1e5a9da",
+    "origin": "github",
+    "result": "installed and rebooted"
+  },
+  "vm_qualification": {
+    "vm_id": 115,
+    "pre_update_backup": "vzdump-qemu-115-2026_09_12-02_45_57.vma.zst",
+    "backup_zstd_test": "passed",
+    "starting_build": "git-f080a1843377",
+    "bridge_build": "git-4b8e9fae3ae6",
+    "final_build": "git-89de745be436",
+    "rollback_retained_before_final_reboot": "git-f080a1843377",
+    "downloaded_bytes": 2187005952,
+    "stage": "passed",
+    "reboot": "passed",
+    "final_status": "up_to_date",
+    "tailscaled_service": "active"
+  },
+  "tests": {
+    "full_python_tests_passed": 390,
+    "focused_python_tests_passed": 48,
+    "github_actions_run": 34708023790,
+    "github_actions_result": "success"
+  }
+}

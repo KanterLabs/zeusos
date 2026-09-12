@@ -118,6 +118,12 @@ assets. Publish one final compatible GitHub bootstrap build before switching the
 signed feed to `--artifact-origin homelab`; retain that bootstrap asset so an old
 installation can always cross the compatibility boundary.
 
+Keep the public latest pointer on that bootstrap until every owner device has
+installed it. A qualified homelab manifest may be retained under
+`updates/candidates/` while this compatibility hold is active. Promote the exact
+signed candidate pair only after the device reports the bootstrap build ID; this
+avoids stranding an older updater on a feed whose archive host it cannot yet trust.
+
 For example, verify the exported archive and the per-build feed pair before the
 copy:
 
