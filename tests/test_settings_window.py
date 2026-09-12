@@ -348,6 +348,19 @@ class SettingsLaunchTests(unittest.TestCase):
         cancellable.cancel.assert_called_once_with()
         self.assertIn("Canceling", window._developer_notice)
 
+    def test_developer_status_json_is_not_truncated_before_parsing(self):
+        window = self.new_window()
+        window._developer_process = object()
+        window._developer_cancellable = object()
+        callback = Mock()
+        payload = '{"state":"disabled","padding":"' + ("x" * 1024) + '"}'
+        window._finish_developer_process(
+            "status", callback, True, payload, "", "", False
+        )
+        returned = callback.call_args.args
+        self.assertEqual(returned[1], payload)
+        self.assertEqual(MODEL.developer_status_from_json(returned[1]).state, "off")
+
 
 if __name__ == "__main__":
     unittest.main()

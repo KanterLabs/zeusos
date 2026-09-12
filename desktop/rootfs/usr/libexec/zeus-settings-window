@@ -30,6 +30,7 @@ APPLICATION_ID = "org.zeus.Settings"
 NATIVE_SETTINGS_DESKTOP_ID = "org.gnome.Settings.desktop"
 GNOME_CONTROL_CENTER_COMMAND = "/usr/bin/gnome-control-center"
 DEVELOPER_COMMAND = "/usr/libexec/zeus-developer"
+DEVELOPER_STATUS_OUTPUT_LIMIT = 64 * 1024
 
 
 CSS = """
@@ -700,12 +701,12 @@ class SettingsWindow(Adw.ApplicationWindow):
         self._start_developer_process("status", True, self._after_developer_status)
 
     @staticmethod
-    def _developer_output_text(value: Any, fallback: str = "") -> str:
+    def _developer_output_text(value: Any, fallback: str = "", *, limit: int = 512) -> str:
         if isinstance(value, str):
             text = value.strip()
         else:
             text = "" if value is None else str(value).strip()
-        return text[:512] if text else fallback
+        return text[:limit] if text else fallback
 
     def _start_developer_process(self, action: str, json_status: bool, callback):
         """Start the fixed helper argv and report completion through Gio."""
@@ -822,9 +823,10 @@ class SettingsWindow(Adw.ApplicationWindow):
     ):
         self._developer_process = None
         self._developer_cancellable = None
+        stdout_limit = DEVELOPER_STATUS_OUTPUT_LIMIT if action == "status" else 512
         callback(
             bool(succeeded),
-            self._developer_output_text(stdout),
+            self._developer_output_text(stdout, limit=stdout_limit),
             self._developer_output_text(stderr),
             self._developer_output_text(error),
             bool(canceled),

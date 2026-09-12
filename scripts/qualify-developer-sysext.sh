@@ -621,7 +621,7 @@ ensure_extension_parent() {
         local uid mode
         uid=$(/usr/bin/stat -c '%u' "$EXTENSION_PARENT")
         mode=$(/usr/bin/stat -c '%a' "$EXTENSION_PARENT")
-        [[ "$uid" == '0' && $((8#$mode & 22)) -eq 0 ]] || die unsafe_extension_parent "$EXTENSION_PARENT is not a private root-owned directory"
+        [[ "$uid" == '0' && $((8#$mode & 8#022)) -eq 0 ]] || die unsafe_extension_parent "$EXTENSION_PARENT is not root-owned or is group/world writable"
     else
         /usr/bin/install -d -o root -g root -m 0755 "$EXTENSION_PARENT"
         EXTENSIONS_PARENT_CREATED=1
@@ -755,7 +755,8 @@ check_safe_desktop_recovery() {
     run_checked 'safe-desktop recovery dry run' "$ZEUS_CLI" desktop safe --dry-run
     SAFE_DESKTOP_OUTPUT_SHA256=$(sha256_file "$LAST_OUT_PATH")
     grep -Fqi 'terminal remains available' "$LAST_OUT_PATH" || die safe_desktop_failed 'safe-desktop dry run did not confirm terminal availability'
-    grep -Fqi 'credentials and personal data remain untouched' "$LAST_OUT_PATH" || die safe_desktop_failed 'safe-desktop dry run did not confirm data preservation'
+    grep -Fqi 'credentials and personal data' "$LAST_OUT_PATH" || die safe_desktop_failed 'safe-desktop dry run did not name the protected data scope'
+    grep -Fqi 'remain untouched' "$LAST_OUT_PATH" || die safe_desktop_failed 'safe-desktop dry run did not confirm data preservation'
     SAFE_DESKTOP_CHECKED=1
     pass_case 'safe-desktop recovery remained reachable and preserved terminal, credentials, and personal data'
 }
@@ -1344,7 +1345,7 @@ payload = {
         "cpu_definition": "guest aggregate busy percentage from /proc/stat deltas",
         "disabled_mode": {
             "boot_timing_labels": [item["label"] for item in boot_timings if item["label"] == "disabled"],
-            "idle_labels": [item["label"] for item in idle if item in {"baseline", "post_boot_disabled"}],
+            "idle_labels": [label for label in idle if label in {"baseline", "post_boot_disabled"}],
             "boot_claim": "observed_before_apply" if any(item["label"] == "disabled" for item in boot_timings) else "not_observed",
             "idle_claim": "observed_after_cleanup" if "post_boot_disabled" in idle else "not_observed",
         },

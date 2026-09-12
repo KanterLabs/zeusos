@@ -133,10 +133,12 @@ class DeveloperSysextContract(unittest.TestCase):
             "ConditionPathExists=",
             "systemd-sysext.service",
             "safe-desktop recovery dry run",
-            "credentials and personal data remain untouched",
+            "credentials and personal data",
+            "remain untouched",
             "systemd-analyze time",
             "post_boot_disabled",
             "disabled_mode",
+            '"idle_labels": [label for label in idle',
         )
         for fragment in required_fragments:
             with self.subTest(fragment=fragment):
