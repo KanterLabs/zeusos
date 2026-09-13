@@ -40,6 +40,9 @@ The installer is a **VM-tested preview**; the Nimo laptop remains untested.
 Partition changes require a verified backup receipt. The [qualification
 record](docs/iterations/installer-20260910/README.md) records the clean install,
 preserved files, offline boots, update/rollback checks and remaining limits.
+Installer-managed multi-OS systems have a source-implemented, fail-closed
+[Shut Down to Boot Chooser](docs/features/boot-chooser-shutdown.md) action that
+uses a one-shot firmware selection without changing the default OS.
 
 ## Build
 
@@ -112,6 +115,7 @@ The review VM now has a qualified signed preview updater for owner-triggered Upd
 - [Implementation checklist](docs/implementation-plan.md)
 - [Testing checklist](docs/testing-plan.md)
 - [Developer Mode plan](docs/features/developer-mode.md)
+- [Boot chooser shutdown plan](docs/features/boot-chooser-shutdown.md)
 - [Helm backlog](docs/helm-backlog.md)
 - [Original design](docs/design-v0.1.md)
 - [Planning overview](docs/backlog-overview.md)

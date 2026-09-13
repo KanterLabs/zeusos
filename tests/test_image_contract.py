@@ -52,6 +52,31 @@ class ImageContract(unittest.TestCase):
         for path in assets + list((ROOT / 'desktop/rootfs').rglob('*.xml')):
             ET.parse(path)
 
+    def test_boot_chooser_privilege_boundary_is_packaged(self):
+        packages = {
+            line.strip()
+            for line in (ROOT / 'image/packages.txt').read_text().splitlines()
+            if line.strip() and not line.lstrip().startswith('#')
+        }
+        self.assertIn('efibootmgr', packages)
+        container = (ROOT / 'image/Containerfile').read_text()
+        self.assertIn('chmod 0755 /usr/libexec/zeus-boot-chooser', container)
+        self.assertIn('chmod 0644 /usr/lib/zeus/boot_chooser.py', container)
+
+        policy_path = (
+            ROOT
+            / 'desktop/rootfs/usr/share/polkit-1/actions/org.zeus.BootChooser.policy'
+        )
+        policy = ET.parse(policy_path).getroot()
+        action = policy.find("./action[@id='org.zeus.BootChooser.poweroff']")
+        self.assertIsNotNone(action)
+        self.assertEqual(action.findtext('./defaults/allow_any'), 'no')
+        self.assertEqual(action.findtext('./defaults/allow_inactive'), 'no')
+        self.assertEqual(
+            action.findtext("./annotate[@key='org.freedesktop.policykit.exec.path']"),
+            '/usr/libexec/zeus-boot-chooser',
+        )
+
     def test_workflows_use_homelab_tiers(self):
         for path in (ROOT / '.github/workflows').glob('*.yml'):
             for label in re.findall(r'runs-on:\s*(\S+)', path.read_text()):

@@ -7,6 +7,7 @@ import Shell from 'gi://Shell';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
@@ -17,6 +18,17 @@ const SEARCH_REFRESH_DELAY = 80;
 const TAILSCALE_HELPER = '/usr/libexec/zeus-tailscale';
 const TAILSCALE_REFRESH_SECONDS = 15;
 const MAX_TAILSCALE_RESPONSE = 64 * 1024;
+const BOOT_CHOOSER_HELPER = '/usr/libexec/zeus-boot-chooser';
+const PKEXEC_COMMAND = '/usr/bin/pkexec';
+const BOOT_CHOOSER_STATUS_COMMAND = Object.freeze([
+    BOOT_CHOOSER_HELPER, 'status', '--json',
+]);
+const BOOT_CHOOSER_POWEROFF_COMMAND = Object.freeze([
+    PKEXEC_COMMAND, '--disable-internal-agent', BOOT_CHOOSER_HELPER, 'poweroff', '--json',
+]);
+const MAX_BOOT_CHOOSER_RESPONSE = 16 * 1024;
+const MAX_BOOT_CHOOSER_STDOUT = MAX_BOOT_CHOOSER_RESPONSE;
+const MAX_BOOT_CHOOSER_STDERR = 8 * 1024;
 
 function actorNamed(actor, name) {
     if (!actor)
@@ -139,6 +151,20 @@ class ZeusMenuButton extends PanelMenu.Button {
         this._tailscaleMenu.menu.addMenuItem(this._tailscaleActionItem);
         this._tailscaleMenu.menu.addMenuItem(tailscaleRefreshItem);
         this.menu.addMenuItem(this._tailscaleMenu);
+
+        this._bootChooserState = 'unknown';
+        this._bootChooserCapabilitySerial = 0;
+        this._bootChooserCapabilityBusy = false;
+        this._bootChooserCancellable = null;
+        this._bootChooserActionBusy = false;
+        this._bootChooserActionSerial = 0;
+        this._bootChooserDialog = null;
+        this._bootChooserItem = new PopupMenu.PopupMenuItem(
+            'Shut Down to Boot Chooser…');
+        this._bootChooserItem.setSensitive(false);
+        this._bootChooserItem.hide();
+        this._bootChooserItem.connect('activate', () => this._showBootChooserConfirmation());
+        this.menu.addMenuItem(this._bootChooserItem);
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
         this._addLauncher('Files', 'org.gnome.Nautilus.desktop');
@@ -147,10 +173,13 @@ class ZeusMenuButton extends PanelMenu.Button {
         this._addLauncher('Terminal', 'org.gnome.Ptyxis.desktop');
 
         this._menuOpenSignalId = this.menu.connect('open-state-changed', (_menu, open) => {
-            if (open)
+            if (open) {
+                this._refreshBootChooserCapability();
                 this._startTailscaleRefresh();
-            else
+            } else {
+                this._cancelBootChooserCapability();
                 this._stopTailscaleRefresh();
+            }
         });
     }
 
@@ -166,11 +195,263 @@ class ZeusMenuButton extends PanelMenu.Button {
     destroy() {
         this._stopTailscaleRefresh();
         ++this._tailscaleSerial;
+        this._cancelBootChooserCapability();
+        ++this._bootChooserActionSerial;
+        this._closeBootChooserDialog();
         if (this._menuOpenSignalId) {
             this.menu.disconnect(this._menuOpenSignalId);
             this._menuOpenSignalId = 0;
         }
         super.destroy();
+    }
+
+    _refreshBootChooserCapability() {
+        if (this._bootChooserCapabilityBusy)
+            return;
+
+        this._bootChooserState = 'checking';
+        this._bootChooserItem.setSensitive(false);
+        this._bootChooserItem.hide();
+        const serial = ++this._bootChooserCapabilitySerial;
+        this._bootChooserCapabilityBusy = true;
+        try {
+            this._bootChooserCancellable = new Gio.Cancellable();
+        } catch {
+            this._bootChooserCancellable = null;
+        }
+
+        this._runBootChooserCommand(
+            BOOT_CHOOSER_STATUS_COMMAND,
+            this._bootChooserCancellable,
+            result => {
+                if (serial !== this._bootChooserCapabilitySerial)
+                    return;
+
+                this._bootChooserCapabilityBusy = false;
+                this._bootChooserCancellable = null;
+                if (result.ok && result.payload?.available === true) {
+                    this._bootChooserState = 'available';
+                    this._bootChooserItem.show();
+                    this._bootChooserItem.setSensitive(true);
+                    return;
+                }
+
+                this._bootChooserState = 'unavailable';
+                this._bootChooserItem.setSensitive(false);
+                this._bootChooserItem.hide();
+            });
+    }
+
+    _cancelBootChooserCapability() {
+        ++this._bootChooserCapabilitySerial;
+        this._bootChooserCapabilityBusy = false;
+        this._bootChooserState = 'unknown';
+        this._bootChooserItem?.setSensitive(false);
+        this._bootChooserItem?.hide();
+        try {
+            this._bootChooserCancellable?.cancel();
+        } catch (error) {
+            console.debug(`Zeus boot chooser status cancellation failed: ${error.message}`);
+        }
+        this._bootChooserCancellable = null;
+    }
+
+    _runBootChooserCommand(command, cancellable, callback) {
+        if (command !== BOOT_CHOOSER_STATUS_COMMAND &&
+            command !== BOOT_CHOOSER_POWEROFF_COMMAND) {
+            callback({
+                ok: false,
+                auth_cancelled: false,
+                payload: null,
+            });
+            return;
+        }
+
+        let process;
+        try {
+            process = Gio.Subprocess.new(
+                Array.from(command),
+                Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+        } catch {
+            callback({
+                ok: false,
+                auth_cancelled: false,
+                payload: null,
+            });
+            return;
+        }
+
+        try {
+            process.communicate_utf8_async(null, cancellable, (source, result) => {
+                let communicated = false;
+                let stdout = '';
+                let stderr = '';
+                let error = null;
+                let exitStatus = null;
+                try {
+                    const output = source.communicate_utf8_finish(result);
+                    communicated = Boolean(output?.[0]);
+                    stdout = typeof output?.[1] === 'string' ? output[1] : '';
+                    stderr = typeof output?.[2] === 'string' ? output[2] : '';
+                } catch (caught) {
+                    error = caught;
+                }
+
+                try {
+                    if (typeof source.get_exit_status === 'function')
+                        exitStatus = source.get_exit_status();
+                } catch {
+                    // A failed or cancelled communication may not expose status.
+                }
+
+                let successful = communicated;
+                try {
+                    if (typeof source.get_successful === 'function')
+                        successful = Boolean(source.get_successful());
+                } catch {
+                    successful = false;
+                }
+
+                const authCancelled = exitStatus === 126 || exitStatus === 127 ||
+                    error?.code === Gio.IOErrorEnum?.CANCELLED;
+                let payload = null;
+                let valid = successful &&
+                    stdout.length <= MAX_BOOT_CHOOSER_STDOUT &&
+                    stderr.length <= MAX_BOOT_CHOOSER_STDERR;
+                if (valid) {
+                    try {
+                        payload = JSON.parse(stdout);
+                        valid = payload !== null && typeof payload === 'object' &&
+                            !Array.isArray(payload) && payload.schema_version === 1;
+                    } catch {
+                        valid = false;
+                    }
+                }
+
+                callback({
+                    ok: valid,
+                    auth_cancelled: authCancelled,
+                    payload,
+                });
+            });
+        } catch {
+            callback({
+                ok: false,
+                auth_cancelled: false,
+                payload: null,
+            });
+        }
+    }
+
+    _showBootChooserConfirmation() {
+        if (this._bootChooserState !== 'available' || this._bootChooserActionBusy ||
+            this._bootChooserDialog)
+            return;
+
+        this.menu.close();
+        const dialog = new ModalDialog.ModalDialog({
+            styleClass: 'zeus-boot-chooser-dialog',
+        });
+        this._bootChooserDialog = dialog;
+
+        const content = new St.BoxLayout({
+            vertical: true,
+            style_class: 'zeus-boot-chooser-content',
+        });
+        content.add_child(new St.Label({
+            text: 'Shut down to the boot chooser?',
+            style_class: 'zeus-boot-chooser-title',
+        }));
+        content.add_child(new St.Label({
+            text: 'Your computer will power off. The existing operating system chooser will open the next time it starts. Save your work before continuing.',
+            style_class: 'zeus-boot-chooser-message',
+        }));
+        dialog.contentLayout.add_child(content);
+        dialog.setButtons([
+            {
+                label: 'Cancel',
+                action: () => this._closeBootChooserDialog(dialog),
+                key: Clutter.KEY_Escape,
+            },
+            {
+                label: 'Shut Down',
+                action: () => this._confirmBootChooserShutdown(dialog),
+                key: Clutter.KEY_Return,
+                default: true,
+            },
+        ]);
+        dialog.open();
+    }
+
+    _closeBootChooserDialog(dialog = this._bootChooserDialog) {
+        if (!dialog)
+            return;
+        if (this._bootChooserDialog === dialog)
+            this._bootChooserDialog = null;
+        try {
+            dialog.close();
+        } catch (error) {
+            console.debug(`Zeus boot chooser dialog close failed: ${error.message}`);
+        }
+        try {
+            dialog.destroy();
+        } catch (error) {
+            console.debug(`Zeus boot chooser dialog cleanup failed: ${error.message}`);
+        }
+    }
+
+    _confirmBootChooserShutdown(dialog) {
+        if (dialog !== this._bootChooserDialog || this._bootChooserActionBusy)
+            return;
+
+        this._bootChooserActionBusy = true;
+        const serial = ++this._bootChooserActionSerial;
+        this._closeBootChooserDialog(dialog);
+        this._runBootChooserCommand(
+            BOOT_CHOOSER_POWEROFF_COMMAND,
+            null,
+            result => {
+                if (serial !== this._bootChooserActionSerial)
+                    return;
+                this._bootChooserActionBusy = false;
+                if (result.ok && result.payload?.ok === true)
+                    return;
+                this._showBootChooserError(result.auth_cancelled);
+            });
+    }
+
+    _showBootChooserError(authCancelled) {
+        if (Main.sessionMode?.isGreeter || Main.sessionMode?.isLocked)
+            return;
+
+        const dialog = new ModalDialog.ModalDialog({
+            styleClass: 'zeus-boot-chooser-dialog',
+        });
+        this._bootChooserDialog = dialog;
+        const content = new St.BoxLayout({
+            vertical: true,
+            style_class: 'zeus-boot-chooser-content',
+        });
+        content.add_child(new St.Label({
+            text: 'Couldn’t shut down to the boot chooser',
+            style_class: 'zeus-boot-chooser-title',
+        }));
+        content.add_child(new St.Label({
+            text: authCancelled
+                ? 'Authentication was cancelled. The computer is still running.'
+                : 'The boot chooser request could not be completed. The computer is still running.',
+            style_class: 'zeus-boot-chooser-message',
+        }));
+        dialog.contentLayout.add_child(content);
+        dialog.setButtons([
+            {
+                label: 'Close',
+                action: () => this._closeBootChooserDialog(dialog),
+                key: Clutter.KEY_Escape,
+                default: true,
+            },
+        ]);
+        dialog.open();
     }
 
     _startTailscaleRefresh() {
@@ -686,6 +967,12 @@ export default class ZeusShellExtension extends Extension {
         this._search?.destroy();
         this._search = null;
 
+        if (this._menuButton) {
+            this._menuButton._cancelBootChooserCapability();
+            ++this._menuButton._bootChooserActionSerial;
+            this._menuButton._closeBootChooserDialog();
+        }
+
         if (this._keybindingInstalled) {
             try {
                 Main.wm.removeKeybinding(KEYBINDING_NAME);
@@ -935,6 +1222,7 @@ export default class ZeusShellExtension extends Extension {
         this._cancelDockRediscovery();
         this._stopPanelWatch();
         this._stopDockWatch();
+        this._menuButton?._closeBootChooserDialog();
 
         const state = this._panelState;
         if (!state)

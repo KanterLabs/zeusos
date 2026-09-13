@@ -46,6 +46,7 @@ rsync
 tailscale
 firewalld
 fwupd
+efibootmgr
 mokutil
 gnome-text-editor
 loupe

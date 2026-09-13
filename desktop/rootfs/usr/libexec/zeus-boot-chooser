@@ -1,0 +1,9 @@
+#!/usr/bin/python3 -I
+"""Fixed entry point for the Zeus one-shot boot chooser helper."""
+
+import sys
+
+sys.path.insert(0, "/usr/lib/zeus")
+from boot_chooser import admin_main
+
+raise SystemExit(admin_main())

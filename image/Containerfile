@@ -80,6 +80,8 @@ RUN dnf remove -y --disable-repo='*' 'qemu-user-static*' && \
     chmod 0755 /usr/libexec/zeus-welcome /usr/libexec/zeus-settings-window && \
     chmod 0755 /usr/libexec/zeus-browser-session && \
     chmod 0755 /usr/libexec/zeus-tailscale /usr/libexec/zeus-tailscale-admin && \
+    chmod 0755 /usr/libexec/zeus-boot-chooser && \
+    chmod 0644 /usr/lib/zeus/boot_chooser.py /usr/share/polkit-1/actions/org.zeus.BootChooser.policy && \
     chmod 0644 /usr/lib/zeus/tailscale_control.py /usr/share/polkit-1/actions/org.zeus.Tailscale.policy && \
     find /usr/libexec -maxdepth 1 -type f -name 'zeus-developer*' -exec chmod 0755 {} + && \
     find /usr/lib/zeus -maxdepth 1 -type f -name 'developer*' -exec chmod 0644 {} + && \

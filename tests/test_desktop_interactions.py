@@ -40,6 +40,65 @@ class DesktopInteractions(unittest.TestCase):
         self.assertNotIn("_dockLookupId", self.extension)
         self.assertNotIn("GLib.timeout_add(", self.extension)
 
+    def test_boot_chooser_uses_on_demand_fixed_commands(self):
+        self.assertIn(
+            "const BOOT_CHOOSER_HELPER = '/usr/libexec/zeus-boot-chooser';",
+            self.extension,
+        )
+        self.assertIn(
+            "BOOT_CHOOSER_HELPER, 'status', '--json'",
+            self.extension,
+        )
+        self.assertIn("PKEXEC_COMMAND = '/usr/bin/pkexec';", self.extension)
+        self.assertIn(
+            "PKEXEC_COMMAND, '--disable-internal-agent', BOOT_CHOOSER_HELPER, 'poweroff', '--json'",
+            self.extension,
+        )
+        self.assertIn("Gio.Subprocess.new(", self.extension)
+        self.assertIn("communicate_utf8_async", self.extension)
+        self.assertIn("MAX_BOOT_CHOOSER_RESPONSE", self.extension)
+        self.assertIn("MAX_BOOT_CHOOSER_STDOUT", self.extension)
+        self.assertIn("MAX_BOOT_CHOOSER_STDERR", self.extension)
+        self.assertIn("payload.schema_version === 1", self.extension)
+
+    def test_boot_chooser_status_is_menu_open_only_and_has_no_poller(self):
+        menu = self.extension.split("const ZeusMenuButton", 1)[1].split(
+            "const SearchResultButton", 1
+        )[0]
+        self.assertIn("if (open)", menu)
+        self.assertIn("this._refreshBootChooserCapability()", menu)
+        chooser = menu.split("    _refreshBootChooserCapability() {", 1)[1].split(
+            "    _startTailscaleRefresh()", 1
+        )[0]
+        self.assertNotIn("GLib.timeout_add", chooser)
+        self.assertNotIn("GLib.idle_add", chooser)
+        self.assertIn("_cancelBootChooserCapability()", menu)
+
+    def test_boot_chooser_visibility_requires_available_capability(self):
+        self.assertIn("this._bootChooserItem.hide()", self.extension)
+        self.assertIn("result.payload?.available === true", self.extension)
+        self.assertIn("this._bootChooserItem.show()", self.extension)
+        self.assertIn("this._bootChooserItem.setSensitive(true)", self.extension)
+        self.assertIn("this._bootChooserItem.setSensitive(false)", self.extension)
+
+    def test_boot_chooser_confirmation_cancel_and_failure_are_explicit(self):
+        self.assertIn("Shut Down to Boot Chooser…", self.extension)
+        self.assertIn("new ModalDialog.ModalDialog", self.extension)
+        self.assertIn("Your computer will power off.", self.extension)
+        self.assertIn(
+            "The existing operating system chooser will open the next time it starts.",
+            self.extension,
+        )
+        self.assertIn("label: 'Cancel'", self.extension)
+        self.assertIn("_closeBootChooserDialog(dialog)", self.extension)
+        self.assertIn("_confirmBootChooserShutdown(dialog)", self.extension)
+        self.assertIn("this.menu.close()", self.extension)
+        self.assertIn("this._bootChooserActionBusy", self.extension)
+        self.assertIn("Authentication was cancelled.", self.extension)
+        self.assertIn("The computer is still running.", self.extension)
+        self.assertIn("could not be completed", self.extension)
+        self.assertIn("result.ok && result.payload?.ok === true", self.extension)
+
     def test_search_refresh_is_coalesced_and_motion_aware(self):
         self.assertIn("_queueRefreshResults", self.extension)
         self.assertIn("timeout_add_once", self.extension)

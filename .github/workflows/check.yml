@@ -39,6 +39,10 @@ jobs:
           python3 -m unittest discover -s tests -p test_desktop_interactions.py -v
           python3 -m unittest discover -s tests -p test_tailscale.py -v
           python3 -m unittest discover -s tests -p test_battery_measurement.py -v
+      - name: Verify one-shot boot chooser safety
+        run: |
+          python3 -m unittest discover -s tests -p test_boot_chooser.py -v
+          python3 -m py_compile desktop/rootfs/usr/lib/zeus/boot_chooser.py
       - name: Check build script syntax
         run: bash -n scripts/build.sh scripts/build-disk.sh scripts/export-iteration.sh
       - name: Verify signed updater trust and transactions

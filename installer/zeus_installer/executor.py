@@ -124,8 +124,11 @@ _MAX_OUTPUT = 8 * 1024 * 1024
 _FINALIZATION_ERRORS = frozenset({
     "grub_invalid", "grub_conflict", "target_mismatch", "ac_required",
     "resource_unverified", "insufficient_ram", "insufficient_staging_space",
+    "boot_chooser_write_failed",
 })
-_FINALIZATION_ACTIONS = frozenset({"write_grub_entry", "grub_regenerate"})
+_FINALIZATION_ACTIONS = frozenset({
+    "write_grub_entry", "grub_regenerate", "write_boot_chooser_marker",
+})
 _FINALIZATION_COMPLETED_PREFIX = (
     "btrfs_resize",
     "btrfs_sync",
@@ -370,9 +373,14 @@ def _finalization_state_shape(record: Mapping[str, Any]) -> bool:
         return False
     completed = state.get("completed_actions")
     expected_completed = list(_FINALIZATION_COMPLETED_PREFIX)
-    if state.get("action") == "grub_regenerate":
+    if state.get("action") in {"grub_regenerate", "write_boot_chooser_marker"}:
         expected_completed.append("write_grub_entry")
+    if state.get("action") == "write_boot_chooser_marker":
+        expected_completed.append("grub_regenerate")
     if completed != expected_completed:
+        return False
+    marker = state.get("boot_chooser_marker")
+    if marker is not None and not bootmenu.validate_boot_chooser_marker(marker):
         return False
     if not _valid_finalization_disk(state.get("disk")):
         return False
@@ -1589,6 +1597,7 @@ class DualBootExecutor:
             record=record,
             state=state,
         )
+        marker = self._verified_boot_chooser_marker(plan, state)
         with self._write_inhibitor():
             # Repeat the read-only target proof after acquiring the inhibitor
             # and immediately before the first write.  This closes the gap
@@ -1601,21 +1610,35 @@ class DualBootExecutor:
                 record=record,
                 state=state,
             )
-            self._before_mutation(journal, state, "write_grub_entry")
-            self._write_fedora_grub(rendered)
-            self._after_mutation(journal, state, "write_grub_entry")
-            self._before_mutation(journal, state, "grub_regenerate")
-            self._run_checked(
-                runner,
-                [GRUB2_MKCONFIG, "--no-grubenv-update", "-o", str(FEDORA_GRUB_CONFIG)],
-                action="Regenerate Fedora GRUB menu",
-            )
-            self._after_mutation(journal, state, "grub_regenerate")
+            marker = self._verified_boot_chooser_marker(plan, state)
+            # A marker write can fail after Fedora's GRUB menu has already
+            # been regenerated.  In that bounded case retry only the marker;
+            # replaying the two parent-menu mutations would unnecessarily
+            # widen the finalization boundary.  Older journals have no marker
+            # and retain the original two-action retry behavior.
+            marker_only_retry = state.get("action") == "write_boot_chooser_marker"
+            if not marker_only_retry:
+                self._before_mutation(journal, state, "write_grub_entry")
+                self._write_fedora_grub(rendered)
+                self._after_mutation(journal, state, "write_grub_entry")
+                self._before_mutation(journal, state, "grub_regenerate")
+                self._run_checked(
+                    runner,
+                    [GRUB2_MKCONFIG, "--no-grubenv-update", "-o", str(FEDORA_GRUB_CONFIG)],
+                    action="Regenerate Fedora GRUB menu",
+                )
+                self._after_mutation(journal, state, "grub_regenerate")
+            if marker is not None and "write_boot_chooser_marker" not in state.get("completed_actions", []):
+                self._before_mutation(journal, state, "write_boot_chooser_marker")
+                self._write_boot_chooser_marker(marker)
+                self._after_mutation(journal, state, "write_boot_chooser_marker")
             state["phase"] = "installed"
             state["status"] = "complete"
             state["action"] = None
             state["reboot_required"] = False
             state["zeus_esp_uuid"] = state["filesystem_uuids"]["esp"]
+            if marker is not None:
+                state["boot_chooser_marker"] = copy.deepcopy(marker)
             state["result"] = self._installed_result(state)
             self._persist_state(journal, state)
         return self._installed_result(state)
@@ -1668,6 +1691,11 @@ class DualBootExecutor:
                 "The current boot identity does not match the saved finalization boundary.",
             )
         self._verify_finalization_target(plan, runner, state)
+        # Validate the preflight-bound Fedora boot identity before any retry
+        # write.  The marker itself is written only after GRUB regeneration;
+        # this check merely ensures a retry cannot select a different entry or
+        # partition from an ambiguous inventory.
+        self._verified_boot_chooser_marker(plan, state)
         return self._finalization_rendered(state)
 
     def _verify_finalization_target(
@@ -1897,6 +1925,74 @@ class DualBootExecutor:
             raise ExecutorError("target_mismatch", "The saved Fedora GRUB entry identity changed before finalization.")
         return rendered
 
+    def _derive_boot_chooser_marker(
+        self,
+        plan: Mapping[str, Any],
+        table: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """Build the installed boot marker from the validated plan only.
+
+        Current preflight plans always carry an ``efi`` inventory object.  A
+        handful of older non-root fixture plans predate that field; retaining
+        their legacy path is safe because those fixtures do not represent a
+        production-qualified installation and cannot write to a host target.
+        """
+
+        inventory = plan.get("inventory") if isinstance(plan, Mapping) else None
+        if not isinstance(inventory, Mapping):
+            if self.require_root:
+                raise ExecutorError("target_unverified", "The Fedora preflight inventory is unavailable.")
+            return None
+        if "efi" not in inventory and not self.require_root:
+            return None
+        try:
+            return bootmenu.derive_boot_chooser_marker(plan, table)
+        except (TypeError, ValueError, KeyError, AttributeError) as error:
+            raise ExecutorError(
+                "target_mismatch",
+                "The validated Fedora boot identities are missing, ambiguous, or inconsistent.",
+            ) from error
+
+    def _verified_boot_chooser_marker(
+        self,
+        plan: Mapping[str, Any],
+        state: Mapping[str, Any],
+    ) -> dict[str, Any] | None:
+        """Verify the durable marker inputs and saved marker agree."""
+
+        table = state.get("original_table")
+        selected = table if isinstance(table, Mapping) else None
+        derived = self._derive_boot_chooser_marker(plan, selected)
+        saved = state.get("boot_chooser_marker")
+        if saved is not None:
+            if not bootmenu.validate_boot_chooser_marker(saved):
+                raise ExecutorError("invalid_state", "The saved Fedora boot chooser marker is invalid.")
+            if derived is not None and dict(saved) != dict(derived):
+                raise ExecutorError(
+                    "target_mismatch",
+                    "The saved Fedora boot chooser marker no longer matches preflight inventory.",
+                )
+            return copy.deepcopy(dict(saved))
+        return copy.deepcopy(derived) if derived is not None else None
+
+    def _write_boot_chooser_marker(self, marker: Mapping[str, Any]) -> None:
+        """Write the root-owned runtime marker through the protected seam."""
+
+        try:
+            data = bootmenu.boot_chooser_marker_bytes(marker)
+            path = self._target_etc_path("zeus/boot-chooser.json")
+            self._write_file(path, data, 0o644)
+        except ExecutorError as error:
+            raise ExecutorError(
+                "boot_chooser_write_failed",
+                "The installed Fedora boot chooser marker could not be saved durably.",
+            ) from error
+        except (TypeError, ValueError, OSError) as error:
+            raise ExecutorError(
+                "boot_chooser_write_failed",
+                "The installed Fedora boot chooser marker could not be saved durably.",
+            ) from error
+
     def _stage2(
         self,
         plan: Mapping[str, Any],
@@ -1990,12 +2086,18 @@ class DualBootExecutor:
             ) from error
         self._verify_stable_ids(plan, current_table, runner)
         self._verify_target_mountpoint_unused(runner)
+        # Resolve all Fedora boot identities before appending or formatting a
+        # Zeus partition.  The marker is not written yet; it is persisted as
+        # immutable source data and emitted only after Fedora GRUB succeeds.
+        boot_chooser_marker = self._derive_boot_chooser_marker(plan, original)
 
         state["stage"] = 2
         state["phase"] = "ready_for_partition_append"
         state["status"] = "ready"
         state["current_boot_id"] = current_boot
         state["kernel_partition_bytes"] = kernel_size
+        if boot_chooser_marker is not None:
+            state["boot_chooser_marker"] = copy.deepcopy(boot_chooser_marker)
         self._persist_state(journal, state)
 
         return self._stage2_write_boundary(
@@ -2177,6 +2279,16 @@ class DualBootExecutor:
                 action="Regenerate Fedora GRUB menu",
             )
             self._after_mutation(journal, state, "grub_regenerate")
+
+            # The marker is the final installer mutation.  It records the
+            # already validated Fedora entry/partition identities for the
+            # installed runtime, and is intentionally created only after the
+            # parent Fedora GRUB menu has regenerated successfully.
+            boot_chooser_marker = state.get("boot_chooser_marker")
+            if boot_chooser_marker is not None:
+                self._before_mutation(journal, state, "write_boot_chooser_marker")
+                self._write_boot_chooser_marker(boot_chooser_marker)
+                self._after_mutation(journal, state, "write_boot_chooser_marker")
 
             state["phase"] = "installed"
             state["status"] = "complete"
@@ -3743,6 +3855,7 @@ class DualBootExecutor:
             # readback once it exists.
             "expected_table": copy.deepcopy(state.get("allocated_table", state.get("expected_table"))),
             "bootmenu_hash": state.get("bootmenu_hash"),
+            "boot_chooser_marker": copy.deepcopy(state.get("boot_chooser_marker")),
         }
 
     @staticmethod

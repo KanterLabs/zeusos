@@ -38,6 +38,11 @@ and **Zeus OS**. Fedora remains the default until the owner changes it. Normal
 installation should not require entering firmware setup. Additional reboots may
 be necessary; this is not an in-place conversion of the running Fedora desktop.
 
+The installed Zeus system also receives the fixed, root-owned provenance needed
+by [Shut down to the boot chooser](boot-chooser-shutdown.md). That feature uses
+only a one-shot UEFI `BootNext` request for the already-verified Fedora parent;
+it does not make Zeus the default or edit Fedora's GRUB files at runtime.
+
 Offer an initial **128 GiB total Zeus allocation**, adjustable after preflight,
 including its boot partitions. This is a proposal, not a measured minimum.
 The existing image definition requests at least 56 GiB for its root filesystem.
@@ -145,6 +150,10 @@ enough to establish update safety.
   cannot delete Fedora files and credentials are absent from public artifacts.
 - Update Fedora's kernel and bootloader; update and roll back Zeus. Both choices
   must remain usable and new user files must survive retained Zeus binaries.
+- From Zeus, qualify **Shut Down to Boot Chooser…** in a disposable dual-boot
+  fixture. Prove the next cold start reaches Fedora's existing chooser, both OS
+  entries still boot, `BootOrder` and saved defaults are unchanged, and the
+  one-shot selection is consumed.
 - Test removal from Fedora with populated Zeus home, cancellation and repeated
   invocation. Never remove arbitrary partitions by label alone.
 - After VM acceptance, collect laptop preflight and pass physical deployment

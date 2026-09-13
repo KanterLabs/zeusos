@@ -267,6 +267,7 @@ class ExecutorFixtureTests(unittest.TestCase):
         self.artifact_path.chmod(0o600)
         self.receipt = {"verified": True, "backup_target": "/var/backups/zeus-test"}
         self.files: dict[Path, bytes] = {}
+        self.write_calls: list[tuple[Path, bytes, int]] = []
         self.boot = {"id": "deadbeef"}
         self.events: list[str] = []
 
@@ -280,6 +281,11 @@ class ExecutorFixtureTests(unittest.TestCase):
 
         self.inhibitor = inhibitor
         self.runner = FixtureRunner(self.plan["target"]["sfdisk_table"], self.proposal)
+
+        def writer(path: Path, data: bytes, mode: int) -> None:
+            self.write_calls.append((path, bytes(data), int(mode)))
+            self.files[path] = bytes(data)
+
         self.executor = installer_executor.DualBootExecutor(
             qualified=True,
             efi_update=lambda *args, **kwargs: None,
@@ -300,7 +306,7 @@ class ExecutorFixtureTests(unittest.TestCase):
                 ]
             ).__next__,
             reader=lambda path: json.dumps(self.receipt) if path == Path("/etc/zeus-dualboot-backup.json") else None,
-            writer=lambda path, data, mode: self.files.__setitem__(path, bytes(data)),
+            writer=writer,
             inhibitor=inhibitor,
             require_root=False,
         )
@@ -309,6 +315,47 @@ class ExecutorFixtureTests(unittest.TestCase):
             "path": str(self.artifact_path),
             "build_id": installer_executor.QUALIFIED_BUILD_ID,
             "manifest_digest": installer_executor.QUALIFIED_MANIFEST_DIGEST,
+        }
+
+    def _enable_boot_chooser_inventory(self) -> None:
+        """Add the complete Fedora identity shape used by marker tests."""
+
+        table = self.plan["target"]["sfdisk_table"]
+        inventory = self.plan["inventory"]
+        for device in inventory["block_devices"]:
+            if device.get("path") == "/dev/nvme0n1p1":
+                device["partuuid"] = table["partitions"][0]["uuid"]
+            elif device.get("path") == "/dev/nvme0n1p2":
+                device["partuuid"] = table["partitions"][1]["uuid"]
+        inventory["partition_table"] = copy.deepcopy(table)
+        inventory["mounts"] = [
+            {
+                "target": "/boot/efi",
+                "source": "/dev/nvme0n1p1",
+                "fstype": "vfat",
+                "partuuid": table["partitions"][0]["uuid"],
+            },
+            {
+                "target": "/boot",
+                "source": "/dev/nvme0n1p2",
+                "fstype": "ext4",
+                "partuuid": table["partitions"][1]["uuid"],
+            },
+        ]
+        inventory["efi"] = {
+            "variables_supported": True,
+            "boot_order": ["0001", "0002"],
+            "entries": [
+                {
+                    "id": "0001",
+                    "description": (
+                        "Fedora HD(1,GPT,"
+                        f"{table['partitions'][0]['uuid']},0x800)/File(\\EFI\\fedora\\shimx64.efi)"
+                    ),
+                    "path": r"\EFI\fedora\shimx64.efi",
+                },
+                {"id": "0002", "description": "Linux Firmware", "path": None},
+            ],
         }
 
     def tearDown(self) -> None:
@@ -632,6 +679,102 @@ class ExecutorFixtureTests(unittest.TestCase):
         ].decode()
         self.assertIn("MountFlags=slave", dropin)
         self.assertIn("RequiresMountsFor=/boot/efi", dropin)
+
+    def test_boot_chooser_marker_is_written_after_grub_regeneration(self) -> None:
+        self._enable_boot_chooser_inventory()
+        self.execute_stage1()
+        self.boot["id"] = "feedface"
+        original = self.executor._write_boot_chooser_marker
+        observed: list[tuple[str, object]] = []
+
+        def marker_writer(marker):
+            observed.append(("marker", copy.deepcopy(marker)))
+            self.assertTrue(
+                any(argv[0] == installer_executor.GRUB2_MKCONFIG for argv, _ in self.runner.calls),
+                "the marker must follow successful GRUB regeneration",
+            )
+            return original(marker)
+
+        with mock.patch.object(self.executor, "_write_boot_chooser_marker", side_effect=marker_writer):
+            result = self.executor.execute(
+                plan=self.plan,
+                artifact=self.artifact,
+                runner=self.runner,
+                journal=self.journal,
+            )
+        self.assertEqual(result["phase"], "installed")
+        marker_path = self.executor.deployment_root / "etc/zeus/boot-chooser.json"
+        marker = json.loads(self.files[marker_path])
+        self.assertEqual(marker["fedora_boot_entry"], "Boot0001")
+        self.assertEqual(marker["fedora_boot_path"], r"\EFI\fedora\shimx64.efi")
+        self.assertEqual(marker["fedora_esp_partuuid"], self.plan["target"]["sfdisk_table"]["partitions"][0]["uuid"])
+        self.assertEqual(marker["fedora_boot_partuuid"], self.plan["target"]["sfdisk_table"]["partitions"][1]["uuid"])
+        self.assertEqual(marker["grub_entry_id"], "zeusos-dualboot")
+        self.assertEqual(marker["grub_timeout_style"], "menu")
+        self.assertEqual(marker["grub_timeout"], 5)
+        self.assertTrue(marker["default_preserved"])
+        self.assertEqual(len(observed), 1)
+
+    def test_boot_chooser_marker_uses_fixed_path_and_nonwritable_mode(self) -> None:
+        self._enable_boot_chooser_inventory()
+        marker = installer_executor.bootmenu.derive_boot_chooser_marker(self.plan)
+        self.executor.deployment_root = Path(
+            "/target/ostree/deploy/default/deploy/" + "a" * 64 + ".0"
+        )
+        self.executor._write_boot_chooser_marker(marker)
+        path, data, mode = self.write_calls[-1]
+        self.assertEqual(path, self.executor.deployment_root / "etc/zeus/boot-chooser.json")
+        self.assertEqual(mode, 0o644)
+        self.assertEqual(json.loads(data), marker)
+
+    def test_marker_write_failure_retries_marker_without_replaying_grub(self) -> None:
+        self._enable_boot_chooser_inventory()
+        self.execute_stage1()
+        self.boot["id"] = "feedface"
+        original = self.executor._write_boot_chooser_marker
+        with mock.patch.object(
+            self.executor,
+            "_write_boot_chooser_marker",
+            side_effect=installer_executor.ExecutorError(
+                "boot_chooser_write_failed", "marker writer failed"
+            ),
+        ):
+            with self.assertRaises(installer_executor.ExecutorError) as error:
+                self.executor.execute(
+                    plan=self.plan,
+                    artifact=self.artifact,
+                    runner=self.runner,
+                    journal=self.journal,
+                )
+        self.assertEqual(error.exception.code, "boot_chooser_write_failed")
+        record = self.journal.load()
+        record["phase"] = "error"
+        record["error"] = "boot_chooser_write_failed"
+        record["boot_id"] = self.boot["id"]
+        record["artifact"] = copy.deepcopy(self.artifact)
+        self.journal.write(record)
+        self.executor.reader = lambda path: (
+            json.dumps(self.receipt)
+            if path == self.executor.backup_receipt_path
+            else self.files.get(path)
+        )
+        grub_calls_before = sum(
+            argv[0] == installer_executor.GRUB2_MKCONFIG for argv, _ in self.runner.calls
+        )
+        self.executor._write_boot_chooser_marker = original
+        result = self.executor.execute(
+            plan=self.plan,
+            artifact=self.artifact,
+            runner=self.runner,
+            journal=self.journal,
+        )
+        self.assertEqual(result["phase"], "installed")
+        grub_calls_after = sum(
+            argv[0] == installer_executor.GRUB2_MKCONFIG for argv, _ in self.runner.calls
+        )
+        self.assertEqual(grub_calls_after, grub_calls_before)
+        marker_path = self.executor.deployment_root / "etc/zeus/boot-chooser.json"
+        self.assertIn(marker_path, self.files)
 
     def _assert_failed_command_is_not_replayed(self, *, stage: int, match) -> None:
         if stage == 2:
