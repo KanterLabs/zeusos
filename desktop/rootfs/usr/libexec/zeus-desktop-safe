@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Toggle only optional Zeus shell/dock/lock effects and managed window styling."""
+"""Toggle optional Zeus desktop extensions and managed window styling."""
 import subprocess
 import sys
 from gi.repository import Gio
 
 extensions = ('dash-to-dock@micxgx.gmail.com', 'zeus-shell@kanterlabs',
-              'zeus-lock-background@kanterlabs')
+              'zeus-lock-background@kanterlabs', 'codex-usage@kanterlabs')
 action = sys.argv[1] if len(sys.argv) == 2 else ''
 settings = Gio.Settings.new('org.gnome.shell')
 disabled = list(settings.get_strv('disabled-extensions'))
@@ -16,12 +16,12 @@ if action in ('disable', 'fallback'):
     settings.set_strv('disabled-extensions', disabled)
     Gio.Settings.sync()
     subprocess.run(['/usr/libexec/zeus-style-sync', '--disable'], check=True)
-    print('Zeus shell, dock and lock appearance disabled. Reopen apps for native window styling.')
+    print('Zeus shell, dock, lock, and Codex indicator disabled. Reopen apps for native window styling.')
 elif action in ('enable', 'restore'):
     settings.set_strv('disabled-extensions', [item for item in disabled if item not in extensions])
     Gio.Settings.sync()
     subprocess.run(['/usr/libexec/zeus-style-sync', '--enable'], check=True)
-    print('Zeus shell, dock, lock appearance and window styling restored.')
+    print('Zeus shell, dock, lock, Codex indicator, and window styling restored.')
 elif action == 'status':
     for extension in extensions:
         print(extension + ': ' + ('disabled' if extension in disabled else 'enabled'))

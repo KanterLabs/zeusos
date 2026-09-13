@@ -1,0 +1,8 @@
+Codex Usage Indicator is adapted from Radoslav Dodek's
+codex-usage-gnome-shell-ext project at commit
+22baeaef5bc4642851148c99b505cb6469679199.
+
+The adapted extension is covered by the GNU Affero General Public License,
+version 3.  Zeus modifications and the official Codex app-server interface
+are documented in README.md.  This notice does not relicense the upstream
+work under the Zeus MIT license.

@@ -1,0 +1,18 @@
+Codex Usage Indicator for Zeus OS
+
+This GNOME Shell extension is adapted from:
+  https://github.com/radoslavdodek/codex-usage-gnome-shell-ext
+  commit 22baeaef5bc4642851148c99b505cb6469679199
+
+The upstream work is Copyright (C) Radoslav Dodek and is licensed under the
+GNU Affero General Public License, version 3.  This adapted extension remains
+AGPL-3.0-covered; see LICENSE and image/licenses/codex-usage/README.md.
+
+Zeus modifications (2026): fixed the provider to /usr/bin/codex app-server
+stdio, removed configurable settings/mock data and CLI-output parsing, added
+bounded JSON-RPC transport and redacted failures, and added the ChatGPT
+device-code menu flow with cancel support and an exact OpenAI verification URL
+guard. The protocol follows the official Codex app-server account/login/start,
+account/login/cancel, account/login/completed, and account/rateLimits/read
+interface documented at:
+  https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md

@@ -1,0 +1,35 @@
+.codex-usage-panel {
+  spacing: 4px;
+}
+
+.codex-usage-panel-box {
+  spacing: 4px;
+}
+
+.codex-usage-panel-label {
+  font-weight: 600;
+}
+
+.codex-usage-panel-normal .codex-usage-panel-label {
+  color: #8ff0a4;
+}
+
+.codex-usage-panel-warning .codex-usage-panel-label {
+  color: #f8e45c;
+}
+
+.codex-usage-panel-limit .codex-usage-panel-label,
+.codex-usage-panel-error .codex-usage-panel-label {
+  color: #ff7b63;
+}
+
+.codex-usage-panel-signed-out .codex-usage-panel-label {
+  color: #99c1f1;
+}
+
+.codex-usage-panel-offline .codex-usage-panel-label,
+.codex-usage-panel-stale .codex-usage-panel-label,
+.codex-usage-panel-loading .codex-usage-panel-label,
+.codex-usage-panel-refreshing .codex-usage-panel-label {
+  color: #deddda;
+}

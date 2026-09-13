@@ -4,8 +4,9 @@ Status: **ZOS-70 is awaiting Bluetooth-equipped test hardware**. The current
 owner-provided pair is described as a newer/better AirPods Pro pair, but its
 exact model, case model and firmware are **UNKNOWN**. An earlier
 screenshot-based identification is stale and is not qualification evidence.
-The software readiness gate is implemented and verified; the broader AirPods
-support outcome remains incomplete.
+The software readiness gate and event-driven connection card are implemented;
+the broader AirPods support outcome remains incomplete until physical hardware
+qualification is complete.
 The software inventory was verified on `git-fd2125f63159`; this document is an
 implementation and qualification contract, not a claim of a tested AirPods pair.
 Continue iterating **0.1.0-preview.2** with separate build IDs.
@@ -28,6 +29,8 @@ model. Other listening modes need confirmed device support before being exposed.
 ## Experience to deliver
 
 - Pair from Zeus Settings using the native Bluetooth authorization flow.
+- Show a brief animated card when an already-paired AirPods device transitions
+  to BlueZ's connected state. Clicking it opens native Bluetooth Settings.
 - Reconnect a previously paired device after opening the case, restarting Zeus,
   waking the laptop and returning within range, without repeated pairing.
 - Prefer the best mutually supported stereo playback codec. Report the active
@@ -53,6 +56,8 @@ model. Other listening modes need confirmed device support before being exposed.
   retain native audio and scope the optional control adapter separately.
 - [x] Gate image builds on the existing audio executables and loadable AAC,
   SBC, CVSD and mSBC plugins, with regression coverage for failures.
+- [x] Add an event-driven, motion-aware connection card backed by BlueZ's
+  read-only system-bus state, with no discovery loop or connection side effect.
 - [ ] Implement supported controls with clear missing-adapter, disconnected,
   busy, unavailable-profile and unsupported-model states.
 - [ ] Keep core Bluetooth audio functional if optional AirPods controls fail.
@@ -105,6 +110,20 @@ Keep native BlueZ/PipeWire/WirePlumber for audio. Add a build-time software
 readiness check so future images cannot silently lose the existing AAC and
 microphone codec prerequisites. This check must never report physical AirPods
 qualification from installed software alone.
+
+The Zeus Shell connection card subscribes to BlueZ ObjectManager and Device1
+property signals. Its initial object inventory establishes a baseline and never
+produces a startup notification. A card appears only for a paired device whose
+bounded friendly name identifies it as AirPods and whose `Connected` property
+changes from false to true. Disconnect, BlueZ restart, lock, and extension
+shutdown all remove the card and listeners. The card intentionally says only
+that the device is connected: it does not infer active audio routing, codec,
+microphone state, battery levels, or noise-control support.
+
+The animation uses Shell-native actors, honors the desktop animation/reduced-
+motion preference, includes dark and high-contrast styles, dismisses after 5.2
+seconds, and opens GNOME Bluetooth Settings on activation. It does not scan,
+pair, connect, persist an address, or change any BlueZ/PipeWire setting.
 
 Advanced controls are tracked in **ZOS-71: Add optional AirPods battery and noise
 controls to Zeus Settings**, an unclaimed Backlog card. They require a separate

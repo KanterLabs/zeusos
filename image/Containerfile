@@ -52,6 +52,7 @@ COPY --from=cli-builder /src/zeus/target/release/zeus /usr/bin/zeus
 COPY --from=codex-package /usr/lib/codex /usr/lib/codex
 COPY image/codex.lock.json /usr/share/zeus/codex.lock.json
 COPY image/licenses/codex/ /usr/share/licenses/zeus-codex/
+COPY image/licenses/codex-usage/ /usr/share/licenses/zeus-codex-usage/
 COPY zeus/assets/welcome.py /usr/libexec/zeus-welcome
 COPY zeus/assets/org.zeus.Welcome.desktop /usr/share/applications/org.zeus.Welcome.desktop
 COPY image/inputs.json /usr/share/zeus/inputs.json
@@ -77,6 +78,7 @@ RUN dnf remove -y --disable-repo='*' 'qemu-user-static*' && \
     rm /tmp/zeus-validate-bluetooth-audio.py /tmp/zeus-validate-browser.py /tmp/zeus-validate-codex.py /tmp/zeus-validate-wifi.py && \
     chmod 0644 /usr/share/backgrounds/zeus/zeus-city-new-york-dusk.png /usr/share/gnome-background-properties/zeus.xml && \
     chmod 0644 /usr/share/gnome-shell/extensions/zeus-lock-background@kanterlabs/extension.js /usr/share/gnome-shell/extensions/zeus-lock-background@kanterlabs/metadata.json && \
+    chmod 0644 /usr/share/gnome-shell/extensions/codex-usage@kanterlabs/* /usr/share/licenses/zeus-codex-usage/* && \
     chmod 0755 /usr/libexec/zeus-welcome /usr/libexec/zeus-settings-window && \
     chmod 0755 /usr/libexec/zeus-browser-session && \
     chmod 0755 /usr/libexec/zeus-tailscale /usr/libexec/zeus-tailscale-admin && \

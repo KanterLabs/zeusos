@@ -29,6 +29,14 @@ const BOOT_CHOOSER_POWEROFF_COMMAND = Object.freeze([
 const MAX_BOOT_CHOOSER_RESPONSE = 16 * 1024;
 const MAX_BOOT_CHOOSER_STDOUT = MAX_BOOT_CHOOSER_RESPONSE;
 const MAX_BOOT_CHOOSER_STDERR = 8 * 1024;
+const BLUEZ_BUS_NAME = 'org.bluez';
+const BLUEZ_OBJECT_MANAGER_INTERFACE = 'org.freedesktop.DBus.ObjectManager';
+const BLUEZ_PROPERTIES_INTERFACE = 'org.freedesktop.DBus.Properties';
+const BLUEZ_DEVICE_INTERFACE = 'org.bluez.Device1';
+const BLUEZ_CALL_TIMEOUT_MS = 5000;
+const AIRPODS_CARD_DISMISS_MS = 5200;
+const AIRPODS_EVENT_QUEUE_LIMIT = 64;
+const GNOME_CONTROL_CENTER = '/usr/bin/gnome-control-center';
 
 function actorNamed(actor, name) {
     if (!actor)
@@ -86,6 +94,428 @@ function animationsAllowed(settings = St.Settings.get()) {
     // the preview's target shell.
     return booleanSetting(settings, 'enable_animations', true) &&
         !reducedMotionEnabled(settings);
+}
+
+function unpackVariant(value) {
+    let unpacked = value;
+    for (let depth = 0; depth < 4 && unpacked?.deep_unpack; ++depth)
+        unpacked = unpacked.deep_unpack();
+    return unpacked;
+}
+
+function dictionaryHas(dictionary, key) {
+    if (dictionary instanceof Map)
+        return dictionary.has(key);
+    return dictionary !== null && typeof dictionary === 'object' &&
+        Object.prototype.hasOwnProperty.call(dictionary, key);
+}
+
+function dictionaryGet(dictionary, key) {
+    const value = dictionary instanceof Map ? dictionary.get(key) : dictionary?.[key];
+    return unpackVariant(value);
+}
+
+function safeDeviceName(value) {
+    if (typeof value !== 'string')
+        return 'AirPods';
+    const clean = value.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 80);
+    return clean || 'AirPods';
+}
+
+function isAirPodsName(value) {
+    return typeof value === 'string' && /\bairpods?\b/i.test(value);
+}
+
+class AirPodsConnectionCard {
+    constructor(extension) {
+        this._extension = extension;
+        this._dismissId = 0;
+        this._inChrome = false;
+        this._devicePath = null;
+
+        this.actor = new St.Widget({
+            name: 'zeusAirPodsOverlay',
+            style_class: 'zeus-airpods-overlay',
+            reactive: false,
+            layout_manager: new Clutter.BinLayout(),
+            x_expand: true,
+            y_expand: true,
+        });
+        this.actor.add_constraint(new Clutter.BindConstraint({
+            source: global.stage,
+            coordinate: Clutter.BindCoordinate.ALL,
+        }));
+
+        this._card = new St.Button({
+            style_class: 'zeus-airpods-card',
+            reactive: true,
+            can_focus: true,
+            track_hover: true,
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.START,
+        });
+        this._card.connect('clicked', () => this._openBluetoothSettings());
+        this.actor.add_child(this._card);
+
+        const content = new St.BoxLayout({
+            style_class: 'zeus-airpods-card-content',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this._card.set_child(content);
+
+        this._visual = new St.BoxLayout({
+            style_class: 'zeus-airpods-visual',
+            vertical: true,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this._lid = new St.Widget({style_class: 'zeus-airpods-case-lid'});
+        const caseBody = new St.BoxLayout({
+            style_class: 'zeus-airpods-case-body',
+            x_align: Clutter.ActorAlign.CENTER,
+        });
+        this._leftPod = this._makePod('zeus-airpods-pod-left');
+        this._rightPod = this._makePod('zeus-airpods-pod-right');
+        caseBody.add_child(this._leftPod);
+        caseBody.add_child(this._rightPod);
+        this._visual.add_child(this._lid);
+        this._visual.add_child(caseBody);
+        content.add_child(this._visual);
+
+        const labels = new St.BoxLayout({
+            style_class: 'zeus-airpods-labels',
+            vertical: true,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this._title = new St.Label({
+            text: 'AirPods',
+            style_class: 'zeus-airpods-title',
+        });
+        this._status = new St.Label({
+            text: 'Connected',
+            style_class: 'zeus-airpods-status',
+        });
+        labels.add_child(this._title);
+        labels.add_child(this._status);
+        content.add_child(labels);
+
+        content.add_child(new St.Icon({
+            icon_name: 'go-next-symbolic',
+            icon_size: 14,
+            style_class: 'zeus-airpods-open-icon',
+            y_align: Clutter.ActorAlign.CENTER,
+        }));
+        this.actor.hide();
+    }
+
+    _makePod(sideClass) {
+        const pod = new St.BoxLayout({
+            style_class: `zeus-airpods-pod ${sideClass}`,
+            vertical: true,
+            x_align: Clutter.ActorAlign.CENTER,
+        });
+        pod.add_child(new St.Widget({style_class: 'zeus-airpods-pod-head'}));
+        pod.add_child(new St.Widget({style_class: 'zeus-airpods-pod-stem'}));
+        return pod;
+    }
+
+    show(deviceName, devicePath) {
+        this.hide(false);
+        this._devicePath = devicePath;
+        this._title.text = safeDeviceName(deviceName);
+        this._status.text = 'Connected · Open Bluetooth Settings';
+        if (!this._inChrome) {
+            Main.layoutManager.addChrome(this.actor);
+            this._inChrome = true;
+        }
+        this._extension.syncAppearance();
+        this.actor.show();
+
+        const animate = animationsAllowed();
+        this._card.remove_all_transitions();
+        this._leftPod.remove_all_transitions();
+        this._rightPod.remove_all_transitions();
+        this._lid.remove_all_transitions();
+        this._card.opacity = animate ? 0 : 255;
+        this._card.translation_y = animate ? -18 : 0;
+        this._card.scale_x = animate ? 0.94 : 1;
+        this._card.scale_y = animate ? 0.94 : 1;
+        this._leftPod.opacity = animate ? 0 : 255;
+        this._rightPod.opacity = animate ? 0 : 255;
+        this._leftPod.translation_y = animate ? 12 : 0;
+        this._rightPod.translation_y = animate ? 12 : 0;
+        this._lid.translation_y = animate ? 7 : 0;
+
+        if (animate) {
+            this._card.ease({
+                opacity: 255,
+                translation_y: 0,
+                scale_x: 1,
+                scale_y: 1,
+                duration: 260,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+            this._lid.ease({
+                translation_y: 0,
+                duration: 420,
+                mode: Clutter.AnimationMode.EASE_OUT_BACK,
+            });
+            this._leftPod.ease({
+                opacity: 255,
+                translation_y: 0,
+                delay: 120,
+                duration: 420,
+                mode: Clutter.AnimationMode.EASE_OUT_BACK,
+            });
+            this._rightPod.ease({
+                opacity: 255,
+                translation_y: 0,
+                delay: 190,
+                duration: 420,
+                mode: Clutter.AnimationMode.EASE_OUT_BACK,
+            });
+        }
+
+        this._dismissId = GLib.timeout_add_once(
+            GLib.PRIORITY_DEFAULT, AIRPODS_CARD_DISMISS_MS, () => {
+                this._dismissId = 0;
+                this.hide(true);
+            });
+        GLib.Source.set_name_by_id(
+            this._dismissId, '[zeus-shell] dismiss AirPods connection card');
+    }
+
+    hide(animate = true, devicePath = null) {
+        if (devicePath && devicePath !== this._devicePath)
+            return;
+        if (this._dismissId) {
+            GLib.source_remove(this._dismissId);
+            this._dismissId = 0;
+        }
+        this._devicePath = null;
+        if (!this._inChrome)
+            return;
+
+        const detach = () => {
+            if (!this._inChrome)
+                return;
+            this.actor.hide();
+            Main.layoutManager.removeChrome(this.actor);
+            this._inChrome = false;
+        };
+        this._card.remove_all_transitions();
+        if (animate && animationsAllowed() && this.actor.visible) {
+            this._card.ease({
+                opacity: 0,
+                translation_y: -10,
+                duration: 180,
+                mode: Clutter.AnimationMode.EASE_IN_QUAD,
+                onComplete: detach,
+            });
+        } else {
+            detach();
+        }
+    }
+
+    _openBluetoothSettings() {
+        try {
+            Gio.Subprocess.new(
+                [GNOME_CONTROL_CENTER, 'bluetooth'], Gio.SubprocessFlags.NONE);
+        } catch (error) {
+            console.debug(`Zeus could not open Bluetooth Settings: ${error.message}`);
+        }
+        this.hide(false);
+    }
+
+    destroy() {
+        this.hide(false);
+        this._card.remove_all_transitions();
+        this._leftPod.remove_all_transitions();
+        this._rightPod.remove_all_transitions();
+        this._lid.remove_all_transitions();
+        this.actor.destroy();
+    }
+}
+
+class BluezAirPodsMonitor {
+    constructor(onConnected, onDisconnected) {
+        this._onConnected = onConnected;
+        this._onDisconnected = onDisconnected;
+        this._connection = null;
+        this._signalIds = [];
+        this._devices = new Map();
+        this._queuedEvents = [];
+        this._baselineReady = false;
+        this._baselineSerial = 0;
+        this._cancellable = null;
+    }
+
+    start() {
+        try {
+            this._connection = Gio.bus_get_sync(Gio.BusType.SYSTEM, null);
+        } catch (error) {
+            console.debug(`Zeus could not access the Bluetooth system bus: ${error.message}`);
+            return;
+        }
+
+        this._subscribe(BLUEZ_BUS_NAME, BLUEZ_OBJECT_MANAGER_INTERFACE,
+            'InterfacesAdded', null, null,
+            (_connection, _sender, _path, _iface, _signal, parameters) =>
+                this._queueOrApply(() => this._interfacesAdded(parameters)));
+        this._subscribe(BLUEZ_BUS_NAME, BLUEZ_OBJECT_MANAGER_INTERFACE,
+            'InterfacesRemoved', null, null,
+            (_connection, _sender, _path, _iface, _signal, parameters) =>
+                this._queueOrApply(() => this._interfacesRemoved(parameters)));
+        this._subscribe(BLUEZ_BUS_NAME, BLUEZ_PROPERTIES_INTERFACE,
+            'PropertiesChanged', null, BLUEZ_DEVICE_INTERFACE,
+            (_connection, _sender, path, _iface, _signal, parameters) =>
+                this._queueOrApply(() => this._propertiesChanged(path, parameters)));
+        this._subscribe('org.freedesktop.DBus', 'org.freedesktop.DBus',
+            'NameOwnerChanged', '/org/freedesktop/DBus', BLUEZ_BUS_NAME,
+            (_connection, _sender, _path, _iface, _signal, parameters) =>
+                this._nameOwnerChanged(parameters));
+        this._reloadBaseline();
+    }
+
+    _subscribe(sender, iface, signal, path, firstArgument, callback) {
+        const id = this._connection.signal_subscribe(
+            sender, iface, signal, path, firstArgument,
+            Gio.DBusSignalFlags.NONE, callback);
+        this._signalIds.push(id);
+    }
+
+    _reloadBaseline() {
+        ++this._baselineSerial;
+        const serial = this._baselineSerial;
+        this._baselineReady = false;
+        this._queuedEvents = [];
+        this._devices.clear();
+        this._cancellable?.cancel();
+        this._cancellable = new Gio.Cancellable();
+        this._connection.call(
+            BLUEZ_BUS_NAME,
+            '/',
+            BLUEZ_OBJECT_MANAGER_INTERFACE,
+            'GetManagedObjects',
+            null,
+            null,
+            Gio.DBusCallFlags.NO_AUTO_START,
+            BLUEZ_CALL_TIMEOUT_MS,
+            this._cancellable,
+            (connection, result) => {
+                if (serial !== this._baselineSerial)
+                    return;
+                try {
+                    const reply = unpackVariant(connection.call_finish(result));
+                    const objects = unpackVariant(reply?.[0]) ?? {};
+                    const entries = objects instanceof Map
+                        ? objects.entries()
+                        : Object.entries(objects);
+                    for (const [path, interfaces] of entries) {
+                        const properties = dictionaryGet(interfaces, BLUEZ_DEVICE_INTERFACE);
+                        if (properties)
+                            this._recordDevice(path, properties, false);
+                    }
+                } catch {
+                    // BlueZ being absent or stopped is a normal unavailable state.
+                }
+                this._baselineReady = true;
+                const queued = this._queuedEvents.splice(0, AIRPODS_EVENT_QUEUE_LIMIT);
+                for (const apply of queued)
+                    apply();
+            });
+    }
+
+    _queueOrApply(apply) {
+        if (this._baselineReady) {
+            apply();
+            return;
+        }
+        if (this._queuedEvents.length < AIRPODS_EVENT_QUEUE_LIMIT)
+            this._queuedEvents.push(apply);
+    }
+
+    _interfacesAdded(parameters) {
+        const [path, interfaces] = unpackVariant(parameters) ?? [];
+        const properties = dictionaryGet(interfaces, BLUEZ_DEVICE_INTERFACE);
+        if (typeof path === 'string' && properties)
+            this._recordDevice(path, properties, true);
+    }
+
+    _interfacesRemoved(parameters) {
+        const [path, interfaces] = unpackVariant(parameters) ?? [];
+        if (typeof path !== 'string' || !Array.isArray(interfaces) ||
+            !interfaces.includes(BLUEZ_DEVICE_INTERFACE))
+            return;
+        if (this._devices.get(path)?.connected)
+            this._onDisconnected(path);
+        this._devices.delete(path);
+    }
+
+    _propertiesChanged(path, parameters) {
+        const [iface, changed] = unpackVariant(parameters) ?? [];
+        if (iface !== BLUEZ_DEVICE_INTERFACE || typeof path !== 'string')
+            return;
+        this._recordDevice(path, changed, true);
+    }
+
+    _recordDevice(path, properties, notify) {
+        const previous = this._devices.get(path) ?? {
+            paired: false,
+            connected: false,
+            name: '',
+        };
+        const next = {...previous};
+        if (dictionaryHas(properties, 'Paired'))
+            next.paired = dictionaryGet(properties, 'Paired') === true;
+        if (dictionaryHas(properties, 'Connected'))
+            next.connected = dictionaryGet(properties, 'Connected') === true;
+        if (dictionaryHas(properties, 'Alias'))
+            next.name = safeDeviceName(dictionaryGet(properties, 'Alias'));
+        else if (dictionaryHas(properties, 'Name'))
+            next.name = safeDeviceName(dictionaryGet(properties, 'Name'));
+        this._devices.set(path, next);
+
+        if (!notify)
+            return;
+        if (previous.connected && !next.connected) {
+            this._onDisconnected(path);
+            return;
+        }
+        if (!previous.connected && next.connected && next.paired && isAirPodsName(next.name))
+            this._onConnected(next.name, path);
+    }
+
+    _nameOwnerChanged(parameters) {
+        const [name, oldOwner, newOwner] = unpackVariant(parameters) ?? [];
+        if (name !== BLUEZ_BUS_NAME)
+            return;
+        if (oldOwner)
+            this._onDisconnected(null);
+        if (newOwner)
+            this._reloadBaseline();
+        else {
+            ++this._baselineSerial;
+            this._baselineReady = false;
+            this._queuedEvents = [];
+            this._devices.clear();
+            this._cancellable?.cancel();
+            this._cancellable = null;
+        }
+    }
+
+    destroy() {
+        ++this._baselineSerial;
+        this._cancellable?.cancel();
+        this._cancellable = null;
+        for (const id of this._signalIds)
+            this._connection?.signal_unsubscribe(id);
+        this._signalIds = [];
+        this._queuedEvents = [];
+        this._devices.clear();
+        this._connection = null;
+        this._onConnected = null;
+        this._onDisconnected = null;
+    }
 }
 
 const ZeusMenuButton = GObject.registerClass(
@@ -921,6 +1351,14 @@ export default class ZeusShellExtension extends Extension {
         this._panelDivider = null;
         this._appLabel = null;
         this._search = new SpotlightDialog(this);
+        this._airPodsCard = new AirPodsConnectionCard(this);
+        this._airPodsMonitor = new BluezAirPodsMonitor(
+            (name, path) => {
+                if (!Main.sessionMode?.isGreeter && !Main.sessionMode?.isLocked)
+                    this._airPodsCard?.show(name, path);
+            },
+            path => this._airPodsCard?.hide(true, path));
+        this._airPodsMonitor.start();
         this._appSystem = Shell.AppSystem.get_default();
         this._installedApps = null;
         this._tracker = Shell.WindowTracker.get_default();
@@ -964,6 +1402,10 @@ export default class ZeusShellExtension extends Extension {
     }
 
     disable() {
+        this._airPodsMonitor?.destroy();
+        this._airPodsMonitor = null;
+        this._airPodsCard?.destroy();
+        this._airPodsCard = null;
         this._search?.destroy();
         this._search = null;
 
@@ -1013,6 +1455,10 @@ export default class ZeusShellExtension extends Extension {
         }
 
         this._search.open();
+    }
+
+    syncAppearance() {
+        this._syncAppearance();
     }
 
     launchDesktopId(desktopId) {
@@ -1113,6 +1559,7 @@ export default class ZeusShellExtension extends Extension {
     _syncSessionMode() {
         if (!Main.sessionMode || Main.sessionMode.isGreeter || Main.sessionMode.isLocked) {
             this._search?.close();
+            this._airPodsCard?.hide(false);
             this._restorePanel();
             return;
         }
@@ -1273,14 +1720,13 @@ export default class ZeusShellExtension extends Extension {
 
     _syncAppearance() {
         const panel = this._panel;
-        if (!panel)
-            return;
-
         const settings = St.Settings.get();
         const light = settings.color_scheme === St.SystemColorScheme.PREFER_LIGHT;
         const highContrast = settings.high_contrast;
         const reducedMotion = !animationsAllowed(settings);
-        for (const actor of [panel, this._dock, this._search?._overlay]) {
+        for (const actor of [
+            panel, this._dock, this._search?._overlay, this._airPodsCard?.actor,
+        ]) {
             setClass(actor, 'zeus-light', light);
             setClass(actor, 'zeus-dark', !light);
             setClass(actor, 'zeus-high-contrast', highContrast);

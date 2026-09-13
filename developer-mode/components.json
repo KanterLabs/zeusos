@@ -310,6 +310,7 @@
       "activation": "logout-login",
       "tests": [
         "tests/test_desktop_interactions.py",
+        "tests/test_airpods_connection_ui.py",
         "tests/test_style_preservation.py"
       ],
       "files": [

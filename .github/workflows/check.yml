@@ -37,8 +37,10 @@ jobs:
       - name: Verify desktop interaction and battery measurement contracts
         run: |
           python3 -m unittest discover -s tests -p test_desktop_interactions.py -v
+          python3 -m unittest discover -s tests -p test_airpods_connection_ui.py -v
           python3 -m unittest discover -s tests -p test_tailscale.py -v
           python3 -m unittest discover -s tests -p test_battery_measurement.py -v
+          node --check desktop/rootfs/usr/share/gnome-shell/extensions/zeus-shell@kanterlabs/extension.js
       - name: Verify one-shot boot chooser safety
         run: |
           python3 -m unittest discover -s tests -p test_boot_chooser.py -v

@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "component": "zeus-codex-usage-gnome-extension",
+  "license": "AGPL-3.0-only",
+  "upstream": {
+    "repository": "https://github.com/radoslavdodek/codex-usage-gnome-shell-ext",
+    "commit": "22baeaef5bc4642851148c99b505cb6469679199"
+  },
+  "protocol": {
+    "repository": "https://github.com/openai/codex",
+    "documentation": "https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md",
+    "methods": [
+      "initialize",
+      "initialized",
+      "account/rateLimits/read",
+      "account/login/start",
+      "account/login/cancel",
+      "account/login/completed"
+    ]
+  },
+  "local_modifications": [
+    "fixed /usr/bin/codex app-server stdio transport",
+    "fixed five-minute refresh and manual refresh action",
+    "ChatGPT device-code sign-in/cancel and exact OpenAI verification URL guard",
+    "multi-limit exact-window normalization and no idle child process",
+    "bounded JSON-RPC transport and redacted provider errors",
+    "removed settings, mock provider, pause controls, and CLI output parsing"
+  ]
+}

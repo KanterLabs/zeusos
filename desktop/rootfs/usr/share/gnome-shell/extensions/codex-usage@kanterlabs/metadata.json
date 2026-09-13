@@ -1,0 +1,8 @@
+{
+  "uuid": "codex-usage@kanterlabs",
+  "name": "Codex Usage Indicator",
+  "description": "Shows ChatGPT Codex usage in the GNOME top bar.",
+  "version": 1,
+  "shell-version": ["46", "47", "48", "49", "50"],
+  "url": "https://github.com/kanterlabs/zeusos"
+}
