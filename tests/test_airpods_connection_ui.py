@@ -55,8 +55,8 @@ class AirPodsConnectionUiTests(unittest.TestCase):
         self.assertIn("animationsAllowed()", self.card)
         self.assertIn("EASE_OUT_BACK", self.card)
         self.assertIn("remove_all_transitions", self.card)
-        self.assertIn("Open Bluetooth Settings", self.card)
-        self.assertIn("[GNOME_CONTROL_CENTER, 'bluetooth']", self.card)
+        self.assertIn("Open Zeus Bluetooth", self.card)
+        self.assertIn("[ZEUS_SETTINGS, 'bluetooth']", self.card)
 
     def test_card_does_not_claim_battery_codec_or_audio_routing(self):
         self.assertNotIn("Battery1", self.monitor)

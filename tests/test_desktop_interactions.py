@@ -153,14 +153,19 @@ class DesktopInteractions(unittest.TestCase):
         self.assertEqual(dock["show-favorites"], "true")
 
     def test_settings_destinations_have_distinct_identity(self):
+        favorites = self.dconf["org/gnome/shell"]["favorite-apps"]
+        self.assertIn("org.zeus.Settings.desktop", favorites)
+        self.assertNotIn("org.gnome.Settings.desktop", favorites)
         self.assertIn(
             "_addLauncher('Zeus Settings', 'org.zeus.Settings.desktop')",
             self.extension,
         )
+        self.assertNotIn("_addLauncher('GNOME Settings'", self.extension)
         self.assertIn(
-            "_addLauncher('GNOME Settings', 'org.gnome.Settings.desktop')",
+            "const ZEUS_SETTINGS = '/usr/libexec/zeus-settings-window';",
             self.extension,
         )
+        self.assertIn("[ZEUS_SETTINGS, 'bluetooth']", self.extension)
         self.assertTrue(ZEUS_SETTINGS_ICON.is_file())
         self.assertFalse(
             GNOME_SETTINGS_ICON.exists(),

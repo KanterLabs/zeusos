@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Native Zeus Settings home for the controls people use every day.
+"""Native Zeus Settings application for the controls people use every day.
 
-Zeus keeps hardware policy in Fedora's supported GNOME stack.  This window is
-only a compact, accessible directory for those native panels plus the existing
-Temp and Updates tools.  Panel launches use fixed desktop IDs or fixed argv
-arrays, and the one hardware snapshot is read-only and taken during open.
+Zeus keeps hardware policy in Fedora's supported stack while owning the visible
+navigation and page identity.  Normal entry points stay inside this window;
+the stock control center remains an explicit compatibility fallback while
+individual controls migrate to Zeus-native pages.
 """
 
 from __future__ import annotations
@@ -254,6 +254,78 @@ CSS = """
 .bottom-space {
   min-height: 8px;
 }
+
+.detail-page {
+  padding: 26px 36px 30px;
+}
+
+.detail-icon {
+  background: alpha(@accent_bg_color, 0.14);
+  border-radius: 16px;
+  color: @accent_color;
+  margin-bottom: 16px;
+  padding: 13px;
+}
+
+.detail-title {
+  color: @window_fg_color;
+  font-size: 1.72em;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+
+.detail-copy {
+  color: alpha(@window_fg_color, 0.70);
+  line-height: 1.42;
+  margin-top: 7px;
+}
+
+.detail-card {
+  background: @card_bg_color;
+  border: 1px solid alpha(@window_fg_color, 0.10);
+  border-radius: 16px;
+  margin-top: 20px;
+  padding: 16px;
+}
+
+.detail-card-title {
+  color: @window_fg_color;
+  font-weight: 740;
+}
+
+.detail-card-copy {
+  color: alpha(@window_fg_color, 0.66);
+  line-height: 1.36;
+  margin-top: 4px;
+}
+
+.detail-actions {
+  margin-top: 13px;
+}
+
+.settings-sidebar {
+  background: alpha(@headerbar_bg_color, 0.72);
+  border-right: 1px solid alpha(@window_fg_color, 0.09);
+  padding: 18px 12px;
+}
+
+.sidebar-eyebrow {
+  color: alpha(@window_fg_color, 0.55);
+  font-size: 0.74em;
+  font-weight: 760;
+  letter-spacing: 0.08em;
+  margin: 12px 10px 6px;
+}
+
+.sidebar-button {
+  border-radius: 11px;
+  margin: 2px 0;
+  padding: 9px 10px;
+}
+
+.sidebar-button image {
+  margin-right: 10px;
+}
 """
 
 
@@ -270,6 +342,12 @@ def _label(
     if wrap:
         label.set_wrap(True)
         label.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
+        # Measure wrapped copy by its minimum width. This prevents long detail
+        # text from forcing a compact or 200%-scaled window wider than the
+        # available display before the responsive breakpoint can collapse.
+        natural_wrap_mode = getattr(Gtk, "NaturalWrapMode", None)
+        if natural_wrap_mode is not None:
+            label.set_natural_wrap_mode(natural_wrap_mode.NONE)
         label.set_hexpand(True)
         if max_width_chars is not None:
             label.set_max_width_chars(max_width_chars)
@@ -286,11 +364,15 @@ def _safe_hardware_snapshot() -> settings_model.HardwareState:
 
 
 class SettingsWindow(Adw.ApplicationWindow):
-    """A compact native directory for system and Zeus settings."""
+    """The Zeus-owned navigation surface for system and local settings."""
 
-    def __init__(self, application: Adw.Application):
+    def __init__(
+        self,
+        application: Adw.Application,
+        requested_page: str = settings_model.DEFAULT_PAGE,
+    ):
         super().__init__(application=application, title="Settings")
-        self.set_default_size(760, 720)
+        self.set_default_size(1040, 720)
         self.set_size_request(520, 500)
         self.add_css_class("zeus-window")
         self._closed = False
@@ -305,9 +387,12 @@ class SettingsWindow(Adw.ApplicationWindow):
         self._developer_notice = ""
         self._developer_notice_kind = "info"
         self._developer_preserve_notice = False
+        self._page = settings_model.DEFAULT_PAGE
+        self._requested_page = settings_model.normalize_page(requested_page)
 
         self._install_css()
         self._build_window()
+        self.show_page(self._requested_page)
         # The helper is queried once when the window opens.  Later reads happen
         # after an explicit action or when the window becomes active; there is
         # no timer or background polling while Settings is idle.
@@ -350,26 +435,135 @@ class SettingsWindow(Adw.ApplicationWindow):
         # inherit the active light/dark/high-contrast theme.
         header.set_show_start_title_buttons(True)
         header.set_show_end_title_buttons(True)
-        header.set_title_widget(_label("Settings", "section-heading"))
-        all_settings = Gtk.Button(label="All Settings")
-        all_settings.add_css_class("flat")
-        self._set_accessible_label(all_settings, "Open all settings")
-        all_settings.set_tooltip_text("Open the complete system settings")
-        all_settings.connect("clicked", self._open_native_settings)
-        header.pack_end(all_settings)
+        self._header_title = _label("Settings", "section-heading")
+        header.set_title_widget(self._header_title)
+        self._back_button = Gtk.Button.new_from_icon_name("go-previous-symbolic")
+        self._back_button.add_css_class("flat")
+        self._set_accessible_label(self._back_button, "Back to Settings")
+        self._back_button.set_tooltip_text("Back to Settings")
+        self._back_button.connect("clicked", self._on_back_clicked)
+        header.pack_start(self._back_button)
+        advanced = Gtk.Button(label="Advanced")
+        advanced.add_css_class("flat")
+        self._set_accessible_label(advanced, "Open advanced Zeus settings")
+        advanced.set_tooltip_text("Advanced Zeus settings and compatibility tools")
+        advanced.connect("clicked", lambda _button: self.show_page("advanced"))
+        header.pack_end(advanced)
         toolbar.add_top_bar(header)
 
         self._toast_overlay = Adw.ToastOverlay()
+        self._stack = Gtk.Stack()
+        self._stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
+        self._stack.set_transition_duration(180)
+        self._stack.set_hhomogeneous(False)
+        self._stack.set_vhomogeneous(False)
+        self._stack.add_named(self._wrap_page(self._build_content()), "home")
+        for item in settings_model.DESTINATIONS:
+            self._stack.add_named(self._wrap_page(self._build_detail_page(item)), item.key)
+        self._stack.add_named(self._wrap_page(self._build_advanced_page()), "advanced")
+        self._stack.add_named(self._wrap_page(self._build_about_page()), "about")
+
+        self._split_view = Adw.OverlaySplitView()
+        self._split_view.set_min_sidebar_width(210)
+        self._split_view.set_max_sidebar_width(280)
+        self._split_view.set_sidebar_width_fraction(0.30)
+        self._split_view.set_pin_sidebar(True)
+        # Begin in the compact state so a constrained or highly scaled display
+        # never has to allocate both panes before its breakpoint is evaluated.
+        self._split_view.set_collapsed(True)
+        self._split_view.set_sidebar(self._wrap_page(self._build_sidebar()))
+        self._split_view.set_content(self._stack)
+        self._split_view.set_show_sidebar(True)
+        self._split_view.connect("notify::collapsed", self._on_split_collapsed_changed)
+        breakpoint = Adw.Breakpoint.new(
+            Adw.BreakpointCondition.parse("min-width: 900px")
+        )
+        breakpoint.add_setter(self._split_view, "collapsed", False)
+        self.add_breakpoint(breakpoint)
+
+        self._toast_overlay.set_child(self._split_view)
+        toolbar.set_content(self._toast_overlay)
+        self.set_content(toolbar)
+
+    @staticmethod
+    def _wrap_page(content: Gtk.Widget) -> Gtk.ScrolledWindow:
         scroller = Gtk.ScrolledWindow()
         scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         clamp = Adw.Clamp()
         clamp.set_maximum_size(860)
         clamp.set_tightening_threshold(600)
-        clamp.set_child(self._build_content())
+        clamp.set_child(content)
         scroller.set_child(clamp)
-        self._toast_overlay.set_child(scroller)
-        toolbar.set_content(self._toast_overlay)
-        self.set_content(toolbar)
+        return scroller
+
+    def _build_sidebar(self) -> Gtk.Widget:
+        sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        sidebar.add_css_class("settings-sidebar")
+        sidebar.append(
+            self._sidebar_button("home", "Overview", "preferences-system-symbolic")
+        )
+        sidebar.append(_label("EVERYDAY", "sidebar-eyebrow"))
+        for item in settings_model.PANEL_DESTINATIONS:
+            sidebar.append(self._sidebar_button(item.key, item.title, item.icon_name))
+        sidebar.append(_label("ZEUS", "sidebar-eyebrow"))
+        for item in settings_model.LOCAL_DESTINATIONS:
+            sidebar.append(self._sidebar_button(item.key, item.title, item.icon_name))
+        sidebar.append(
+            self._sidebar_button(
+                "advanced", "Advanced", "applications-engineering-symbolic"
+            )
+        )
+        return sidebar
+
+    def _sidebar_button(self, page: str, title: str, icon_name: str) -> Gtk.Button:
+        button = Gtk.Button()
+        button.add_css_class("flat")
+        button.add_css_class("sidebar-button")
+        button.set_hexpand(True)
+        button.set_halign(Gtk.Align.FILL)
+        self._set_accessible_label(button, title)
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        icon = Gtk.Image.new_from_icon_name(icon_name)
+        icon.set_pixel_size(18)
+        row.append(icon)
+        text = _label(title, "control-title")
+        text.set_hexpand(True)
+        text.set_halign(Gtk.Align.START)
+        row.append(text)
+        button.set_child(row)
+        button.connect("clicked", lambda _button: self.show_page(page))
+        return button
+
+    def show_page(self, page: str):
+        """Navigate to one allowlisted Zeus page and update window identity."""
+
+        if self._closed:
+            return
+        selected = settings_model.normalize_page(page)
+        self._page = selected
+        self._stack.set_visible_child_name(selected)
+        self._sync_sidebar_visibility()
+        self._back_button.set_visible(selected != settings_model.DEFAULT_PAGE)
+        item = settings_model.destination(selected)
+        title = item.title if item is not None else {
+            "home": "Settings",
+            "advanced": "Advanced",
+            "about": "About Zeus OS",
+        }.get(selected, "Settings")
+        self._header_title.set_text(title)
+        self.set_title(f"{title} — Zeus Settings" if selected != "home" else "Zeus Settings")
+
+    def _on_back_clicked(self, _button: Gtk.Button):
+        self.show_page(settings_model.DEFAULT_PAGE)
+
+    def _on_split_collapsed_changed(self, _split_view, _parameter):
+        self._sync_sidebar_visibility()
+
+    def _sync_sidebar_visibility(self):
+        self._split_view.set_show_sidebar(
+            not self._split_view.get_collapsed()
+            or self._page == settings_model.DEFAULT_PAGE
+        )
 
     def _build_content(self) -> Gtk.Widget:
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -432,21 +626,6 @@ class SettingsWindow(Adw.ApplicationWindow):
         local.append(local_grid)
         content.append(local)
 
-        advanced = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        advanced.add_css_class("content-section")
-        advanced.add_css_class("advanced-section")
-        advanced.append(_label("Advanced", "section-heading"))
-        advanced.append(
-            _label(
-                "Optional repository-backed controls for verified desktop iterations.",
-                "section-copy",
-                wrap=True,
-                max_width_chars=82,
-            )
-        )
-        advanced.append(self._build_developer_card())
-        content.append(advanced)
-
         # Keep the actionable cards together; hardware notes remain useful
         # context below them and never displace Temp or Updates from the first
         # view at the normal window size.
@@ -469,6 +648,129 @@ class SettingsWindow(Adw.ApplicationWindow):
         bottom_space.add_css_class("bottom-space")
         content.append(bottom_space)
         return content
+
+    def _build_detail_page(self, item: settings_model.Destination) -> Gtk.Widget:
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        page.add_css_class("detail-page")
+        icon = Gtk.Image.new_from_icon_name(item.icon_name)
+        icon.set_pixel_size(34)
+        icon.set_halign(Gtk.Align.START)
+        icon.add_css_class("detail-icon")
+        page.append(icon)
+        page.append(_label(item.title, "detail-title"))
+        page.append(_label(item.summary, "detail-copy", wrap=True, max_width_chars=76))
+
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        card.add_css_class("detail-card")
+        if item.command:
+            card.append(_label(f"Open {item.title}", "detail-card-title"))
+            card.append(
+                _label(
+                    f"{item.title} already uses a dedicated Zeus-owned window.",
+                    "detail-card-copy",
+                    wrap=True,
+                    max_width_chars=72,
+                )
+            )
+            action = Gtk.Button(label=f"Open {item.title}")
+            action.set_halign(Gtk.Align.START)
+            action.add_css_class("suggested-action")
+            action.add_css_class("detail-actions")
+            action.connect("clicked", lambda _button, selected=item: self._open_local(selected))
+            card.append(action)
+        else:
+            card.append(_label("Zeus-native page", "detail-card-title"))
+            card.append(
+                _label(
+                    "This destination now stays inside Zeus Settings. Controls are moving here in focused, tested increments; the Fedora panel remains available only as a compatibility tool during that transition.",
+                    "detail-card-copy",
+                    wrap=True,
+                    max_width_chars=72,
+                )
+            )
+            compatibility = Gtk.Button(label="Open compatibility panel")
+            compatibility.set_halign(Gtk.Align.START)
+            compatibility.add_css_class("flat")
+            compatibility.add_css_class("detail-actions")
+            self._set_accessible_label(
+                compatibility,
+                f"Open the Fedora compatibility panel for {item.title}",
+            )
+            compatibility.connect(
+                "clicked", lambda _button, selected=item: self._open_panel(selected)
+            )
+            card.append(compatibility)
+        page.append(card)
+        return page
+
+    def _build_advanced_page(self) -> Gtk.Widget:
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        page.add_css_class("detail-page")
+        page.append(_label("ADVANCED", "eyebrow"))
+        page.append(_label("Advanced", "detail-title"))
+        page.append(
+            _label(
+                "Developer controls, system identity, and an explicit recovery path.",
+                "detail-copy",
+                wrap=True,
+                max_width_chars=76,
+            )
+        )
+        page.append(self._build_developer_card())
+
+        compatibility = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        compatibility.add_css_class("detail-card")
+        compatibility.append(_label("Fedora compatibility", "detail-card-title"))
+        compatibility.append(
+            _label(
+                "Use the stock control center only for an uncommon control that Zeus Settings does not cover yet. It remains installed for recovery and does not replace Zeus defaults.",
+                "detail-card-copy",
+                wrap=True,
+                max_width_chars=72,
+            )
+        )
+        open_compatibility = Gtk.Button(label="Open Fedora compatibility settings")
+        open_compatibility.set_halign(Gtk.Align.START)
+        open_compatibility.add_css_class("flat")
+        open_compatibility.add_css_class("detail-actions")
+        open_compatibility.connect("clicked", self._open_native_settings)
+        compatibility.append(open_compatibility)
+        page.append(compatibility)
+
+        about = Gtk.Button(label="About Zeus OS")
+        about.set_halign(Gtk.Align.START)
+        about.add_css_class("flat")
+        about.add_css_class("detail-actions")
+        about.connect("clicked", lambda _button: self.show_page("about"))
+        page.append(about)
+        return page
+
+    def _build_about_page(self) -> Gtk.Widget:
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        page.add_css_class("detail-page")
+        page.append(_label("ZEUS OS", "eyebrow"))
+        page.append(_label("About this system", "detail-title"))
+        page.append(
+            _label(
+                "A focused laptop desktop built on Fedora and GNOME with signed Zeus updates.",
+                "detail-copy",
+                wrap=True,
+                max_width_chars=76,
+            )
+        )
+        identity = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        identity.add_css_class("detail-card")
+        identity.append(_label(f"Zeus OS {self._version}", "detail-card-title"))
+        identity.append(
+            _label(
+                f"Build {self._build_id}",
+                "detail-card-copy",
+                wrap=True,
+                max_width_chars=72,
+            )
+        )
+        page.append(identity)
+        return page
 
     def _build_developer_card(self) -> Gtk.Widget:
         """Build the compact Advanced → Developer Mode card."""
@@ -1038,10 +1340,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         return button
 
     def _on_destination_clicked(self, _button: Gtk.Button, item: settings_model.Destination):
-        if item.panel_ids:
-            self._open_panel(item)
-            return
-        self._open_local(item)
+        self.show_page(item.key)
 
     def _launch_context(self):
         try:
@@ -1139,8 +1438,8 @@ class SettingsWindow(Adw.ApplicationWindow):
             )
         except (GLib.Error, OSError, TypeError, ValueError):
             # The process has been handed off already.  Do not synchronously
-            # wait in the GTK loop; All Settings remains available in the
-            # header if an older Gio binding cannot report completion.
+            # wait in the GTK loop; the Advanced compatibility page remains
+            # available if an older Gio binding cannot report completion.
             return
 
     def _on_panel_command_finished(self, process, result, context):
@@ -1199,13 +1498,29 @@ class SettingsWindow(Adw.ApplicationWindow):
 
 class SettingsApplication(Adw.Application):
     def __init__(self):
-        super().__init__(application_id=APPLICATION_ID)
+        super().__init__(
+            application_id=APPLICATION_ID,
+            flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
+        )
         self._window: SettingsWindow | None = None
+        self._requested_page = settings_model.DEFAULT_PAGE
+
+    def do_command_line(self, command_line) -> int:
+        arguments = []
+        for value in list(command_line.get_arguments())[1:]:
+            if isinstance(value, bytes):
+                value = value.decode("utf-8", errors="replace")
+            arguments.append(str(value))
+        self._requested_page = settings_model.requested_page(arguments)
+        self.activate()
+        return 0
 
     def do_activate(self):
         if self._window is None:
-            self._window = SettingsWindow(self)
+            self._window = SettingsWindow(self, self._requested_page)
             self._window.connect("close-request", self._on_window_close)
+        else:
+            self._window.show_page(self._requested_page)
         self._window.present()
 
     def _on_window_close(self, window: SettingsWindow) -> bool:

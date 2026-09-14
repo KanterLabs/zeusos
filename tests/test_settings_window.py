@@ -14,6 +14,9 @@ ROOT = Path(__file__).resolve().parents[1]
 MODEL_PATH = ROOT / "desktop/rootfs/usr/lib/zeus"
 SOURCE = ROOT / "desktop/rootfs/usr/libexec/zeus-settings-window"
 DESKTOP = ROOT / "desktop/rootfs/usr/share/applications/org.zeus.Settings.desktop"
+COMPATIBILITY_DESKTOP = (
+    ROOT / "desktop/rootfs/usr/share/applications/org.gnome.Settings.desktop"
+)
 
 
 sys.path.insert(0, str(MODEL_PATH))
@@ -67,6 +70,20 @@ def write_sysfs_fixture(root: Path, *, battery=False, backlight=False, wifi=Fals
 
 
 class SettingsModelTests(unittest.TestCase):
+    def test_public_page_routes_are_allowlisted_and_aliases_are_stable(self):
+        self.assertEqual(MODEL.normalize_page("wifi"), "network")
+        self.assertEqual(MODEL.normalize_page("Displays"), "display")
+        self.assertEqual(MODEL.normalize_page("developer"), "advanced")
+        self.assertEqual(MODEL.normalize_page("../../bin/sh"), "home")
+        self.assertEqual(MODEL.requested_page(["bluetooth", "ignored"]), "bluetooth")
+        self.assertEqual(MODEL.requested_page([]), "home")
+        self.assertEqual(
+            MODEL.settings_argv("bluetooth"),
+            ("/usr/libexec/zeus-settings-window", "bluetooth"),
+        )
+        with self.assertRaises(ValueError):
+            MODEL.normalize_page("home", fallback="not-a-page")
+
     def test_panel_ids_match_fedora_gnome_50_inventory(self):
         by_key = MODEL.DESTINATIONS_BY_KEY
         self.assertEqual(by_key["network"].panel_ids, ("wifi", "network"))
@@ -259,6 +276,13 @@ class SettingsLaunchTests(unittest.TestCase):
         window._spawn_fixed.assert_called_once_with(("/usr/bin/gnome-control-center", "bluetooth"), "Bluetooth")
         window._open_native_settings.assert_called_once_with()
 
+    def test_destination_click_stays_inside_zeus_settings(self):
+        window = self.new_window()
+        window.show_page = Mock()
+        item = MODEL.destination("bluetooth")
+        window._on_destination_clicked(Mock(), item)
+        window.show_page.assert_called_once_with("bluetooth")
+
     def test_false_desktop_launch_is_treated_as_unlaunchable(self):
         class FalseDesktop:
             def launch(self, _files, _context):
@@ -299,14 +323,31 @@ class SettingsLaunchTests(unittest.TestCase):
 
     def test_window_has_fixed_desktop_entry_and_no_shell_or_polling(self):
         desktop = DESKTOP.read_text(encoding="utf-8")
+        compatibility = COMPATIBILITY_DESKTOP.read_text(encoding="utf-8")
         self.assertIn("Name=Zeus Settings", desktop)
         self.assertIn("Exec=/usr/libexec/zeus-settings-window", desktop)
         self.assertIn("Icon=org.zeus.Settings", desktop)
         self.assertIn("Categories=GTK;GNOME;Settings;System;", desktop)
+        self.assertIn("Name=Fedora Compatibility Settings", compatibility)
+        self.assertIn("Exec=/usr/bin/gnome-control-center", compatibility)
+        self.assertIn("NoDisplay=true", compatibility)
         source = SOURCE.read_text(encoding="utf-8")
         self.assertIn("set_show_start_title_buttons(True)", source)
         self.assertIn("set_show_end_title_buttons(True)", source)
-        self.assertIn('header.pack_end(all_settings)', source)
+        self.assertIn("Gtk.Stack()", source)
+        self.assertIn("Adw.OverlaySplitView()", source)
+        self.assertIn("self._split_view.set_pin_sidebar(True)", source)
+        self.assertIn("self._split_view.set_collapsed(True)", source)
+        self.assertIn('Adw.BreakpointCondition.parse("min-width: 900px")', source)
+        self.assertIn('breakpoint.add_setter(self._split_view, "collapsed", False)', source)
+        self.assertIn("def show_page(self, page: str)", source)
+        self.assertIn("Gio.ApplicationFlags.HANDLES_COMMAND_LINE", source)
+        self.assertIn('advanced = Gtk.Button(label="Advanced")', source)
+        self.assertIn(
+            'open_compatibility = Gtk.Button(label="Open Fedora compatibility settings")',
+            source,
+        )
+        self.assertNotIn('Gtk.Button(label="All Settings")', source)
         self.assertIn("Gio.Subprocess.new(list(arguments), Gio.SubprocessFlags.NONE)", source)
         self.assertIn("if result is False:", source)
         self.assertIn('notify::is-active', source)

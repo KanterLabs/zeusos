@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Fedora Compatibility Settings
+GenericName=Compatibility settings
+Comment=Recovery control center for settings not yet available in Zeus Settings
+Exec=/usr/bin/gnome-control-center
+Icon=org.gnome.Settings
+Terminal=false
+DBusActivatable=true
+StartupNotify=true
+NoDisplay=true
+OnlyShowIn=GNOME;
+Categories=GNOME;GTK;Settings;System;
+Keywords=compatibility;recovery;fedora;gnome;settings;

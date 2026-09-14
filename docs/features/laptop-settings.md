@@ -2,17 +2,26 @@
 
 Zeus Settings groups everyday laptop destinations in one native GTK4/libadwaita
 window. Open it from **Welcome → Open Settings**, the **Zeus → Settings** menu,
-or application search. **All Settings** retains access to GNOME's complete
-control center, including in the safe desktop.
+or application search. Every destination first opens a Zeus-owned page. The
+stock Fedora control center is retained under **Advanced → Fedora compatibility**
+as a recovery path while individual controls move into Zeus. Its desktop entry
+is hidden from normal application search, but the executable remains installed
+for recovery from a terminal with `gnome-control-center`.
+
+At desktop widths the destination list stays visible beside the active page.
+On compact or highly scaled displays it collapses into a one-pane route with a
+clear Back button; fixed deep links such as `zeus-settings-window bluetooth`
+open the same page without accepting arbitrary commands.
 
 The top-panel **Zeus → Tailscale** submenu is a separate compact network status
 surface. It shows this device's connection state and provides fixed Connect,
 Disconnect and Refresh actions; see [Built-in Tailscale](tailscale.md).
 
-Network, Bluetooth, display, power, sound and appearance changes use the existing
-GNOME panels. Temp and Updates open their existing native apps. The window shows
-the locally installed version and build; opening it does not check for an update,
-change preferences, pair devices, scan networks or install software.
+Network, Bluetooth, display, power, sound and appearance have stable Zeus page
+routes. During the transition, their explicit compatibility action opens the
+corresponding Fedora panel. Temp and Updates open their existing Zeus apps. The
+window shows the locally installed version and build; opening it does not check
+for an update, change preferences, pair devices, scan networks or install software.
 
 GNOME supplies physical screen brightness in the top-right system menu on
 supported hardware, as described in its
@@ -27,7 +36,7 @@ message rather than an invented reading.
 - Bounded local hardware discovery; unavailable and unknown are distinct states.
 - Fixed desktop entries and native panel IDs; no user text is executed as a command.
 - Launch with the native activation context so existing windows can receive focus.
-- Unavailable panels fall back to native Settings; a missing native Settings app
+- Unavailable compatibility panels fall back to Fedora Settings; a missing app
   produces an actionable message while the rest of the window remains usable.
 - Closing the window ends its work. Owner preferences and Temp policy are retained.
 - OS updater state remains owned by the existing signed updater. Opening the

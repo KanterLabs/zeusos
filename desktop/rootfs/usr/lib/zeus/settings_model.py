@@ -1,10 +1,10 @@
-"""Dependency-free data for the native Zeus Settings home.
+"""Dependency-free data for the native Zeus Settings application.
 
-The Settings window is a small directory of native GNOME destinations.  This
-module keeps the information that can be tested without GTK separate from the
-view: panel identifiers are fixed, build identity is display-only, and the
-hardware probe reads a bounded set of sysfs entries once when the window opens.
-No value returned here is a control or a request to change device state.
+The Settings window owns stable Zeus page routes.  This module keeps the
+information that can be tested without GTK separate from the view: legacy
+compatibility panel identifiers are fixed, build identity is display-only, and
+the hardware probe reads a bounded set of sysfs entries once when the window
+opens.  No value returned here changes device state.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from typing import Any, Mapping
 PRODUCT_VERSION = "0.1.0-preview.2"
 DEFAULT_BUILD_ID = "development"
 GNOME_CONTROL_CENTER_COMMAND = "/usr/bin/gnome-control-center"
+ZEUS_SETTINGS_COMMAND = "/usr/libexec/zeus-settings-window"
 VERSION_PATH = Path("/usr/share/zeus/version")
 BUILD_ID_PATH = Path("/usr/share/zeus/build-id")
 DEVELOPER_HELPER_PATH = "/usr/libexec/zeus-developer"
@@ -127,6 +128,21 @@ LOCAL_DESTINATIONS: tuple[Destination, ...] = (
 
 DESTINATIONS: tuple[Destination, ...] = PANEL_DESTINATIONS + LOCAL_DESTINATIONS
 DESTINATIONS_BY_KEY = {destination.key: destination for destination in DESTINATIONS}
+DEFAULT_PAGE = "home"
+SPECIAL_PAGES = (DEFAULT_PAGE, "advanced", "about")
+PAGE_KEYS = SPECIAL_PAGES + tuple(destination.key for destination in DESTINATIONS)
+PAGE_ALIASES = {
+    "wifi": "network",
+    "wi-fi": "network",
+    "networking": "network",
+    "display": "display",
+    "displays": "display",
+    "battery": "power",
+    "audio": "sound",
+    "background": "appearance",
+    "developer": "advanced",
+    "system": "about",
+}
 
 
 @dataclass(frozen=True)
@@ -584,6 +600,32 @@ def read_build_identity(
     )
 
 
+def normalize_page(value: object, fallback: str = DEFAULT_PAGE) -> str:
+    """Return one stable Zeus Settings page key from the public allowlist."""
+
+    if not isinstance(fallback, str) or fallback not in PAGE_KEYS:
+        raise ValueError("fallback is not a Zeus Settings page")
+    if not isinstance(value, str):
+        return fallback
+    candidate = value.strip().lower().replace("_", "-")
+    candidate = PAGE_ALIASES.get(candidate, candidate)
+    return candidate if candidate in PAGE_KEYS else fallback
+
+
+def requested_page(arguments: object) -> str:
+    """Normalize an application argument list without interpreting commands."""
+
+    if not isinstance(arguments, (list, tuple)) or not arguments:
+        return DEFAULT_PAGE
+    return normalize_page(arguments[0])
+
+
+def settings_argv(page: object = DEFAULT_PAGE) -> tuple[str, ...]:
+    """Return the fixed Zeus Settings command for a validated page."""
+
+    return (ZEUS_SETTINGS_COMMAND, normalize_page(page))
+
+
 def destination(key: str) -> Destination | None:
     """Return an allowlisted destination by key for tests and view routing."""
 
@@ -645,6 +687,7 @@ __all__ = [
     "BLUETOOTH_PATH",
     "BUILD_ID_PATH",
     "DEFAULT_BUILD_ID",
+    "DEFAULT_PAGE",
     "DEVELOPER_ACTIONS",
     "DEVELOPER_HELPER_PATH",
     "DEVELOPER_REQUIRED_ACTIONS",
@@ -659,9 +702,13 @@ __all__ = [
     "MAX_DISCOVERY_ENTRIES",
     "NETWORK_PATH",
     "PANEL_DESTINATIONS",
+    "PAGE_ALIASES",
+    "PAGE_KEYS",
     "POWER_SUPPLY_PATH",
     "PRODUCT_VERSION",
+    "SPECIAL_PAGES",
     "VERSION_PATH",
+    "ZEUS_SETTINGS_COMMAND",
     "availability_text",
     "default_developer_status",
     "destination",
@@ -674,8 +721,11 @@ __all__ = [
     "discover_hardware",
     "hardware_summary",
     "local_command",
+    "normalize_page",
     "panel_argv",
     "panel_attempt_order",
     "panel_desktop_id",
     "read_build_identity",
+    "requested_page",
+    "settings_argv",
 ]

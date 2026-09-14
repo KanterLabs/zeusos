@@ -36,7 +36,7 @@ const BLUEZ_DEVICE_INTERFACE = 'org.bluez.Device1';
 const BLUEZ_CALL_TIMEOUT_MS = 5000;
 const AIRPODS_CARD_DISMISS_MS = 5200;
 const AIRPODS_EVENT_QUEUE_LIMIT = 64;
-const GNOME_CONTROL_CENTER = '/usr/bin/gnome-control-center';
+const ZEUS_SETTINGS = '/usr/libexec/zeus-settings-window';
 
 function actorNamed(actor, name) {
     if (!actor)
@@ -222,7 +222,7 @@ class AirPodsConnectionCard {
         this.hide(false);
         this._devicePath = devicePath;
         this._title.text = safeDeviceName(deviceName);
-        this._status.text = 'Connected · Open Bluetooth Settings';
+        this._status.text = 'Connected · Open Zeus Bluetooth';
         if (!this._inChrome) {
             Main.layoutManager.addChrome(this.actor);
             this._inChrome = true;
@@ -319,7 +319,7 @@ class AirPodsConnectionCard {
     _openBluetoothSettings() {
         try {
             Gio.Subprocess.new(
-                [GNOME_CONTROL_CENTER, 'bluetooth'], Gio.SubprocessFlags.NONE);
+                [ZEUS_SETTINGS, 'bluetooth'], Gio.SubprocessFlags.NONE);
         } catch (error) {
             console.debug(`Zeus could not open Bluetooth Settings: ${error.message}`);
         }
@@ -599,7 +599,6 @@ class ZeusMenuButton extends PanelMenu.Button {
 
         this._addLauncher('Files', 'org.gnome.Nautilus.desktop');
         this._addLauncher('Zeus Settings', 'org.zeus.Settings.desktop');
-        this._addLauncher('GNOME Settings', 'org.gnome.Settings.desktop');
         this._addLauncher('Terminal', 'org.gnome.Ptyxis.desktop');
 
         this._menuOpenSignalId = this.menu.connect('open-state-changed', (_menu, open) => {

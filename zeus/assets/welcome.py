@@ -334,7 +334,7 @@ class WelcomeWindow(Adw.ApplicationWindow):
         content.append(journey)
         content.append(
             make_label(
-                "You can always open the standard GNOME applications from the top bar.",
+                "You can always open Zeus Settings from the top bar.",
                 "footer-copy",
                 wrap=True,
                 max_width_chars=80,
@@ -459,7 +459,7 @@ class WelcomeWindow(Adw.ApplicationWindow):
                 return
             except GLib.Error:
                 pass
-        self._launch_command(["/usr/libexec/zeus-settings-window", "gnome-control-center"], "Settings")
+        self._launch_command(["/usr/libexec/zeus-settings-window"], "Settings")
 
     def _open_updates(self, _button):
         desktop = Gio.DesktopAppInfo.new(f"{UPDATES_APPLICATION_ID}.desktop")

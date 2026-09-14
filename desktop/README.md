@@ -25,10 +25,10 @@ this layer.
 
 ## Defaults and schema choices
 
-`org.gnome.shell.favorite-apps` is the complete five-item dock list:
+`org.gnome.shell.favorite-apps` is the complete six-item dock list:
 
 `org.gnome.Nautilus.desktop`, `org.gnome.Ptyxis.desktop`, `google-chrome.desktop`,
-`org.gnome.Settings.desktop`, and `org.zeus.Welcome.desktop`.
+`org.zeus.Settings.desktop`, `org.zeus.Temp.desktop`, and `org.zeus.Welcome.desktop`.
 
 The dash-to-dock settings use its published GSettings schema: bottom floating
 placement, 48px maximum and fixed icons, intelligent hide, pointer reveal,

@@ -30,7 +30,7 @@ model. Other listening modes need confirmed device support before being exposed.
 
 - Pair from Zeus Settings using the native Bluetooth authorization flow.
 - Show a brief animated card when an already-paired AirPods device transitions
-  to BlueZ's connected state. Clicking it opens native Bluetooth Settings.
+  to BlueZ's connected state. Clicking it opens the Bluetooth page in Zeus Settings.
 - Reconnect a previously paired device after opening the case, restarting Zeus,
   waking the laptop and returning within range, without repeated pairing.
 - Prefer the best mutually supported stereo playback codec. Report the active
@@ -122,7 +122,7 @@ microphone state, battery levels, or noise-control support.
 
 The animation uses Shell-native actors, honors the desktop animation/reduced-
 motion preference, includes dark and high-contrast styles, dismisses after 5.2
-seconds, and opens GNOME Bluetooth Settings on activation. It does not scan,
+seconds, and opens Zeus Bluetooth Settings on activation. It does not scan,
 pair, connect, persist an address, or change any BlueZ/PipeWire setting.
 
 Advanced controls are tracked in **ZOS-71: Add optional AirPods battery and noise
