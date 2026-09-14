@@ -17,11 +17,25 @@ The top-panel **Zeus → Tailscale** submenu is a separate compact network statu
 surface. It shows this device's connection state and provides fixed Connect,
 Disconnect and Refresh actions; see [Built-in Tailscale](tailscale.md).
 
-Network, Bluetooth, display, power, sound and appearance have stable Zeus page
-routes. During the transition, their explicit compatibility action opens the
-corresponding Fedora panel. Temp and Updates open their existing Zeus apps. The
-window shows the locally installed version and build; opening it does not check
-for an update, change preferences, pair devices, scan networks or install software.
+Wi-Fi and Bluetooth now use event-driven Zeus pages backed directly by
+NetworkManager and BlueZ. They cover radio state, scanning, saved and available
+Wi-Fi networks, connection and removal, supported hotspots, and normal Bluetooth
+pair/connect/trust/remove flows. Bluetooth discovery runs only while its page is
+open. Display, power, sound and appearance keep their explicit compatibility
+actions during the next migration slices. Temp and Updates open their existing
+Zeus apps.
+
+The existing AirPods connection card deep-links to this Bluetooth page. Optional
+AirPods battery/noise controls remain in ZOS-71, and the authenticated QR action
+from ZOS-124 is reserved for the active Wi-Fi row; neither secret/device protocol
+is duplicated in the base connectivity controller.
+
+Wi-Fi passwords use a bounded native password field, travel directly to
+NetworkManager in memory, and are not placed in logs, shell commands, process
+arguments, screenshots, the clipboard, or Zeus-owned storage. NetworkManager
+continues to own its normal saved-connection and secret policy. Enterprise and
+legacy authentication use the explicit compatibility action until their native
+flows are qualified.
 
 GNOME supplies physical screen brightness in the top-right system menu on
 supported hardware, as described in its
@@ -34,6 +48,8 @@ message rather than an invented reading.
 
 - No additional image packages, persistent Zeus service or periodic refresh job.
 - Bounded local hardware discovery; unavailable and unknown are distinct states.
+- NetworkManager and BlueZ remain authoritative; no `nmcli`, `bluetoothctl`, shell,
+  or Zeus network database is introduced.
 - Fixed desktop entries and native panel IDs; no user text is executed as a command.
 - Launch with the native activation context so existing windows can receive focus.
 - Unavailable compatibility panels fall back to Fedora Settings; a missing app
@@ -53,8 +69,9 @@ from the deployed build before the feature is marked complete in Helm.
 
 VM 115 provides Ethernet, display configuration and native power profiles. It has
 no physical Wi-Fi/Bluetooth adapter, backlight or battery. Successful VM navigation
-does not qualify radio pairing, brightness adjustment, battery runtime or physical
-laptop suspend/resume; those checks remain in hardware qualification.
+and backend/UI probes do not qualify Wi-Fi authentication, radio toggling, hotspot,
+Bluetooth pairing, AirPods reconnect, brightness adjustment, battery runtime or
+physical laptop suspend/resume; those checks remain in hardware qualification.
 
 The deployed **git-fd2125f63159** [receipt and screenshots](../iterations/git-fd2125f63159/README.md)
 record completed VM qualification, all 136 source tests, unchanged dependencies,

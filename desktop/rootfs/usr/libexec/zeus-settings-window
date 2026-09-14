@@ -24,6 +24,7 @@ if MODEL_PATH not in sys.path:
     sys.path.insert(0, MODEL_PATH)
 
 import settings_model
+import settings_connectivity
 
 
 APPLICATION_ID = "org.zeus.Settings"
@@ -326,6 +327,33 @@ CSS = """
 .sidebar-button image {
   margin-right: 10px;
 }
+
+.setting-row {
+  background: @card_bg_color;
+  border: 1px solid alpha(@window_fg_color, 0.10);
+  border-radius: 14px;
+  margin-top: 9px;
+  padding: 12px 14px;
+}
+
+.setting-row-title {
+  color: @window_fg_color;
+  font-weight: 720;
+}
+
+.setting-row-copy {
+  color: alpha(@window_fg_color, 0.66);
+  font-size: 0.88em;
+  margin-top: 3px;
+}
+
+.setting-row-actions {
+  margin-left: 12px;
+}
+
+.page-toolbar {
+  margin-top: 18px;
+}
 """
 
 
@@ -387,11 +415,23 @@ class SettingsWindow(Adw.ApplicationWindow):
         self._developer_notice = ""
         self._developer_notice_kind = "info"
         self._developer_preserve_notice = False
+        self._wifi_controller = None
+        self._bluetooth_controller = None
+        self._wifi_rendering = False
+        self._bluetooth_rendering = False
         self._page = settings_model.DEFAULT_PAGE
         self._requested_page = settings_model.normalize_page(requested_page)
 
         self._install_css()
         self._build_window()
+        self._wifi_controller = settings_connectivity.WifiController(
+            self._render_wifi, self._show_toast
+        )
+        self._bluetooth_controller = settings_connectivity.BluetoothController(
+            self._render_bluetooth, self._show_toast
+        )
+        self._wifi_controller.start()
+        self._bluetooth_controller.start()
         self.show_page(self._requested_page)
         # The helper is queried once when the window opens.  Later reads happen
         # after an explicit action or when the window becomes active; there is
@@ -539,6 +579,7 @@ class SettingsWindow(Adw.ApplicationWindow):
 
         if self._closed:
             return
+        previous = self._page
         selected = settings_model.normalize_page(page)
         self._page = selected
         self._stack.set_visible_child_name(selected)
@@ -552,6 +593,16 @@ class SettingsWindow(Adw.ApplicationWindow):
         }.get(selected, "Settings")
         self._header_title.set_text(title)
         self.set_title(f"{title} — Zeus Settings" if selected != "home" else "Zeus Settings")
+        if self._wifi_controller is not None:
+            if previous == "network" and selected != "network":
+                self._wifi_controller.leave()
+            elif selected == "network" and previous != "network":
+                self._wifi_controller.enter()
+        if self._bluetooth_controller is not None:
+            if previous == "bluetooth" and selected != "bluetooth":
+                self._bluetooth_controller.leave()
+            elif selected == "bluetooth" and previous != "bluetooth":
+                self._bluetooth_controller.enter()
 
     def _on_back_clicked(self, _button: Gtk.Button):
         self.show_page(settings_model.DEFAULT_PAGE)
@@ -650,6 +701,10 @@ class SettingsWindow(Adw.ApplicationWindow):
         return content
 
     def _build_detail_page(self, item: settings_model.Destination) -> Gtk.Widget:
+        if item.key == "network":
+            return self._build_wifi_page(item)
+        if item.key == "bluetooth":
+            return self._build_bluetooth_page(item)
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         page.add_css_class("detail-page")
         icon = Gtk.Image.new_from_icon_name(item.icon_name)
@@ -682,7 +737,9 @@ class SettingsWindow(Adw.ApplicationWindow):
             card.append(_label("Zeus-native page", "detail-card-title"))
             card.append(
                 _label(
-                    "This destination now stays inside Zeus Settings. Controls are moving here in focused, tested increments; the Fedora panel remains available only as a compatibility tool during that transition.",
+                    "This destination now stays inside Zeus Settings. Controls are moving "
+                    "here in focused, tested increments; the Fedora panel remains available "
+                    "only as a compatibility tool during that transition.",
                     "detail-card-copy",
                     wrap=True,
                     max_width_chars=72,
@@ -702,6 +759,361 @@ class SettingsWindow(Adw.ApplicationWindow):
             card.append(compatibility)
         page.append(card)
         return page
+
+    def _detail_page_intro(self, item: settings_model.Destination) -> Gtk.Box:
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        page.add_css_class("detail-page")
+        icon = Gtk.Image.new_from_icon_name(item.icon_name)
+        icon.set_pixel_size(34)
+        icon.set_halign(Gtk.Align.START)
+        icon.add_css_class("detail-icon")
+        page.append(icon)
+        page.append(_label(item.title, "detail-title"))
+        page.append(_label(item.summary, "detail-copy", wrap=True, max_width_chars=76))
+        return page
+
+    def _build_wifi_page(self, item: settings_model.Destination) -> Gtk.Widget:
+        page = self._detail_page_intro(item)
+        toolbar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        toolbar.add_css_class("page-toolbar")
+        toolbar.set_hexpand(True)
+        self._wifi_status = _label("Loading Wi-Fi…", "detail-copy", wrap=True)
+        self._wifi_status.set_hexpand(True)
+        toolbar.append(self._wifi_status)
+        self._wifi_switch = Gtk.Switch()
+        self._wifi_switch.set_valign(Gtk.Align.CENTER)
+        self._set_accessible_label(self._wifi_switch, "Turn Wi-Fi on or off")
+        self._wifi_switch.connect("notify::active", self._on_wifi_switch_changed)
+        toolbar.append(self._wifi_switch)
+        page.append(toolbar)
+
+        actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        actions.add_css_class("page-toolbar")
+        refresh = Gtk.Button(label="Scan again")
+        refresh.connect("clicked", lambda _button: self._wifi_controller.request_scan())
+        actions.append(refresh)
+        self._hotspot_button = Gtk.Button(label="Start hotspot")
+        self._hotspot_button.connect("clicked", self._show_hotspot_dialog)
+        actions.append(self._hotspot_button)
+        page.append(actions)
+
+        self._wifi_networks = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self._wifi_networks.add_css_class("page-toolbar")
+        page.append(self._wifi_networks)
+        return page
+
+    def _on_wifi_switch_changed(self, switch: Gtk.Switch, _parameter):
+        if not self._wifi_rendering and self._wifi_controller is not None:
+            self._wifi_controller.set_enabled(switch.get_active())
+
+    @staticmethod
+    def _clear_box(box: Gtk.Box):
+        child = box.get_first_child()
+        while child is not None:
+            following = child.get_next_sibling()
+            box.remove(child)
+            child = following
+
+    def _render_wifi(self):
+        if self._closed or not hasattr(self, "_wifi_networks"):
+            return
+        state = self._wifi_controller.snapshot() if self._wifi_controller else None
+        if state is None:
+            return
+        self._wifi_rendering = True
+        self._wifi_switch.set_sensitive(state.available)
+        self._wifi_switch.set_active(state.enabled)
+        self._wifi_rendering = False
+        self._hotspot_button.set_sensitive(
+            state.available and state.enabled and state.hotspot_supported
+        )
+        if not state.available:
+            self._wifi_status.set_text(
+                "No Wi-Fi adapter was detected. Ethernet and saved system networking "
+                "remain available."
+            )
+        elif not state.enabled:
+            self._wifi_status.set_text("Wi-Fi is off")
+        elif state.scanning:
+            self._wifi_status.set_text("Looking for networks…")
+        else:
+            self._wifi_status.set_text("Available networks")
+        self._clear_box(self._wifi_networks)
+        if not state.networks:
+            self._wifi_networks.append(
+                _label(
+                    "No Wi-Fi networks are visible right now.",
+                    "detail-card-copy",
+                    wrap=True,
+                )
+            )
+            return
+        for network in state.networks:
+            self._wifi_networks.append(self._wifi_network_row(network))
+
+    def _wifi_network_row(self, network: settings_connectivity.WifiNetwork) -> Gtk.Widget:
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        row.add_css_class("setting-row")
+        copy = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        copy.set_hexpand(True)
+        copy.append(_label(network.name, "setting-row-title"))
+        security = {
+            "open": "Open",
+            "personal": "Secured",
+            "owe": "Enhanced open",
+            "enterprise": "Enterprise security",
+            "legacy": "Legacy security",
+            "saved": "Saved",
+        }.get(network.security, "Secured")
+        if network.active:
+            status = "Connected"
+        elif not network.visible:
+            status = "Saved · Not currently in range"
+        else:
+            status = f"{network.strength}% signal · {security}"
+        copy.append(_label(status, "setting-row-copy", wrap=True))
+        row.append(copy)
+        actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        actions.add_css_class("setting-row-actions")
+        if network.active:
+            button = Gtk.Button(label="Disconnect")
+            button.connect("clicked", lambda _button: self._wifi_controller.disconnect())
+            actions.append(button)
+            # ZOS-124 plugs its authenticated QR disclosure into this active
+            # row. Keep secret retrieval out of this connection controller so
+            # there is one audited sharing path rather than a duplicate.
+        elif network.security in {"enterprise", "legacy"} and not network.saved:
+            button = Gtk.Button(label="Advanced")
+            button.connect(
+                "clicked",
+                lambda _button: self._open_panel(settings_model.destination("network")),
+            )
+            actions.append(button)
+        else:
+            button = Gtk.Button(label="Connect")
+            button.add_css_class("suggested-action")
+            button.connect("clicked", self._on_wifi_connect, network)
+            actions.append(button)
+        if network.saved:
+            forget = Gtk.Button.new_from_icon_name("user-trash-symbolic")
+            forget.add_css_class("flat")
+            self._set_accessible_label(forget, f"Forget {network.name}")
+            forget.connect("clicked", self._confirm_forget_wifi, network)
+            actions.append(forget)
+        row.append(actions)
+        return row
+
+    def _on_wifi_connect(self, _button: Gtk.Button, network: settings_connectivity.WifiNetwork):
+        if network.saved or network.security in {"open", "owe"}:
+            self._wifi_controller.connect_network(network.token)
+            return
+        dialog = Adw.AlertDialog.new(
+            f"Join {network.name}?",
+            "Enter the network password. Zeus passes it directly to NetworkManager "
+            "and does not log or store its own copy.",
+        )
+        entry = Gtk.PasswordEntry()
+        entry.set_show_peek_icon(True)
+        entry.set_max_length(64)
+        entry.set_input_purpose(Gtk.InputPurpose.PASSWORD)
+        self._set_accessible_label(entry, f"Password for {network.name}")
+        dialog.set_extra_child(entry)
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("connect", "Connect")
+        dialog.set_response_appearance("connect", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("connect")
+        dialog.set_close_response("cancel")
+        dialog.connect("response", self._on_wifi_password_response, entry, network.token)
+        dialog.present(self)
+
+    def _on_wifi_password_response(self, _dialog, response: str, entry, token: str):
+        if response != "connect" or self._closed:
+            entry.set_text("")
+            return
+        password = entry.get_text()
+        entry.set_text("")
+        self._wifi_controller.connect_network(token, password)
+        password = None
+
+    def _confirm_forget_wifi(self, _button, network: settings_connectivity.WifiNetwork):
+        dialog = Adw.AlertDialog.new(
+            f"Forget {network.name}?",
+            "Its saved NetworkManager connection and password will be removed from this computer.",
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("forget", "Forget")
+        dialog.set_response_appearance("forget", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+        dialog.connect(
+            "response",
+            lambda _dialog, response: self._wifi_controller.forget(network.token)
+            if response == "forget" and not self._closed
+            else None,
+        )
+        dialog.present(self)
+
+    def _show_hotspot_dialog(self, _button):
+        dialog = Adw.AlertDialog.new(
+            "Start a Wi-Fi hotspot?",
+            "Devices nearby will see this network. NetworkManager owns the saved "
+            "hotspot connection.",
+        )
+        fields = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        name = Gtk.Entry()
+        name.set_text("Zeus Hotspot")
+        name.set_max_length(32)
+        self._set_accessible_label(name, "Hotspot name")
+        password = Gtk.PasswordEntry()
+        password.set_show_peek_icon(True)
+        password.set_max_length(64)
+        self._set_accessible_label(password, "Hotspot password")
+        fields.append(name)
+        fields.append(password)
+        dialog.set_extra_child(fields)
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("start", "Start hotspot")
+        dialog.set_response_appearance("start", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("start")
+        dialog.set_close_response("cancel")
+        dialog.connect("response", self._on_hotspot_response, name, password)
+        dialog.present(self)
+
+    def _on_hotspot_response(self, _dialog, response: str, name, password):
+        if response != "start" or self._closed:
+            password.set_text("")
+            return
+        secret = password.get_text()
+        password.set_text("")
+        self._wifi_controller.start_hotspot(name.get_text(), secret)
+        secret = None
+
+    def _build_bluetooth_page(self, item: settings_model.Destination) -> Gtk.Widget:
+        page = self._detail_page_intro(item)
+        toolbar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        toolbar.add_css_class("page-toolbar")
+        self._bluetooth_status = _label("Loading Bluetooth…", "detail-copy", wrap=True)
+        self._bluetooth_status.set_hexpand(True)
+        toolbar.append(self._bluetooth_status)
+        self._bluetooth_switch = Gtk.Switch()
+        self._bluetooth_switch.set_valign(Gtk.Align.CENTER)
+        self._set_accessible_label(self._bluetooth_switch, "Turn Bluetooth on or off")
+        self._bluetooth_switch.connect("notify::active", self._on_bluetooth_switch_changed)
+        toolbar.append(self._bluetooth_switch)
+        page.append(toolbar)
+        self._bluetooth_devices = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self._bluetooth_devices.add_css_class("page-toolbar")
+        page.append(self._bluetooth_devices)
+        return page
+
+    def _on_bluetooth_switch_changed(self, switch: Gtk.Switch, _parameter):
+        if not self._bluetooth_rendering and self._bluetooth_controller is not None:
+            self._bluetooth_controller.set_powered(switch.get_active())
+
+    def _render_bluetooth(self):
+        if self._closed or not hasattr(self, "_bluetooth_devices"):
+            return
+        state = self._bluetooth_controller.snapshot() if self._bluetooth_controller else None
+        if state is None:
+            return
+        self._bluetooth_rendering = True
+        self._bluetooth_switch.set_sensitive(state.available)
+        self._bluetooth_switch.set_active(state.powered)
+        self._bluetooth_rendering = False
+        if not state.available:
+            self._bluetooth_status.set_text("No Bluetooth adapter was detected on this computer.")
+        elif not state.powered:
+            self._bluetooth_status.set_text("Bluetooth is off")
+        elif state.scanning:
+            self._bluetooth_status.set_text("Looking for nearby devices…")
+        else:
+            self._bluetooth_status.set_text("Nearby and saved devices")
+        self._clear_box(self._bluetooth_devices)
+        if not state.devices:
+            self._bluetooth_devices.append(
+                _label(
+                    "No Bluetooth devices are visible right now.",
+                    "detail-card-copy",
+                    wrap=True,
+                )
+            )
+            return
+        for device in state.devices:
+            self._bluetooth_devices.append(self._bluetooth_device_row(device))
+
+    def _bluetooth_device_row(self, device: settings_connectivity.BluetoothDevice) -> Gtk.Widget:
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        row.add_css_class("setting-row")
+        copy = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        copy.set_hexpand(True)
+        copy.append(_label(device.name, "setting-row-title"))
+        status = (
+            "Connected"
+            if device.connected
+            else "Paired"
+            if device.paired
+            else "Ready to pair"
+        )
+        if device.trusted:
+            status += " · Trusted"
+        copy.append(_label(status, "setting-row-copy", wrap=True))
+        row.append(copy)
+        actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        actions.add_css_class("setting-row-actions")
+        if device.connected:
+            action = Gtk.Button(label="Disconnect")
+            action.connect(
+                "clicked",
+                lambda _button: self._bluetooth_controller.disconnect_device(device.token),
+            )
+        elif device.paired:
+            action = Gtk.Button(label="Connect")
+            action.add_css_class("suggested-action")
+            action.connect(
+                "clicked", lambda _button: self._bluetooth_controller.connect_device(device.token)
+            )
+        else:
+            action = Gtk.Button(label="Pair")
+            action.add_css_class("suggested-action")
+            action.connect(
+                "clicked", lambda _button: self._bluetooth_controller.pair(device.token)
+            )
+        actions.append(action)
+        if device.paired:
+            trust = Gtk.Button(label="Untrust" if device.trusted else "Trust")
+            trust.add_css_class("flat")
+            trust.connect(
+                "clicked",
+                lambda _button: self._bluetooth_controller.set_trusted(
+                    device.token, not device.trusted
+                ),
+            )
+            actions.append(trust)
+            remove = Gtk.Button.new_from_icon_name("user-trash-symbolic")
+            remove.add_css_class("flat")
+            self._set_accessible_label(remove, f"Remove {device.name}")
+            remove.connect("clicked", self._confirm_remove_bluetooth, device)
+            actions.append(remove)
+        row.append(actions)
+        return row
+
+    def _confirm_remove_bluetooth(self, _button, device: settings_connectivity.BluetoothDevice):
+        dialog = Adw.AlertDialog.new(
+            f"Remove {device.name}?",
+            "The BlueZ pairing will be removed from this computer.",
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("remove", "Remove")
+        dialog.set_response_appearance("remove", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+        dialog.connect(
+            "response",
+            lambda _dialog, response: self._bluetooth_controller.remove(device.token)
+            if response == "remove" and not self._closed
+            else None,
+        )
+        dialog.present(self)
 
     def _build_advanced_page(self) -> Gtk.Widget:
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -723,7 +1135,9 @@ class SettingsWindow(Adw.ApplicationWindow):
         compatibility.append(_label("Fedora compatibility", "detail-card-title"))
         compatibility.append(
             _label(
-                "Use the stock control center only for an uncommon control that Zeus Settings does not cover yet. It remains installed for recovery and does not replace Zeus defaults.",
+                "Use the stock control center only for an uncommon control that Zeus "
+                "Settings does not cover yet. It remains installed for recovery and "
+                "does not replace Zeus defaults.",
                 "detail-card-copy",
                 wrap=True,
                 max_width_chars=72,
@@ -1480,6 +1894,10 @@ class SettingsWindow(Adw.ApplicationWindow):
 
     def shutdown(self):
         self._closed = True
+        for controller_name in ("_wifi_controller", "_bluetooth_controller"):
+            controller = getattr(self, controller_name, None)
+            if controller is not None:
+                controller.close()
         cancellable = getattr(self, "_developer_cancellable", None)
         cancel = getattr(cancellable, "cancel", None)
         if callable(cancel):

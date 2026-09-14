@@ -64,8 +64,8 @@ jobs:
         run: python3 -m py_compile zeus/assets/welcome.py scripts/build-greeter-theme.py scripts/measure-*.py scripts/validate-*.py
       - name: Verify native laptop Settings
         run: |
-          python3 -m unittest discover -s tests -p test_settings_window.py -v
-          python3 -m py_compile desktop/rootfs/usr/libexec/zeus-settings-window
+          python3 -m unittest discover -s tests -p 'test_settings*.py' -v
+          python3 -m py_compile desktop/rootfs/usr/lib/zeus/settings_connectivity.py desktop/rootfs/usr/libexec/zeus-settings-window
       - name: Verify Bluetooth audio readiness checks
         run: |
           python3 -m unittest discover -s tests -p test_bluetooth_audio.py -v
