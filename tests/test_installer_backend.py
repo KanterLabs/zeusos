@@ -1034,8 +1034,8 @@ class ArtifactPinTests(unittest.TestCase):
             signature,
             ROOT / "installer" / "zeus_installer" / "data" / "update-allowed-signers",
         )
-        self.assertEqual(manifest["build_id"], "git-2745be08e255")
-        self.assertEqual(artifacts.validate_release(manifest)["sequence"], 1789259329)
+        self.assertEqual(manifest["build_id"], "git-7cd5ed6714d4")
+        self.assertEqual(artifacts.validate_release(manifest)["sequence"], 1789267599)
 
     def test_signed_homelab_candidate_can_be_verified_with_bundled_policy(self) -> None:
         candidate = ROOT / "updates" / "candidates" / "update-git-89de745be436.json"
