@@ -44,7 +44,9 @@ class AirPodsConnectionUiTests(unittest.TestCase):
 
     def test_only_paired_named_airpods_connection_transition_notifies(self):
         self.assertIn("next.paired && isAirPodsName(next.name)", self.monitor)
-        self.assertIn("!previous.connected && next.connected", self.monitor)
+        self.assertIn("!next.notifiedConnected", self.monitor)
+        self.assertIn("next.notifiedConnected = true", self.monitor)
+        self.assertIn("next.notifiedConnected = false", self.monitor)
         self.assertIn("previous.connected && !next.connected", self.monitor)
         self.assertIn("_recordDevice(path, properties, false)", self.monitor)
         self.assertIn("/\\bairpods?\\b/i", self.source)

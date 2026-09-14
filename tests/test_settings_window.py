@@ -340,9 +340,9 @@ class SettingsLaunchTests(unittest.TestCase):
         self.assertIn("self._split_view.set_collapsed(True)", source)
         self.assertIn('Adw.BreakpointCondition.parse("min-width: 900px")', source)
         self.assertIn('breakpoint.add_setter(self._split_view, "collapsed", False)', source)
-        self.assertIn("def show_page(self, page: str)", source)
+        self.assertIn("def show_page(self, page: str, *, add_history: bool = True)", source)
         self.assertIn("Gio.ApplicationFlags.HANDLES_COMMAND_LINE", source)
-        self.assertIn('advanced = Gtk.Button(label="Advanced")', source)
+        self.assertIn('self._advanced_button = Gtk.Button(label="Advanced")', source)
         self.assertIn(
             'open_compatibility = Gtk.Button(label="Open Fedora compatibility settings")',
             source,
@@ -355,6 +355,24 @@ class SettingsLaunchTests(unittest.TestCase):
         self.assertNotIn("shell=True", source)
         self.assertNotIn("timeout_add", source)
         self.assertNotIn("Gio.Settings", source)
+
+    def test_navigation_compact_layout_and_accessibility_contracts(self):
+        source = SOURCE.read_text(encoding="utf-8")
+        for contract in (
+            'button.add_css_class("selected")',
+            "_set_accessible_selected(button, is_selected)",
+            "GLib.idle_add(self._focus_page_heading, selected)",
+            'self._advanced_button.set_visible(collapsed and self._page != "advanced")',
+            "grid = Adw.WrapBox()",
+            "actions = Adw.WrapBox()",
+            "Pango.EllipsizeMode.END",
+            'f"Connect to {network.name}"',
+            'f"Pair with {device.name}"',
+            'f"Disconnect from {device.name}"',
+        ):
+            self.assertIn(contract, source)
+        self.assertIn("Compatibility-backed for now", source)
+        self.assertNotIn('card.append(_label("Zeus-native page"', source)
 
     def test_window_has_developer_provenance_card_and_fixed_actions(self):
         source = SOURCE.read_text(encoding="utf-8")

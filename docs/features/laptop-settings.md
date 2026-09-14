@@ -20,10 +20,12 @@ Disconnect and Refresh actions; see [Built-in Tailscale](tailscale.md).
 Wi-Fi and Bluetooth now use event-driven Zeus pages backed directly by
 NetworkManager and BlueZ. They cover radio state, scanning, saved and available
 Wi-Fi networks, connection and removal, supported hotspots, and normal Bluetooth
-pair/connect/trust/remove flows. Bluetooth discovery runs only while its page is
-open. Display, power, sound and appearance keep their explicit compatibility
-actions during the next migration slices. Temp and Updates open their existing
-Zeus apps.
+pair/connect/trust/remove flows. Zeus registers a bounded BlueZ `Agent1` while
+the window is open, so passkeys and confirmation stay in Zeus dialogs. Bluetooth
+discovery runs only while its page is open and only devices belonging to the
+selected adapter are shown. Display, power, sound and appearance are labeled
+honestly as compatibility-backed during the next migration slices. Temp and
+Updates open their existing Zeus apps.
 
 The existing AirPods connection card deep-links to this Bluetooth page. Optional
 AirPods battery/noise controls remain in ZOS-71, and the authenticated QR action
@@ -35,7 +37,10 @@ NetworkManager in memory, and are not placed in logs, shell commands, process
 arguments, screenshots, the clipboard, or Zeus-owned storage. NetworkManager
 continues to own its normal saved-connection and secret policy. Enterprise and
 legacy authentication use the explicit compatibility action until their native
-flows are qualified.
+flows are qualified. WPA3-Personal uses NetworkManager's SAE key management,
+and hotspot connections are volatile so repeated starts do not accumulate saved
+profiles. Loading, backend failure, missing-radio, radio-off and in-progress
+states have distinct copy; repeated operations are guarded until completion.
 
 GNOME supplies physical screen brightness in the top-right system menu on
 supported hardware, as described in its

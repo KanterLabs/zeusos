@@ -463,6 +463,7 @@ class BluezAirPodsMonitor {
             paired: false,
             connected: false,
             name: '',
+            notifiedConnected: false,
         };
         const next = {...previous};
         if (dictionaryHas(properties, 'Paired'))
@@ -473,16 +474,32 @@ class BluezAirPodsMonitor {
             next.name = safeDeviceName(dictionaryGet(properties, 'Alias'));
         else if (dictionaryHas(properties, 'Name'))
             next.name = safeDeviceName(dictionaryGet(properties, 'Name'));
-        this._devices.set(path, next);
 
-        if (!notify)
+        if (!next.connected)
+            next.notifiedConnected = false;
+        else if (!notify)
+            // Baseline devices were already connected before the extension
+            // started and must not become a delayed connection notification.
+            next.notifiedConnected = true;
+
+        if (!notify) {
+            this._devices.set(path, next);
             return;
+        }
         if (previous.connected && !next.connected) {
+            this._devices.set(path, next);
             this._onDisconnected(path);
             return;
         }
-        if (!previous.connected && next.connected && next.paired && isAirPodsName(next.name))
+        // BlueZ may publish Connected, Paired, and Alias in separate property
+        // signals. Notify once when the complete qualifying state is first
+        // observed, regardless of which property arrived last.
+        if (next.connected && next.paired && isAirPodsName(next.name) &&
+            !next.notifiedConnected) {
+            next.notifiedConnected = true;
             this._onConnected(next.name, path);
+        }
+        this._devices.set(path, next);
     }
 
     _nameOwnerChanged(parameters) {

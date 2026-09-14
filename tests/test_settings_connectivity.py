@@ -101,14 +101,21 @@ class FakeDevice:
     def get_capabilities(self):
         return _Capabilities.AP
 
+    def get_active_connection(self):
+        return None
+
 
 class FakeClient:
-    def __init__(self, connections):
+    def __init__(self, connections, devices=()):
         self._connections = connections
+        self._devices = devices
         self.props = types.SimpleNamespace(wireless_enabled=True)
 
     def get_connections(self):
         return self._connections
+
+    def get_devices(self):
+        return self._devices
 
 
 class FakeVariant:
@@ -126,6 +133,31 @@ class FakeBluezProxy:
     def get_cached_property(self, name):
         value = self._properties.get(name)
         return None if value is None else FakeVariant(value)
+
+
+class FakeBluezObject:
+    def __init__(self, path, *, adapter=None, device=None):
+        self._path = path
+        self._adapter = adapter
+        self._device = device
+
+    def get_object_path(self):
+        return self._path
+
+    def get_interface(self, name):
+        if name == CONNECTIVITY.BLUEZ_ADAPTER:
+            return self._adapter
+        if name == CONNECTIVITY.BLUEZ_DEVICE:
+            return self._device
+        return None
+
+
+class FakeBluezManager:
+    def __init__(self, objects):
+        self._objects = objects
+
+    def get_objects(self):
+        return self._objects
 
 
 class SettingsConnectivityTests(unittest.TestCase):
@@ -183,6 +215,45 @@ class SettingsConnectivityTests(unittest.TestCase):
         self.assertFalse(state.networks[2].visible)
         self.assertTrue(state.networks[2].saved)
 
+    def test_active_bssid_wins_even_when_stronger_duplicate_arrives_later(self):
+        active = FakeAccessPoint("/active", b"Zeus", 24, rsn=_Flags.KEY_MGMT_PSK)
+        stronger = FakeAccessPoint("/stronger", b"Zeus", 90, rsn=_Flags.KEY_MGMT_PSK)
+        controller = CONNECTIVITY.WifiController(lambda: None, lambda _message: None)
+        controller._client = FakeClient([])
+        controller._device = FakeDevice([active, stronger], active=active)
+
+        state = controller.snapshot()
+
+        self.assertEqual(len(state.networks), 1)
+        self.assertEqual(state.networks[0].token, "/active")
+        self.assertTrue(state.networks[0].active)
+        self.assertEqual(state.networks[0].strength, 24)
+        self.assertEqual(set(controller._access_points), {"/active"})
+
+    def test_wifi_off_hides_stale_networks_and_wpa3_is_distinct(self):
+        sae = FakeAccessPoint("/sae", b"Zeus WPA3", 75, rsn=_Flags.KEY_MGMT_SAE)
+        controller = CONNECTIVITY.WifiController(lambda: None, lambda _message: None)
+        client = FakeClient([])
+        client.props.wireless_enabled = False
+        controller._client = client
+        controller._device = FakeDevice([sae])
+
+        state = controller.snapshot()
+
+        self.assertTrue(state.available)
+        self.assertFalse(state.enabled)
+        self.assertEqual(state.networks, ())
+        self.assertEqual(controller._security(sae), "sae")
+
+    def test_loaded_network_manager_without_radio_is_unavailable(self):
+        controller = CONNECTIVITY.WifiController(lambda: None, lambda _message: None)
+        controller._client = FakeClient([])
+        controller._status = "ready"
+
+        controller._select_device()
+
+        self.assertEqual(controller.snapshot().status, "unavailable")
+
     def test_bluez_snapshot_is_bounded_and_disconnect_stops_page_scan(self):
         controller = CONNECTIVITY.BluetoothController(lambda: None, lambda _message: None)
         controller._adapter = FakeBluezProxy(Powered=True)
@@ -206,6 +277,83 @@ class SettingsConnectivityTests(unittest.TestCase):
         self.assertFalse(controller._page_active)
         controller._stop_discovery.assert_called_once_with()
 
+    def test_bluez_off_hides_unsaved_cached_devices(self):
+        controller = CONNECTIVITY.BluetoothController(lambda: None, lambda _message: None)
+        controller._adapter = FakeBluezProxy(Powered=False)
+        controller._devices = {
+            "/device/saved": FakeBluezProxy(Alias="Saved", Paired=True),
+            "/device/stale": FakeBluezProxy(Alias="Stale", Paired=False, RSSI=-50),
+        }
+
+        state = controller.snapshot()
+
+        self.assertFalse(state.powered)
+        self.assertEqual([device.name for device in state.devices], ["Saved"])
+
+    def test_bluez_uses_one_deterministic_adapter_and_its_devices_only(self):
+        hci0 = FakeBluezProxy(Powered=True)
+        hci1 = FakeBluezProxy(Powered=True)
+        own = FakeBluezProxy(Alias="Own", Paired=True)
+        other = FakeBluezProxy(Alias="Other", Paired=True)
+        controller = CONNECTIVITY.BluetoothController(lambda: None, lambda _message: None)
+        controller._manager = FakeBluezManager(
+            [
+                FakeBluezObject("/org/bluez/hci1", adapter=hci1),
+                FakeBluezObject("/org/bluez/hci1/dev_OTHER", device=other),
+                FakeBluezObject("/org/bluez/hci0/dev_OWN", device=own),
+                FakeBluezObject("/org/bluez/hci0", adapter=hci0),
+            ]
+        )
+
+        controller._refresh_objects()
+
+        self.assertIs(controller._adapter, hci0)
+        self.assertEqual(controller._adapter_path, "/org/bluez/hci0")
+        self.assertEqual(set(controller._devices), {"/org/bluez/hci0/dev_OWN"})
+
+    def test_pending_device_call_is_not_repeated(self):
+        changed = Mock()
+        controller = CONNECTIVITY.BluetoothController(changed, lambda _message: None)
+        controller._adapter = FakeBluezProxy(Powered=True)
+        proxy = FakeBluezProxy(Alias="AirPods", Paired=False, RSSI=-40)
+        proxy.call = Mock()
+        controller._devices = {"/device/1": proxy}
+        controller._agent_ready = True
+
+        controller.pair("/device/1")
+        controller.pair("/device/1")
+
+        proxy.call.assert_called_once()
+        self.assertEqual(controller._pending, "pair:/device/1")
+
+    def test_pairing_confirmation_waits_for_zeus_answer(self):
+        requests = []
+        controller = CONNECTIVITY.BluetoothController(
+            lambda: None,
+            lambda _message: None,
+            lambda prompt, respond: requests.append((prompt, respond)),
+        )
+        controller._devices = {
+            "/device/1": FakeBluezProxy(Alias="Keyboard", Paired=False)
+        }
+        invocation = Mock()
+
+        controller._on_agent_method_call(
+            None,
+            None,
+            None,
+            CONNECTIVITY.BLUEZ_AGENT,
+            "RequestConfirmation",
+            FakeVariant(("/device/1", 1234)),
+            invocation,
+        )
+
+        self.assertEqual(requests[0][0].name, "Keyboard")
+        self.assertEqual(requests[0][0].code, "001234")
+        invocation.return_value.assert_not_called()
+        requests[0][1](True)
+        invocation.return_value.assert_called_once()
+
     def test_source_uses_native_event_driven_backends_and_no_cli_secrets(self):
         source = MODULE_PATH.read_text(encoding="utf-8")
         window = WINDOW_PATH.read_text(encoding="utf-8")
@@ -221,6 +369,9 @@ class SettingsConnectivityTests(unittest.TestCase):
             '"Connect"',
             '"Disconnect"',
             '"RemoveDevice"',
+            '"RegisterAgent"',
+            '"sae": "sae"',
+            'GLib.Variant("s", "volatile")',
         ):
             self.assertIn(contract, source)
         self.assertNotIn("subprocess", source)
@@ -228,6 +379,8 @@ class SettingsConnectivityTests(unittest.TestCase):
         self.assertNotIn("bluetoothctl", source)
         self.assertIn("Gtk.PasswordEntry()", window)
         self.assertIn('entry.set_text("")', window)
+        self.assertIn('dialog.set_response_enabled("connect", False)', window)
+        self.assertIn('dialog.set_response_enabled("start", False)', window)
         self.assertIn("self._bluetooth_controller.leave()", window)
 
 

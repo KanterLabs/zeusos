@@ -328,6 +328,18 @@ CSS = """
   margin-right: 10px;
 }
 
+.sidebar-button.selected {
+  background: alpha(@accent_bg_color, 0.24);
+  box-shadow: inset 3px 0 @accent_color;
+  color: @accent_color;
+  font-weight: 740;
+}
+
+.sidebar-button.selected image,
+.sidebar-button.selected label {
+  color: @accent_color;
+}
+
 .setting-row {
   background: @card_bg_color;
   border: 1px solid alpha(@window_fg_color, 0.10);
@@ -382,6 +394,18 @@ def _label(
     return label
 
 
+def _row_title(text: str) -> Gtk.Label:
+    """Return a title that yields space instead of widening compact pages."""
+
+    label = _label(text, "setting-row-title")
+    label.set_hexpand(True)
+    label.set_width_chars(1)
+    label.set_max_width_chars(42)
+    label.set_ellipsize(Pango.EllipsizeMode.END)
+    label.set_tooltip_text(text)
+    return label
+
+
 def _safe_hardware_snapshot() -> settings_model.HardwareState:
     """Return an honest unknown state if sysfs cannot be read at startup."""
 
@@ -419,6 +443,9 @@ class SettingsWindow(Adw.ApplicationWindow):
         self._bluetooth_controller = None
         self._wifi_rendering = False
         self._bluetooth_rendering = False
+        self._sidebar_buttons: dict[str, Gtk.Button] = {}
+        self._page_headings: dict[str, Gtk.Widget] = {}
+        self._page_history: list[str] = []
         self._page = settings_model.DEFAULT_PAGE
         self._requested_page = settings_model.normalize_page(requested_page)
 
@@ -428,7 +455,9 @@ class SettingsWindow(Adw.ApplicationWindow):
             self._render_wifi, self._show_toast
         )
         self._bluetooth_controller = settings_connectivity.BluetoothController(
-            self._render_bluetooth, self._show_toast
+            self._render_bluetooth,
+            self._show_toast,
+            self._show_bluetooth_pairing_prompt,
         )
         self._wifi_controller.start()
         self._bluetooth_controller.start()
@@ -468,6 +497,37 @@ class SettingsWindow(Adw.ApplicationWindow):
         except (AttributeError, RuntimeError):
             pass
 
+    @staticmethod
+    def _set_accessible_role(widget: Gtk.Widget, role_name: str):
+        role = getattr(getattr(Gtk, "AccessibleRole", None), role_name, None)
+        setter = getattr(widget, "set_accessible_role", None)
+        if role is not None and callable(setter):
+            try:
+                setter(role)
+            except (AttributeError, RuntimeError, TypeError, ValueError):
+                pass
+
+    @staticmethod
+    def _set_accessible_selected(widget: Gtk.Widget, selected: bool):
+        state = getattr(getattr(Gtk, "AccessibleState", None), "SELECTED", None)
+        update = getattr(widget, "update_state", None)
+        if state is not None and callable(update):
+            try:
+                tristate = getattr(Gtk, "AccessibleTristate", None)
+                value = (
+                    int(tristate.TRUE if selected else tristate.FALSE)
+                ) if tristate is not None else bool(selected)
+                update([state], [value])
+            except (AttributeError, RuntimeError, TypeError, ValueError):
+                pass
+
+    def _page_heading(self, page: str, text: str, css_class: str) -> Gtk.Label:
+        label = _label(text, css_class)
+        label.set_focusable(True)
+        self._set_accessible_role(label, "HEADING")
+        self._page_headings[page] = label
+        return label
+
     def _build_window(self):
         toolbar = Adw.ToolbarView()
         header = Adw.HeaderBar()
@@ -483,12 +543,12 @@ class SettingsWindow(Adw.ApplicationWindow):
         self._back_button.set_tooltip_text("Back to Settings")
         self._back_button.connect("clicked", self._on_back_clicked)
         header.pack_start(self._back_button)
-        advanced = Gtk.Button(label="Advanced")
-        advanced.add_css_class("flat")
-        self._set_accessible_label(advanced, "Open advanced Zeus settings")
-        advanced.set_tooltip_text("Advanced Zeus settings and compatibility tools")
-        advanced.connect("clicked", lambda _button: self.show_page("advanced"))
-        header.pack_end(advanced)
+        self._advanced_button = Gtk.Button(label="Advanced")
+        self._advanced_button.add_css_class("flat")
+        self._set_accessible_label(self._advanced_button, "Open advanced Zeus settings")
+        self._advanced_button.set_tooltip_text("Advanced Zeus settings and compatibility tools")
+        self._advanced_button.connect("clicked", lambda _button: self.show_page("advanced"))
+        header.pack_end(self._advanced_button)
         toolbar.add_top_bar(header)
 
         self._toast_overlay = Adw.ToastOverlay()
@@ -572,17 +632,28 @@ class SettingsWindow(Adw.ApplicationWindow):
         row.append(text)
         button.set_child(row)
         button.connect("clicked", lambda _button: self.show_page(page))
+        self._sidebar_buttons[page] = button
         return button
 
-    def show_page(self, page: str):
+    def show_page(self, page: str, *, add_history: bool = True):
         """Navigate to one allowlisted Zeus page and update window identity."""
 
         if self._closed:
             return
         previous = self._page
         selected = settings_model.normalize_page(page)
+        if add_history and selected != previous:
+            self._page_history.append(previous)
+            self._page_history = self._page_history[-16:]
         self._page = selected
         self._stack.set_visible_child_name(selected)
+        for key, button in self._sidebar_buttons.items():
+            is_selected = key == selected
+            if is_selected:
+                button.add_css_class("selected")
+            else:
+                button.remove_css_class("selected")
+            self._set_accessible_selected(button, is_selected)
         self._sync_sidebar_visibility()
         self._back_button.set_visible(selected != settings_model.DEFAULT_PAGE)
         item = settings_model.destination(selected)
@@ -591,8 +662,19 @@ class SettingsWindow(Adw.ApplicationWindow):
             "advanced": "Advanced",
             "about": "About Zeus OS",
         }.get(selected, "Settings")
+        back_page = self._page_history[-1] if self._page_history else settings_model.DEFAULT_PAGE
+        back_item = settings_model.destination(back_page)
+        back_title = back_item.title if back_item is not None else {
+            "home": "Settings",
+            "advanced": "Advanced",
+            "about": "About Zeus OS",
+        }.get(back_page, "Settings")
+        self._set_accessible_label(self._back_button, f"Back to {back_title}")
+        self._back_button.set_tooltip_text(f"Back to {back_title}")
         self._header_title.set_text(title)
         self.set_title(f"{title} — Zeus Settings" if selected != "home" else "Zeus Settings")
+        if selected != previous:
+            GLib.idle_add(self._focus_page_heading, selected)
         if self._wifi_controller is not None:
             if previous == "network" and selected != "network":
                 self._wifi_controller.leave()
@@ -605,16 +687,24 @@ class SettingsWindow(Adw.ApplicationWindow):
                 self._bluetooth_controller.enter()
 
     def _on_back_clicked(self, _button: Gtk.Button):
-        self.show_page(settings_model.DEFAULT_PAGE)
+        target = self._page_history.pop() if self._page_history else settings_model.DEFAULT_PAGE
+        self.show_page(target, add_history=False)
+
+    def _focus_page_heading(self, page: str):
+        if self._closed or self._page != page:
+            return GLib.SOURCE_REMOVE
+        heading = self._page_headings.get(page)
+        if heading is not None:
+            heading.grab_focus()
+        return GLib.SOURCE_REMOVE
 
     def _on_split_collapsed_changed(self, _split_view, _parameter):
         self._sync_sidebar_visibility()
 
     def _sync_sidebar_visibility(self):
-        self._split_view.set_show_sidebar(
-            not self._split_view.get_collapsed()
-            or self._page == settings_model.DEFAULT_PAGE
-        )
+        collapsed = self._split_view.get_collapsed()
+        self._split_view.set_show_sidebar(not collapsed or self._page == settings_model.DEFAULT_PAGE)
+        self._advanced_button.set_visible(collapsed and self._page != "advanced")
 
     def _build_content(self) -> Gtk.Widget:
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -622,10 +712,10 @@ class SettingsWindow(Adw.ApplicationWindow):
         hero = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         hero.add_css_class("settings-hero")
         hero.append(_label("ZEUS OS", "eyebrow"))
-        hero.append(_label("Make it yours", "hero-title"))
+        hero.append(self._page_heading("home", "Settings", "hero-title"))
         hero.append(
             _label(
-                "A quiet home for the controls you use every day.",
+                "Make it yours. A quiet home for the controls you use every day.",
                 "hero-copy",
                 wrap=True,
                 max_width_chars=82,
@@ -643,17 +733,18 @@ class SettingsWindow(Adw.ApplicationWindow):
             max_width_chars=82,
         )
         controls.append(self._brightness_label)
-        grid = Gtk.Grid(column_spacing=11, row_spacing=11)
-        grid.set_column_homogeneous(True)
+        grid = Adw.WrapBox()
+        grid.set_child_spacing(11)
+        grid.set_line_spacing(11)
+        grid.set_line_homogeneous(True)
+        grid.set_natural_line_length(620)
         grid.add_css_class("control-grid")
-        for index, item in enumerate(settings_model.PANEL_DESTINATIONS):
-            grid.attach(
-                self._destination_button(item),
-                index % 2,
-                index // 2,
-                1,
-                1,
-            )
+        previous_card = None
+        for item in settings_model.PANEL_DESTINATIONS:
+            card = self._destination_button(item)
+            card.set_size_request(270, -1)
+            grid.insert_child_after(card, previous_card)
+            previous_card = card
         controls.append(grid)
         content.append(controls)
 
@@ -669,11 +760,18 @@ class SettingsWindow(Adw.ApplicationWindow):
                 max_width_chars=82,
             )
         )
-        local_grid = Gtk.Grid(column_spacing=11, row_spacing=11)
-        local_grid.set_column_homogeneous(True)
+        local_grid = Adw.WrapBox()
+        local_grid.set_child_spacing(11)
+        local_grid.set_line_spacing(11)
+        local_grid.set_line_homogeneous(True)
+        local_grid.set_natural_line_length(620)
         local_grid.add_css_class("control-grid")
-        for index, item in enumerate(settings_model.LOCAL_DESTINATIONS):
-            local_grid.attach(self._destination_button(item), index, 0, 1, 1)
+        previous_card = None
+        for item in settings_model.LOCAL_DESTINATIONS:
+            card = self._destination_button(item)
+            card.set_size_request(270, -1)
+            local_grid.insert_child_after(card, previous_card)
+            previous_card = card
         local.append(local_grid)
         content.append(local)
 
@@ -712,7 +810,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         icon.set_halign(Gtk.Align.START)
         icon.add_css_class("detail-icon")
         page.append(icon)
-        page.append(_label(item.title, "detail-title"))
+        page.append(self._page_heading(item.key, item.title, "detail-title"))
         page.append(_label(item.summary, "detail-copy", wrap=True, max_width_chars=76))
 
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -734,12 +832,12 @@ class SettingsWindow(Adw.ApplicationWindow):
             action.connect("clicked", lambda _button, selected=item: self._open_local(selected))
             card.append(action)
         else:
-            card.append(_label("Zeus-native page", "detail-card-title"))
+            card.append(_label("Compatibility-backed for now", "detail-card-title"))
             card.append(
                 _label(
-                    "This destination now stays inside Zeus Settings. Controls are moving "
-                    "here in focused, tested increments; the Fedora panel remains available "
-                    "only as a compatibility tool during that transition.",
+                    "Zeus Settings owns this destination, but these controls are not native "
+                    "yet. The Fedora panel remains available as an explicitly labeled "
+                    "compatibility tool while the Zeus page is built.",
                     "detail-card-copy",
                     wrap=True,
                     max_width_chars=72,
@@ -768,7 +866,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         icon.set_halign(Gtk.Align.START)
         icon.add_css_class("detail-icon")
         page.append(icon)
-        page.append(_label(item.title, "detail-title"))
+        page.append(self._page_heading(item.key, item.title, "detail-title"))
         page.append(_label(item.summary, "detail-copy", wrap=True, max_width_chars=76))
         return page
 
@@ -779,6 +877,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         toolbar.set_hexpand(True)
         self._wifi_status = _label("Loading Wi-Fi…", "detail-copy", wrap=True)
         self._wifi_status.set_hexpand(True)
+        self._set_accessible_role(self._wifi_status, "STATUS")
         toolbar.append(self._wifi_status)
         self._wifi_switch = Gtk.Switch()
         self._wifi_switch.set_valign(Gtk.Align.CENTER)
@@ -789,9 +888,18 @@ class SettingsWindow(Adw.ApplicationWindow):
 
         actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         actions.add_css_class("page-toolbar")
-        refresh = Gtk.Button(label="Scan again")
-        refresh.connect("clicked", lambda _button: self._wifi_controller.request_scan())
-        actions.append(refresh)
+        self._wifi_refresh_button = Gtk.Button(label="Scan again")
+        self._set_accessible_label(self._wifi_refresh_button, "Scan for Wi-Fi networks again")
+        self._wifi_refresh_button.connect(
+            "clicked", lambda _button: self._wifi_controller.request_scan()
+        )
+        actions.append(self._wifi_refresh_button)
+        self._wifi_retry_button = Gtk.Button(label="Retry Wi-Fi")
+        self._wifi_retry_button.connect(
+            "clicked", lambda _button: self._wifi_controller.retry()
+        )
+        self._wifi_retry_button.set_visible(False)
+        actions.append(self._wifi_retry_button)
         self._hotspot_button = Gtk.Button(label="Start hotspot")
         self._hotspot_button.connect("clicked", self._show_hotspot_dialog)
         actions.append(self._hotspot_button)
@@ -821,13 +929,36 @@ class SettingsWindow(Adw.ApplicationWindow):
         if state is None:
             return
         self._wifi_rendering = True
-        self._wifi_switch.set_sensitive(state.available)
+        busy = state.pending is not None
+        self._wifi_busy = busy
+        ready = state.status == "ready" and state.available
+        self._wifi_switch.set_sensitive(ready and not busy)
         self._wifi_switch.set_active(state.enabled)
         self._wifi_rendering = False
         self._hotspot_button.set_sensitive(
-            state.available and state.enabled and state.hotspot_supported
+            ready and state.enabled and state.hotspot_supported and not busy
         )
-        if not state.available:
+        self._hotspot_button.set_label("Stop hotspot" if state.hotspot_active else "Start hotspot")
+        self._set_accessible_label(
+            self._hotspot_button,
+            "Stop the Wi-Fi hotspot" if state.hotspot_active else "Start a Wi-Fi hotspot",
+        )
+        self._wifi_refresh_button.set_sensitive(
+            ready and state.enabled and not state.scanning and not busy
+        )
+        self._wifi_retry_button.set_visible(state.status in {"error", "unavailable"})
+        self._wifi_retry_button.set_sensitive(not busy)
+        if state.pending == "hotspot-start":
+            self._wifi_status.set_text("Starting hotspot…")
+        elif state.pending == "hotspot-stop":
+            self._wifi_status.set_text("Stopping hotspot…")
+        elif state.pending:
+            self._wifi_status.set_text("Finishing Wi-Fi change…")
+        elif state.status == "loading":
+            self._wifi_status.set_text("Loading Wi-Fi…")
+        elif state.status == "error":
+            self._wifi_status.set_text("Wi-Fi controls could not be loaded. Retry when ready.")
+        elif not state.available:
             self._wifi_status.set_text(
                 "No Wi-Fi adapter was detected. Ethernet and saved system networking "
                 "remain available."
@@ -839,7 +970,9 @@ class SettingsWindow(Adw.ApplicationWindow):
         else:
             self._wifi_status.set_text("Available networks")
         self._clear_box(self._wifi_networks)
-        if not state.networks:
+        if not ready or not state.enabled:
+            return
+        if not state.networks and not state.scanning:
             self._wifi_networks.append(
                 _label(
                     "No Wi-Fi networks are visible right now.",
@@ -856,10 +989,11 @@ class SettingsWindow(Adw.ApplicationWindow):
         row.add_css_class("setting-row")
         copy = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         copy.set_hexpand(True)
-        copy.append(_label(network.name, "setting-row-title"))
+        copy.append(_row_title(network.name))
         security = {
             "open": "Open",
             "personal": "Secured",
+            "sae": "WPA3 secured",
             "owe": "Enhanced open",
             "enterprise": "Enterprise security",
             "legacy": "Legacy security",
@@ -875,15 +1009,20 @@ class SettingsWindow(Adw.ApplicationWindow):
         row.append(copy)
         actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         actions.add_css_class("setting-row-actions")
+        actions.set_sensitive(not getattr(self, "_wifi_busy", False))
         if network.active:
             button = Gtk.Button(label="Disconnect")
+            self._set_accessible_label(button, f"Disconnect from {network.name}")
             button.connect("clicked", lambda _button: self._wifi_controller.disconnect())
             actions.append(button)
             # ZOS-124 plugs its authenticated QR disclosure into this active
             # row. Keep secret retrieval out of this connection controller so
             # there is one audited sharing path rather than a duplicate.
         elif network.security in {"enterprise", "legacy"} and not network.saved:
-            button = Gtk.Button(label="Advanced")
+            button = Gtk.Button(label="Compatibility")
+            self._set_accessible_label(
+                button, f"Open compatibility settings for {network.name}"
+            )
             button.connect(
                 "clicked",
                 lambda _button: self._open_panel(settings_model.destination("network")),
@@ -891,6 +1030,7 @@ class SettingsWindow(Adw.ApplicationWindow):
             actions.append(button)
         else:
             button = Gtk.Button(label="Connect")
+            self._set_accessible_label(button, f"Connect to {network.name}")
             button.add_css_class("suggested-action")
             button.connect("clicked", self._on_wifi_connect, network)
             actions.append(button)
@@ -920,9 +1060,17 @@ class SettingsWindow(Adw.ApplicationWindow):
         dialog.set_extra_child(entry)
         dialog.add_response("cancel", "Cancel")
         dialog.add_response("connect", "Connect")
+        dialog.set_response_enabled("connect", False)
         dialog.set_response_appearance("connect", Adw.ResponseAppearance.SUGGESTED)
         dialog.set_default_response("connect")
         dialog.set_close_response("cancel")
+        entry.connect(
+            "notify::text",
+            lambda current, _parameter: dialog.set_response_enabled(
+                "connect",
+                settings_connectivity.validate_personal_password(current.get_text()),
+            ),
+        )
         dialog.connect("response", self._on_wifi_password_response, entry, network.token)
         dialog.present(self)
 
@@ -954,10 +1102,14 @@ class SettingsWindow(Adw.ApplicationWindow):
         dialog.present(self)
 
     def _show_hotspot_dialog(self, _button):
+        state = self._wifi_controller.snapshot()
+        if state.hotspot_active:
+            self._wifi_controller.stop_hotspot()
+            return
         dialog = Adw.AlertDialog.new(
             "Start a Wi-Fi hotspot?",
-            "Devices nearby will see this network. NetworkManager owns the saved "
-            "hotspot connection.",
+            "Devices nearby will see this network. NetworkManager manages a temporary "
+            "connection and removes it after the hotspot stops.",
         )
         fields = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         name = Gtk.Entry()
@@ -968,14 +1120,33 @@ class SettingsWindow(Adw.ApplicationWindow):
         password.set_show_peek_icon(True)
         password.set_max_length(64)
         self._set_accessible_label(password, "Hotspot password")
+        fields.append(_label("Network name", "detail-card-title"))
         fields.append(name)
+        fields.append(_label("Password", "detail-card-title"))
         fields.append(password)
+        fields.append(
+            _label(
+                "Use 8–63 characters, or exactly 64 hexadecimal characters.",
+                "detail-card-copy",
+                wrap=True,
+            )
+        )
         dialog.set_extra_child(fields)
         dialog.add_response("cancel", "Cancel")
         dialog.add_response("start", "Start hotspot")
+        dialog.set_response_enabled("start", False)
         dialog.set_response_appearance("start", Adw.ResponseAppearance.SUGGESTED)
         dialog.set_default_response("start")
         dialog.set_close_response("cancel")
+        def update_start_response(*_args):
+            dialog.set_response_enabled(
+                "start",
+                bool(name.get_text().strip())
+                and settings_connectivity.validate_personal_password(password.get_text()),
+            )
+
+        name.connect("notify::text", update_start_response)
+        password.connect("notify::text", update_start_response)
         dialog.connect("response", self._on_hotspot_response, name, password)
         dialog.present(self)
 
@@ -994,6 +1165,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         toolbar.add_css_class("page-toolbar")
         self._bluetooth_status = _label("Loading Bluetooth…", "detail-copy", wrap=True)
         self._bluetooth_status.set_hexpand(True)
+        self._set_accessible_role(self._bluetooth_status, "STATUS")
         toolbar.append(self._bluetooth_status)
         self._bluetooth_switch = Gtk.Switch()
         self._bluetooth_switch.set_valign(Gtk.Align.CENTER)
@@ -1001,6 +1173,14 @@ class SettingsWindow(Adw.ApplicationWindow):
         self._bluetooth_switch.connect("notify::active", self._on_bluetooth_switch_changed)
         toolbar.append(self._bluetooth_switch)
         page.append(toolbar)
+        self._bluetooth_retry_button = Gtk.Button(label="Retry Bluetooth")
+        self._bluetooth_retry_button.set_halign(Gtk.Align.START)
+        self._bluetooth_retry_button.add_css_class("page-toolbar")
+        self._bluetooth_retry_button.connect(
+            "clicked", lambda _button: self._bluetooth_controller.retry()
+        )
+        self._bluetooth_retry_button.set_visible(False)
+        page.append(self._bluetooth_retry_button)
         self._bluetooth_devices = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self._bluetooth_devices.add_css_class("page-toolbar")
         page.append(self._bluetooth_devices)
@@ -1017,10 +1197,24 @@ class SettingsWindow(Adw.ApplicationWindow):
         if state is None:
             return
         self._bluetooth_rendering = True
-        self._bluetooth_switch.set_sensitive(state.available)
+        busy = state.pending is not None
+        self._bluetooth_busy = busy
+        ready = state.status == "ready" and state.available
+        self._bluetooth_switch.set_sensitive(ready and not busy)
         self._bluetooth_switch.set_active(state.powered)
         self._bluetooth_rendering = False
-        if not state.available:
+        self._bluetooth_retry_button.set_visible(state.status in {"error", "unavailable"})
+        self._bluetooth_retry_button.set_sensitive(not busy)
+        self._bluetooth_pairing_supported = state.pairing_supported
+        if state.pending:
+            self._bluetooth_status.set_text("Finishing Bluetooth change…")
+        elif state.status == "loading":
+            self._bluetooth_status.set_text("Loading Bluetooth…")
+        elif state.status == "error":
+            self._bluetooth_status.set_text(
+                "Bluetooth controls could not be loaded. Retry when ready."
+            )
+        elif not state.available:
             self._bluetooth_status.set_text("No Bluetooth adapter was detected on this computer.")
         elif not state.powered:
             self._bluetooth_status.set_text("Bluetooth is off")
@@ -1029,7 +1223,9 @@ class SettingsWindow(Adw.ApplicationWindow):
         else:
             self._bluetooth_status.set_text("Nearby and saved devices")
         self._clear_box(self._bluetooth_devices)
-        if not state.devices:
+        if not ready or not state.powered:
+            return
+        if not state.devices and not state.scanning:
             self._bluetooth_devices.append(
                 _label(
                     "No Bluetooth devices are visible right now.",
@@ -1046,7 +1242,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         row.add_css_class("setting-row")
         copy = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         copy.set_hexpand(True)
-        copy.append(_label(device.name, "setting-row-title"))
+        copy.append(_row_title(device.name))
         status = (
             "Connected"
             if device.connected
@@ -1060,20 +1256,25 @@ class SettingsWindow(Adw.ApplicationWindow):
         row.append(copy)
         actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         actions.add_css_class("setting-row-actions")
+        actions.set_sensitive(not getattr(self, "_bluetooth_busy", False))
         if device.connected:
             action = Gtk.Button(label="Disconnect")
+            self._set_accessible_label(action, f"Disconnect from {device.name}")
             action.connect(
                 "clicked",
                 lambda _button: self._bluetooth_controller.disconnect_device(device.token),
             )
         elif device.paired:
             action = Gtk.Button(label="Connect")
+            self._set_accessible_label(action, f"Connect to {device.name}")
             action.add_css_class("suggested-action")
             action.connect(
                 "clicked", lambda _button: self._bluetooth_controller.connect_device(device.token)
             )
         else:
             action = Gtk.Button(label="Pair")
+            self._set_accessible_label(action, f"Pair with {device.name}")
+            action.set_sensitive(getattr(self, "_bluetooth_pairing_supported", False))
             action.add_css_class("suggested-action")
             action.connect(
                 "clicked", lambda _button: self._bluetooth_controller.pair(device.token)
@@ -1082,6 +1283,10 @@ class SettingsWindow(Adw.ApplicationWindow):
         if device.paired:
             trust = Gtk.Button(label="Untrust" if device.trusted else "Trust")
             trust.add_css_class("flat")
+            self._set_accessible_label(
+                trust,
+                f"{'Untrust' if device.trusted else 'Trust'} {device.name}",
+            )
             trust.connect(
                 "clicked",
                 lambda _button: self._bluetooth_controller.set_trusted(
@@ -1096,6 +1301,73 @@ class SettingsWindow(Adw.ApplicationWindow):
             actions.append(remove)
         row.append(actions)
         return row
+
+    def _show_bluetooth_pairing_prompt(self, prompt, respond):
+        if self._closed:
+            respond(None)
+            return
+        if prompt.kind == "display":
+            dialog = Adw.AlertDialog.new(
+                f"Pair with {prompt.name}",
+                f"Enter {prompt.code} on the Bluetooth device, then finish pairing there.",
+            )
+            dialog.add_response("done", "Done")
+            dialog.set_default_response("done")
+            dialog.present(self)
+            respond(True)
+            return
+
+        if prompt.kind in {"confirm", "authorize"}:
+            body = (
+                f"Confirm that {prompt.code} matches the code shown on the device."
+                if prompt.kind == "confirm"
+                else "Allow this saved Bluetooth device to connect to Zeus OS?"
+            )
+            dialog = Adw.AlertDialog.new(f"Pair with {prompt.name}?", body)
+            dialog.add_response("cancel", "Cancel")
+            dialog.add_response("allow", "Pair")
+            dialog.set_response_appearance("allow", Adw.ResponseAppearance.SUGGESTED)
+            dialog.set_default_response("allow")
+            dialog.set_close_response("cancel")
+            dialog.connect(
+                "response",
+                lambda _dialog, response: respond(True if response == "allow" else None),
+            )
+            dialog.present(self)
+            return
+
+        title = "PIN" if prompt.kind == "pin" else "passkey"
+        dialog = Adw.AlertDialog.new(
+            f"Enter the {title} for {prompt.name}",
+            "The code is sent directly to BlueZ and is not saved by Zeus Settings.",
+        )
+        entry = Gtk.Entry()
+        entry.set_max_length(16 if prompt.kind == "pin" else 6)
+        if prompt.kind == "passkey":
+            entry.set_input_purpose(Gtk.InputPurpose.DIGITS)
+        self._set_accessible_label(entry, f"Bluetooth {title} for {prompt.name}")
+        dialog.set_extra_child(entry)
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("submit", "Continue")
+        dialog.set_response_enabled("submit", False)
+        dialog.set_response_appearance("submit", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("submit")
+        dialog.set_close_response("cancel")
+
+        def validate_code(current, _parameter):
+            value = current.get_text()
+            valid = bool(value) if prompt.kind == "pin" else value.isdigit() and len(value) <= 6
+            dialog.set_response_enabled("submit", valid)
+
+        entry.connect("notify::text", validate_code)
+
+        def finish(_dialog, response):
+            value = entry.get_text() if response == "submit" else None
+            entry.set_text("")
+            respond(value)
+
+        dialog.connect("response", finish)
+        dialog.present(self)
 
     def _confirm_remove_bluetooth(self, _button, device: settings_connectivity.BluetoothDevice):
         dialog = Adw.AlertDialog.new(
@@ -1119,7 +1391,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         page.add_css_class("detail-page")
         page.append(_label("ADVANCED", "eyebrow"))
-        page.append(_label("Advanced", "detail-title"))
+        page.append(self._page_heading("advanced", "Advanced", "detail-title"))
         page.append(
             _label(
                 "Developer controls, system identity, and an explicit recovery path.",
@@ -1163,7 +1435,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         page.add_css_class("detail-page")
         page.append(_label("ZEUS OS", "eyebrow"))
-        page.append(_label("About this system", "detail-title"))
+        page.append(self._page_heading("about", "About this system", "detail-title"))
         page.append(
             _label(
                 "A focused laptop desktop built on Fedora and GNOME with signed Zeus updates.",
@@ -1258,13 +1530,19 @@ class SettingsWindow(Adw.ApplicationWindow):
         self._developer_progress_label.set_visible(False)
         card.append(self._developer_progress_label)
 
-        actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=7)
+        actions = Adw.WrapBox()
+        actions.set_child_spacing(7)
+        actions.set_line_spacing(7)
+        actions.set_line_homogeneous(False)
+        actions.set_natural_line_length(620)
         actions.add_css_class("developer-actions")
+        previous_action = None
         self._developer_enable_button = Gtk.Button(label="Enable Developer Mode")
         self._developer_enable_button.set_tooltip_text("Enable Developer Mode after administrator authentication")
         self._set_accessible_label(self._developer_enable_button, "Enable Developer Mode")
         self._developer_enable_button.connect("clicked", self._on_developer_action_clicked, "enable")
-        actions.append(self._developer_enable_button)
+        actions.insert_child_after(self._developer_enable_button, previous_action)
+        previous_action = self._developer_enable_button
 
         self._developer_apply_button = Gtk.Button(label="Apply prepared change")
         self._developer_apply_button.add_css_class("suggested-action")
@@ -1273,26 +1551,29 @@ class SettingsWindow(Adw.ApplicationWindow):
         )
         self._set_accessible_label(self._developer_apply_button, "Apply prepared repository change")
         self._developer_apply_button.connect("clicked", self._on_developer_action_clicked, "apply")
-        actions.append(self._developer_apply_button)
+        actions.insert_child_after(self._developer_apply_button, previous_action)
+        previous_action = self._developer_apply_button
 
         self._developer_undo_button = Gtk.Button(label="Undo last apply")
         self._developer_undo_button.set_tooltip_text("Return to the preceding verified Developer Mode artifact")
         self._set_accessible_label(self._developer_undo_button, "Undo last Developer Mode apply")
         self._developer_undo_button.connect("clicked", self._on_developer_action_clicked, "undo")
-        actions.append(self._developer_undo_button)
+        actions.insert_child_after(self._developer_undo_button, previous_action)
+        previous_action = self._developer_undo_button
 
         self._developer_disable_button = Gtk.Button(label="Turn off Developer Mode")
         self._developer_disable_button.set_tooltip_text("Turn off Developer Mode and leave the base image unchanged")
         self._set_accessible_label(self._developer_disable_button, "Turn off Developer Mode")
         self._developer_disable_button.connect("clicked", self._on_developer_action_clicked, "disable")
-        actions.append(self._developer_disable_button)
+        actions.insert_child_after(self._developer_disable_button, previous_action)
+        previous_action = self._developer_disable_button
 
         self._developer_cancel_button = Gtk.Button(label="Cancel")
         self._developer_cancel_button.set_tooltip_text("Cancel the current request")
         self._set_accessible_label(self._developer_cancel_button, "Cancel Developer Mode request")
         self._developer_cancel_button.connect("clicked", self._on_developer_cancel_clicked)
         self._developer_cancel_button.set_visible(False)
-        actions.append(self._developer_cancel_button)
+        actions.insert_child_after(self._developer_cancel_button, previous_action)
         card.append(actions)
 
         self._render_developer_status()
